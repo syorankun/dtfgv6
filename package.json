@@ -1,0 +1,57 @@
+{
+  "name": "dj-dataforge-v6",
+  "version": "6.0.0",
+  "description": "Excel-like data grid with formula engine, plugins, and multi-company support - 100% client-side",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview",
+    "type-check": "tsc --noEmit",
+    "lint": "eslint src --ext .ts",
+    "format": "prettier --write \"src/**/*.{ts,css,html}\"",
+    "test": "vitest run",
+    "test:unit": "vitest run --dir tests/unit",
+    "test:e2e": "playwright test",
+    "test:watch": "vitest",
+    "coverage": "vitest run --coverage",
+    "bench": "vitest bench"
+  },
+  "keywords": [
+    "spreadsheet",
+    "excel",
+    "grid",
+    "formula",
+    "plugin",
+    "typescript",
+    "client-side"
+  ],
+  "author": "DJ DataForge Team",
+  "license": "MIT",
+  "dependencies": {
+    "chart.js": "^4.4.0",
+    "dayjs": "^1.11.0",
+    "decimal.js": "^10.6.0",
+    "dompurify": "^3.0.6",
+    "idb": "^8.0.0",
+    "nanoid": "^5.0.4",
+    "papaparse": "^5.4.1",
+    "xlsx": "^0.18.5"
+  },
+  "devDependencies": {
+    "@types/dompurify": "^3.0.5",
+    "@types/papaparse": "^5.3.14",
+    "@typescript-eslint/eslint-plugin": "^6.15.0",
+    "@typescript-eslint/parser": "^6.15.0",
+    "@vitest/coverage-v8": "^1.0.4",
+    "eslint": "^8.56.0",
+    "playwright": "^1.40.1",
+    "prettier": "^3.1.1",
+    "typescript": "^5.3.3",
+    "vite": "^7.1.11",
+    "vitest": "^1.0.4"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

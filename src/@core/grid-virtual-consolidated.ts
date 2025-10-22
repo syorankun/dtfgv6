@@ -69,6 +69,13 @@ class SelectionManager {
     };
   }
 
+  setSelection(startRow: number, startCol: number, endRow: number, endCol: number): void {
+    this.selection = {
+      start: { row: startRow, col: startCol },
+      end: { row: endRow, col: endCol },
+    };
+  }
+
   getRange(): {
     startRow: number;
     startCol: number;
@@ -777,6 +784,7 @@ export class VirtualGrid {
 
     // Immediately clear editing state to prevent re-entry
     const editor = this.editor;
+    const editorValue = editor.value.trim();  // Capture value before clearing
     this.editor = undefined;
     this.isEditing = false;
     this.isEditingFormula = false;
@@ -786,28 +794,26 @@ export class VirtualGrid {
     this.currentColorIndex = 0;
 
     if (save && this.sheet) {
-      const value = editor.value.trim();
-
       // Check if it's a formula
-      if (value.startsWith('=')) {
+      if (editorValue.startsWith('=')) {
         // Set formula - CalcEngine will compute it
         this.sheet.setCell(row, col, 0, {
-          formula: value,
+          formula: editorValue,
           type: 'formula',
         });
 
         // Trigger immediate recalculation - DON'T render yet, wait for callback
-        this.onCellChange?.(row, col, value);
+        this.onCellChange?.(row, col, editorValue);
       } else {
         // Try to parse as number
-        const numValue = parseFloat(value);
-        if (!isNaN(numValue) && value !== '') {
+        const numValue = parseFloat(editorValue);
+        if (!isNaN(numValue) && editorValue !== '') {
           this.sheet.setCell(row, col, numValue);
         } else {
-          this.sheet.setCell(row, col, value);
+          this.sheet.setCell(row, col, editorValue);
         }
 
-        this.onCellChange?.(row, col, value);
+        this.onCellChange?.(row, col, editorValue);
       }
     }
 
@@ -826,7 +832,7 @@ export class VirtualGrid {
     this.render();
 
     // For formulas, wait a bit and render again to ensure calculated value shows
-    if (save && value.startsWith('=')) {
+    if (save && editorValue.startsWith('=')) {
       setTimeout(() => {
         this.render();
       }, 50);

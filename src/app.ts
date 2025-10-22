@@ -159,15 +159,15 @@ class DJDataForgeApp {
             <div class="ribbon-group">
               <div class="ribbon-group-title">Formatação</div>
               <div class="ribbon-buttons">
-                <button class="ribbon-btn">
+                <button id="btn-bold" class="ribbon-btn">
                   <span class="ribbon-icon"><b>N</b></span>
                   <span class="ribbon-label">Negrito</span>
                 </button>
-                <button class="ribbon-btn">
+                <button id="btn-italic" class="ribbon-btn">
                   <span class="ribbon-icon"><i>I</i></span>
                   <span class="ribbon-label">Itálico</span>
                 </button>
-                <button class="ribbon-btn">
+                <button id="btn-color" class="ribbon-btn">
                   <span class="ribbon-icon">🎨</span>
                   <span class="ribbon-label">Cor</span>
                 </button>
@@ -177,15 +177,15 @@ class DJDataForgeApp {
             <div class="ribbon-group">
               <div class="ribbon-group-title">Alinhamento</div>
               <div class="ribbon-buttons">
-                <button class="ribbon-btn">
+                <button id="btn-align-left" class="ribbon-btn">
                   <span class="ribbon-icon">⬅️</span>
                   <span class="ribbon-label">Esquerda</span>
                 </button>
-                <button class="ribbon-btn">
+                <button id="btn-align-center" class="ribbon-btn">
                   <span class="ribbon-icon">↔️</span>
                   <span class="ribbon-label">Centro</span>
                 </button>
-                <button class="ribbon-btn">
+                <button id="btn-align-right" class="ribbon-btn">
                   <span class="ribbon-icon">➡️</span>
                   <span class="ribbon-label">Direita</span>
                 </button>
@@ -215,19 +215,19 @@ class DJDataForgeApp {
             <div class="ribbon-group">
               <div class="ribbon-group-title">Biblioteca de Funções</div>
               <div class="ribbon-buttons">
-                <button class="ribbon-btn">
+                <button id="btn-autosum" class="ribbon-btn">
                   <span class="ribbon-icon">Σ</span>
                   <span class="ribbon-label">AutoSoma</span>
                 </button>
-                <button class="ribbon-btn">
+                <button id="btn-math-functions" class="ribbon-btn">
                   <span class="ribbon-icon">📐</span>
                   <span class="ribbon-label">Matemática</span>
                 </button>
-                <button class="ribbon-btn">
+                <button id="btn-stats-functions" class="ribbon-btn">
                   <span class="ribbon-icon">📊</span>
                   <span class="ribbon-label">Estatística</span>
                 </button>
-                <button class="ribbon-btn">
+                <button id="btn-financial-functions" class="ribbon-btn">
                   <span class="ribbon-icon">💰</span>
                   <span class="ribbon-label">Financeira</span>
                 </button>
@@ -525,8 +525,24 @@ class DJDataForgeApp {
         }
       }
     });
+
+    // Formatting buttons
+    document.getElementById('btn-bold')?.addEventListener('click', () => this.applyFormatting('bold'));
+    document.getElementById('btn-italic')?.addEventListener('click', () => this.applyFormatting('italic'));
+    document.getElementById('btn-color')?.addEventListener('click', () => this.applyTextColor());
+
+    // Alignment buttons
+    document.getElementById('btn-align-left')?.addEventListener('click', () => this.applyAlignment('left'));
+    document.getElementById('btn-align-center')?.addEventListener('click', () => this.applyAlignment('center'));
+    document.getElementById('btn-align-right')?.addEventListener('click', () => this.applyAlignment('right'));
+
+    // Formula buttons
+    document.getElementById('btn-autosum')?.addEventListener('click', () => this.insertAutoSum());
+    document.getElementById('btn-math-functions')?.addEventListener('click', () => this.showFunctionList('math'));
+    document.getElementById('btn-stats-functions')?.addEventListener('click', () => this.showFunctionList('stats'));
+    document.getElementById('btn-financial-functions')?.addEventListener('click', () => this.showFunctionList('financial'));
   }
-  
+
   private async importData(data: any[][]): Promise<void> {
     const wb = kernel.workbookManager.getActiveWorkbook();
     if (!wb) {
@@ -836,6 +852,271 @@ class DJDataForgeApp {
         </div>
       `;
     }
+  }
+
+  // ============================================================================
+  // RIBBON FUNCTIONALITY METHODS
+  // ============================================================================
+
+  private applyFormatting(type: 'bold' | 'italic'): void {
+    if (!this.grid) return;
+
+    const selection = this.grid.getSelection();
+    const sheet = this.grid.getSheet();
+    if (!sheet) return;
+
+    // Apply formatting to all cells in selection
+    for (let row = selection.start.row; row <= selection.end.row; row++) {
+      for (let col = selection.start.col; col <= selection.end.col; col++) {
+        const cell = sheet.getCell(row, col);
+        const currentFormat = cell?.format || {};
+
+        // Toggle the formatting
+        const newFormat = {
+          ...currentFormat,
+          [type]: !currentFormat[type]
+        };
+
+        sheet.setCell(row, col, cell?.value ?? '', {
+          ...cell,
+          format: newFormat
+        });
+      }
+    }
+
+    this.grid.refresh();
+    logger.info(`[App] Applied ${type} formatting to selection`);
+  }
+
+  private applyTextColor(): void {
+    if (!this.grid) return;
+
+    const selection = this.grid.getSelection();
+    const sheet = this.grid.getSheet();
+    if (!sheet) return;
+
+    // Show color picker dialog
+    const color = prompt('Cor do texto (ex: #FF0000, red, rgb(255,0,0)):', '#000000');
+    if (!color) return;
+
+    // Apply color to all cells in selection
+    for (let row = selection.start.row; row <= selection.end.row; row++) {
+      for (let col = selection.start.col; col <= selection.end.col; col++) {
+        const cell = sheet.getCell(row, col);
+        const currentFormat = cell?.format || {};
+
+        const newFormat = {
+          ...currentFormat,
+          textColor: color
+        };
+
+        sheet.setCell(row, col, cell?.value ?? '', {
+          ...cell,
+          format: newFormat
+        });
+      }
+    }
+
+    this.grid.refresh();
+    logger.info(`[App] Applied text color ${color} to selection`);
+  }
+
+  private applyAlignment(alignment: 'left' | 'center' | 'right'): void {
+    if (!this.grid) return;
+
+    const selection = this.grid.getSelection();
+    const sheet = this.grid.getSheet();
+    if (!sheet) return;
+
+    // Apply alignment to all cells in selection
+    for (let row = selection.start.row; row <= selection.end.row; row++) {
+      for (let col = selection.start.col; col <= selection.end.col; col++) {
+        const cell = sheet.getCell(row, col);
+        const currentFormat = cell?.format || {};
+
+        const newFormat = {
+          ...currentFormat,
+          alignment: alignment
+        };
+
+        sheet.setCell(row, col, cell?.value ?? '', {
+          ...cell,
+          format: newFormat
+        });
+      }
+    }
+
+    this.grid.refresh();
+    logger.info(`[App] Applied ${alignment} alignment to selection`);
+  }
+
+  private insertAutoSum(): void {
+    if (!this.grid) return;
+
+    const selection = this.grid.getSelection();
+    const sheet = this.grid.getSheet();
+    if (!sheet) return;
+
+    const row = selection.start.row;
+    const col = selection.start.col;
+
+    // Auto-detect range to sum
+    let range = '';
+
+    // Try to detect range above (most common case)
+    let rangeAbove = 0;
+    for (let r = row - 1; r >= 0; r--) {
+      const cell = sheet.getCell(r, col);
+      if (cell && typeof cell.value === 'number') {
+        rangeAbove++;
+      } else {
+        break;
+      }
+    }
+
+    // Try to detect range to the left
+    let rangeLeft = 0;
+    for (let c = col - 1; c >= 0; c--) {
+      const cell = sheet.getCell(row, c);
+      if (cell && typeof cell.value === 'number') {
+        rangeLeft++;
+      } else {
+        break;
+      }
+    }
+
+    // Use the larger range
+    if (rangeAbove > rangeLeft && rangeAbove > 0) {
+      const startCell = `${sheet.getColumnName(col)}${row - rangeAbove + 1}`;
+      const endCell = `${sheet.getColumnName(col)}${row}`;
+      range = `${startCell}:${endCell}`;
+    } else if (rangeLeft > 0) {
+      const startCell = `${sheet.getColumnName(col - rangeLeft)}${row + 1}`;
+      const endCell = `${sheet.getColumnName(col - 1)}${row + 1}`;
+      range = `${startCell}:${endCell}`;
+    }
+
+    // If no range detected, show a default formula
+    const formula = range ? `=SUMA(${range})` : '=SUMA(A1:A10)';
+
+    // Set the formula
+    sheet.setCell(row, col, 0, {
+      formula: formula,
+      type: 'formula',
+    });
+
+    // Recalculate
+    kernel.recalculate(sheet.id, undefined, { force: true }).then(() => {
+      this.grid?.refresh();
+      this.updateCellInfo(row, col);
+    });
+
+    logger.info(`[App] Inserted AutoSum: ${formula}`);
+  }
+
+  private showFunctionList(category: 'math' | 'stats' | 'financial'): void {
+    // Define function lists by category
+    const functions: Record<string, { name: string; description: string; syntax: string }[]> = {
+      math: [
+        { name: 'SUMA', description: 'Soma valores', syntax: '=SUMA(A1:A10)' },
+        { name: 'PRODUTO', description: 'Multiplica valores', syntax: '=PRODUTO(A1:A10)' },
+        { name: 'RAIZ', description: 'Raiz quadrada', syntax: '=RAIZ(A1)' },
+        { name: 'POTENCIA', description: 'Eleva à potência', syntax: '=POTENCIA(A1, 2)' },
+        { name: 'ABS', description: 'Valor absoluto', syntax: '=ABS(A1)' },
+        { name: 'TRUNCAR', description: 'Trunca decimais', syntax: '=TRUNCAR(A1, 2)' },
+        { name: 'ARREDONDAR', description: 'Arredonda número', syntax: '=ARREDONDAR(A1, 2)' },
+        { name: 'INT', description: 'Parte inteira', syntax: '=INT(A1)' },
+        { name: 'SINAL', description: 'Sinal do número', syntax: '=SINAL(A1)' },
+      ],
+      stats: [
+        { name: 'MEDIA', description: 'Média aritmética', syntax: '=MEDIA(A1:A10)' },
+        { name: 'MEDIANA', description: 'Mediana', syntax: '=MEDIANA(A1:A10)' },
+        { name: 'MODO', description: 'Valor mais frequente', syntax: '=MODO(A1:A10)' },
+        { name: 'MAXIMO', description: 'Valor máximo', syntax: '=MAXIMO(A1:A10)' },
+        { name: 'MINIMO', description: 'Valor mínimo', syntax: '=MINIMO(A1:A10)' },
+        { name: 'CONTAR', description: 'Conta números', syntax: '=CONTAR(A1:A10)' },
+        { name: 'DESVPAD', description: 'Desvio padrão', syntax: '=DESVPAD(A1:A10)' },
+        { name: 'VARIANCIA', description: 'Variância', syntax: '=VARIANCIA(A1:A10)' },
+      ],
+      financial: [
+        { name: 'VP', description: 'Valor presente', syntax: '=VP(taxa, nper, pgto)' },
+        { name: 'VF', description: 'Valor futuro', syntax: '=VF(taxa, nper, pgto)' },
+        { name: 'PGTO', description: 'Pagamento', syntax: '=PGTO(taxa, nper, vp)' },
+        { name: 'TAXA', description: 'Taxa de juros', syntax: '=TAXA(nper, pgto, vp)' },
+        { name: 'NPER', description: 'Número de períodos', syntax: '=NPER(taxa, pgto, vp)' },
+      ]
+    };
+
+    const categoryFunctions = functions[category] || [];
+
+    // Create modal HTML
+    const html = `
+      <div class="modal-overlay" id="functions-modal">
+        <div class="modal" style="max-width: 600px;">
+          <h2>📚 Funções ${category === 'math' ? 'Matemáticas' : category === 'stats' ? 'Estatísticas' : 'Financeiras'}</h2>
+
+          <div style="max-height: 400px; overflow-y: auto; margin: 20px 0;">
+            ${categoryFunctions.map(fn => `
+              <div class="function-item" style="padding: 12px; border-bottom: 1px solid #e2e8f0; cursor: pointer;"
+                   data-syntax="${fn.syntax}">
+                <div style="font-weight: bold; color: #2563eb; margin-bottom: 4px;">${fn.name}</div>
+                <div style="font-size: 12px; color: #64748b; margin-bottom: 4px;">${fn.description}</div>
+                <div style="font-family: monospace; font-size: 11px; color: #059669;">${fn.syntax}</div>
+              </div>
+            `).join('')}
+          </div>
+
+          <div style="margin-top: 16px; padding-top: 16px; border-top: 1px solid #e2e8f0; color: #64748b; font-size: 12px;">
+            💡 Clique em uma função para inserir na célula selecionada
+          </div>
+
+          <div class="modal-actions">
+            <button id="btn-close-functions" class="btn btn-primary">Fechar</button>
+          </div>
+        </div>
+      </div>
+    `;
+
+    document.body.insertAdjacentHTML('beforeend', html);
+
+    // Event listener for closing
+    document.getElementById('btn-close-functions')?.addEventListener('click', () => {
+      document.getElementById('functions-modal')?.remove();
+    });
+
+    // Event listener for clicking on function items
+    document.querySelectorAll('.function-item').forEach(item => {
+      item.addEventListener('click', () => {
+        const syntax = item.getAttribute('data-syntax');
+        if (syntax && this.grid) {
+          const selection = this.grid.getSelection();
+          const sheet = this.grid.getSheet();
+
+          if (sheet) {
+            const row = selection.start.row;
+            const col = selection.start.col;
+
+            // Set the formula
+            sheet.setCell(row, col, 0, {
+              formula: syntax,
+              type: 'formula',
+            });
+
+            // Recalculate
+            kernel.recalculate(sheet.id, undefined, { force: true }).then(() => {
+              this.grid?.refresh();
+              this.updateCellInfo(row, col);
+            });
+
+            logger.info(`[App] Inserted function: ${syntax}`);
+          }
+
+          document.getElementById('functions-modal')?.remove();
+        }
+      });
+    });
+
+    logger.info(`[App] Showing ${category} functions list`);
   }
 }
 

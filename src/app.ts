@@ -26,25 +26,25 @@ class DJDataForgeApp {
   async init(): Promise<void> {
     try {
       logger.info("[App] Starting DJ DataForge v6 FULL...");
-      
+
       // Show loading screen
       this.showLoading();
-      
+
       // Initialize kernel
       await kernel.init();
-      
-      // Load built-in plugins
-      await this.loadBuiltInPlugins();
-      
-      // Initialize UI
+
+      // Initialize UI first so plugin-toolbar element exists
       await this.initUI();
-      
+
+      // Load built-in plugins after UI is ready
+      await this.loadBuiltInPlugins();
+
       // Hide loading screen
       this.hideLoading();
-      
+
       // Setup global error handler
       this.setupErrorHandler();
-      
+
       logger.info("[App] Application ready - ALL PHASES COMPLETE!");
     } catch (error) {
       logger.error("[App] Initialization failed", error);

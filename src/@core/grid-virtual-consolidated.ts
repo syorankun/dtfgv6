@@ -602,8 +602,13 @@ export class VirtualGrid {
   private stopEditing(row: number, col: number, save: boolean): void {
     if (!this.isEditing || !this.editor) return;
 
+    // Immediately clear editing state to prevent re-entry
+    const editor = this.editor;
+    this.editor = undefined;
+    this.isEditing = false;
+
     if (save && this.sheet) {
-      const value = this.editor.value;
+      const value = editor.value;
 
       // Check if it's a formula
       if (value.startsWith('=')) {
@@ -624,12 +629,15 @@ export class VirtualGrid {
       this.onCellChange?.(row, col, value);
     }
 
-    // Check if editor is still in DOM before removing (prevents race condition with blur events)
-    if (this.editor.parentElement) {
-      this.editor.remove();
+    // Safely remove editor element with error handling
+    try {
+      if (editor.parentElement) {
+        editor.remove();
+      }
+    } catch (e) {
+      // Element already removed, ignore error
     }
-    this.editor = undefined;
-    this.isEditing = false;
+
     this.canvas.focus();
     this.render();
   }

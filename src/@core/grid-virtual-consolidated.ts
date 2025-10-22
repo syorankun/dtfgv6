@@ -424,33 +424,122 @@ export class VirtualGrid {
   private handleKeyDown(e: KeyboardEvent): void {
     if (this.isEditing) return;
 
+    const selection = this.selectionManager.getSelection();
+    const currentRow = selection.start.row;
+    const currentCol = selection.start.col;
+
     switch (e.key) {
       case 'ArrowUp':
         e.preventDefault();
-        this.selectionManager.moveSelection(-1, 0);
+        if (e.ctrlKey || e.metaKey) {
+          // Ctrl+Up: Jump to top
+          this.selectionManager.setSelection(0, currentCol, 0, currentCol);
+        } else {
+          this.selectionManager.moveSelection(-1, 0);
+        }
         this.onSelectionChange?.(this.selectionManager.getSelection());
+        this.ensureCellVisible(this.selectionManager.getSelection().start.row, currentCol);
         this.render();
         break;
+
       case 'ArrowDown':
       case 'Enter':
         e.preventDefault();
-        this.selectionManager.moveSelection(1, 0);
+        if (e.ctrlKey || e.metaKey) {
+          // Ctrl+Down: Jump to last row with data
+          const lastRow = this.sheet ? this.sheet.rowCount - 1 : 0;
+          this.selectionManager.setSelection(lastRow, currentCol, lastRow, currentCol);
+        } else {
+          this.selectionManager.moveSelection(1, 0);
+        }
         this.onSelectionChange?.(this.selectionManager.getSelection());
+        this.ensureCellVisible(this.selectionManager.getSelection().start.row, currentCol);
         this.render();
         break;
+
       case 'ArrowLeft':
         e.preventDefault();
-        this.selectionManager.moveSelection(0, -1);
+        if (e.ctrlKey || e.metaKey) {
+          // Ctrl+Left: Jump to first column
+          this.selectionManager.setSelection(currentRow, 0, currentRow, 0);
+        } else {
+          this.selectionManager.moveSelection(0, -1);
+        }
         this.onSelectionChange?.(this.selectionManager.getSelection());
+        this.ensureCellVisible(currentRow, this.selectionManager.getSelection().start.col);
         this.render();
         break;
+
       case 'ArrowRight':
       case 'Tab':
         e.preventDefault();
-        this.selectionManager.moveSelection(0, 1);
+        if (e.ctrlKey || e.metaKey) {
+          // Ctrl+Right: Jump to last column with data
+          const lastCol = this.sheet ? this.sheet.colCount - 1 : 0;
+          this.selectionManager.setSelection(currentRow, lastCol, currentRow, lastCol);
+        } else {
+          this.selectionManager.moveSelection(0, 1);
+        }
+        this.onSelectionChange?.(this.selectionManager.getSelection());
+        this.ensureCellVisible(currentRow, this.selectionManager.getSelection().start.col);
+        this.render();
+        break;
+
+      case 'PageUp':
+        e.preventDefault();
+        const pageUpRows = Math.floor(this.viewportHeight / this.cellHeight) - 1;
+        const newRowUp = Math.max(0, currentRow - pageUpRows);
+        this.selectionManager.setSelection(newRowUp, currentCol, newRowUp, currentCol);
+        this.onSelectionChange?.(this.selectionManager.getSelection());
+        this.ensureCellVisible(newRowUp, currentCol);
+        this.render();
+        break;
+
+      case 'PageDown':
+        e.preventDefault();
+        const pageDownRows = Math.floor(this.viewportHeight / this.cellHeight) - 1;
+        const maxRow = this.sheet ? this.sheet.rowCount - 1 : 0;
+        const newRowDown = Math.min(maxRow, currentRow + pageDownRows);
+        this.selectionManager.setSelection(newRowDown, currentCol, newRowDown, currentCol);
+        this.onSelectionChange?.(this.selectionManager.getSelection());
+        this.ensureCellVisible(newRowDown, currentCol);
+        this.render();
+        break;
+
+      case 'Home':
+        e.preventDefault();
+        if (e.ctrlKey || e.metaKey) {
+          // Ctrl+Home: Go to A1
+          this.selectionManager.setSelection(0, 0, 0, 0);
+          this.scrollX = 0;
+          this.scrollY = 0;
+        } else {
+          // Home: Go to first column
+          this.selectionManager.setSelection(currentRow, 0, currentRow, 0);
+          this.scrollX = 0;
+        }
         this.onSelectionChange?.(this.selectionManager.getSelection());
         this.render();
         break;
+
+      case 'End':
+        e.preventDefault();
+        if (e.ctrlKey || e.metaKey) {
+          // Ctrl+End: Go to last cell with data
+          const lastRow = this.sheet ? this.sheet.rowCount - 1 : 0;
+          const lastCol = this.sheet ? this.sheet.colCount - 1 : 0;
+          this.selectionManager.setSelection(lastRow, lastCol, lastRow, lastCol);
+          this.ensureCellVisible(lastRow, lastCol);
+        } else {
+          // End: Go to last column
+          const lastCol = this.sheet ? this.sheet.colCount - 1 : 0;
+          this.selectionManager.setSelection(currentRow, lastCol, currentRow, lastCol);
+          this.ensureCellVisible(currentRow, lastCol);
+        }
+        this.onSelectionChange?.(this.selectionManager.getSelection());
+        this.render();
+        break;
+
       case 'Delete':
       case 'Backspace':
         e.preventDefault();
@@ -486,12 +575,17 @@ export class VirtualGrid {
   private handleWheel(e: WheelEvent): void {
     e.preventDefault();
 
-    this.scrollY += e.deltaY;
-    this.scrollX += e.deltaX;
+    // Smooth scrolling multiplier
+    const scrollSpeed = 1.0;
+    this.scrollY += e.deltaY * scrollSpeed;
+    this.scrollX += e.deltaX * scrollSpeed;
 
     // Clamp scroll
-    this.scrollY = Math.max(0, this.scrollY);
-    this.scrollX = Math.max(0, this.scrollX);
+    const maxScrollY = Math.max(0, (this.sheet?.rowCount || 0) * this.cellHeight - this.viewportHeight + this.headerHeight);
+    const maxScrollX = Math.max(0, (this.sheet?.colCount || 0) * this.cellWidth - this.viewportWidth + this.headerWidth);
+
+    this.scrollY = Math.max(0, Math.min(maxScrollY, this.scrollY));
+    this.scrollX = Math.max(0, Math.min(maxScrollX, this.scrollX));
 
     this.render();
   }
@@ -728,9 +822,14 @@ export class VirtualGrid {
 
     this.canvas.focus();
 
-    // Only render if not a formula (formulas will render after recalc via callback)
-    if (!save || !value.startsWith('=')) {
-      this.render();
+    // Always render, but for formulas, schedule another render after recalc
+    this.render();
+
+    // For formulas, wait a bit and render again to ensure calculated value shows
+    if (save && value.startsWith('=')) {
+      setTimeout(() => {
+        this.render();
+      }, 50);
     }
   }
 
@@ -802,6 +901,47 @@ export class VirtualGrid {
   private getCellReference(row: number, col: number): string {
     if (!this.sheet) return '';
     return this.sheet.getColumnName(col) + (row + 1);
+  }
+
+  private ensureCellVisible(row: number, col: number): void {
+    // Calculate cell position
+    const cellX = col * this.cellWidth;
+    const cellY = row * this.cellHeight;
+
+    // Calculate viewport boundaries
+    const viewportLeft = this.scrollX;
+    const viewportRight = this.scrollX + this.viewportWidth - this.headerWidth;
+    const viewportTop = this.scrollY;
+    const viewportBottom = this.scrollY + this.viewportHeight - this.headerHeight;
+
+    // Smooth scroll to make cell visible
+    let needsScroll = false;
+
+    // Horizontal scroll
+    if (cellX < viewportLeft) {
+      this.scrollX = Math.max(0, cellX - this.cellWidth);
+      needsScroll = true;
+    } else if (cellX + this.cellWidth > viewportRight) {
+      this.scrollX = cellX + this.cellWidth - (this.viewportWidth - this.headerWidth) + this.cellWidth;
+      needsScroll = true;
+    }
+
+    // Vertical scroll
+    if (cellY < viewportTop) {
+      this.scrollY = Math.max(0, cellY - this.cellHeight);
+      needsScroll = true;
+    } else if (cellY + this.cellHeight > viewportBottom) {
+      this.scrollY = cellY + this.cellHeight - (this.viewportHeight - this.headerHeight) + this.cellHeight;
+      needsScroll = true;
+    }
+
+    // Clamp scroll values
+    this.scrollX = Math.max(0, this.scrollX);
+    this.scrollY = Math.max(0, this.scrollY);
+
+    if (needsScroll) {
+      this.render();
+    }
   }
 
   // --------------------------------------------------------------------------

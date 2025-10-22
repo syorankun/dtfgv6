@@ -203,7 +203,7 @@ src/
 # Development
 npm run dev              # Inicia dev server (localhost:5173)
 npm run build            # Build para produção
-npm run preview          # Preview do build
+npm run preview          # Preview do build (localhost:4173)
 
 # Quality
 npm run type-check       # Verificar tipos TypeScript
@@ -216,6 +216,57 @@ npm run test:unit        # Testes unitários
 npm run test:e2e         # Testes E2E
 npm run coverage         # Cobertura de testes
 ```
+
+## ⚠️ Importante: Executando o Build
+
+**NÃO abra o arquivo `dist/index.html` diretamente clicando duas vezes!**
+
+Navegadores modernos bloqueiam o protocolo `file://` por segurança (política CORS), causando erros:
+
+```
+Access to script at 'file:///.../index.js' from origin 'null' has been blocked by CORS policy
+```
+
+### ✅ Como Executar o Build Corretamente
+
+**Opção 1: Usando npm preview (Recomendado)**
+
+```bash
+npm run preview
+```
+
+Isso abrirá automaticamente `http://localhost:4173`
+
+**Opção 2: Usando Python**
+
+```bash
+cd dist
+python -m http.server 8000
+# Acesse http://localhost:8000
+```
+
+**Opção 3: Usando http-server**
+
+```bash
+npm install -g http-server
+cd dist
+http-server -p 8080
+# Acesse http://localhost:8080
+```
+
+**Opção 4: VS Code Live Server**
+
+Instale a extensão "Live Server" e clique com botão direito em `dist/index.html` → "Open with Live Server"
+
+### 🚀 Deploy para Produção
+
+Para produção, copie o conteúdo de `dist` para:
+
+- **Netlify**: Arraste pasta `dist` no dashboard
+- **Vercel**: Configure `outputDirectory: dist`
+- **GitHub Pages**: Copie para branch `gh-pages`
+- **Firebase**: Configure `public: dist` e execute `firebase deploy`
+- **Servidor próprio**: Copie arquivos para Apache/Nginx/IIS
 
 ## 🎯 Roadmap
 

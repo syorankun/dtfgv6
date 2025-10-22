@@ -868,14 +868,14 @@ export class VirtualGrid {
 
     const formula = this.editor.value.toUpperCase();
 
-    // Extract function name (between = and ()
-    const match = formula.match(/^=([A-Z]+)/);
+    // Extract function name (after =, before ( or end of string)
+    const match = formula.match(/^=([A-Z]*)/);
     if (!match) {
       this.hideFormulaTooltip();
       return;
     }
 
-    const functionName = match[1];
+    const partialName = match[1];
 
     // Formula syntax reference
     const formulaHelp: Record<string, { syntax: string; description: string }> = {
@@ -902,8 +902,33 @@ export class VirtualGrid {
       'SINAL': { syntax: 'SINAL(número)', description: 'Retorna o sinal do número' },
     };
 
-    const help = formulaHelp[functionName];
-    if (!help) {
+    // Find matching functions (exact match or partial)
+    let matchedFunctions: Array<{ name: string; help: { syntax: string; description: string } }> = [];
+
+    if (partialName === '') {
+      // Show most common functions when just "=" is typed
+      matchedFunctions = [
+        { name: 'SUMA', help: formulaHelp['SUMA'] },
+        { name: 'MEDIA', help: formulaHelp['MEDIA'] },
+        { name: 'SE', help: formulaHelp['SE'] },
+        { name: 'MAXIMO', help: formulaHelp['MAXIMO'] },
+        { name: 'MINIMO', help: formulaHelp['MINIMO'] },
+      ];
+    } else {
+      // Check for exact match first
+      if (formulaHelp[partialName]) {
+        matchedFunctions = [{ name: partialName, help: formulaHelp[partialName] }];
+      } else {
+        // Find partial matches
+        Object.keys(formulaHelp).forEach(key => {
+          if (key.startsWith(partialName)) {
+            matchedFunctions.push({ name: key, help: formulaHelp[key] });
+          }
+        });
+      }
+    }
+
+    if (matchedFunctions.length === 0) {
       this.hideFormulaTooltip();
       return;
     }
@@ -919,7 +944,9 @@ export class VirtualGrid {
       this.tooltipElement.style.fontSize = '12px';
       this.tooltipElement.style.zIndex = '10000';
       this.tooltipElement.style.boxShadow = '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)';
-      this.tooltipElement.style.maxWidth = '400px';
+      this.tooltipElement.style.maxWidth = '450px';
+      this.tooltipElement.style.maxHeight = '300px';
+      this.tooltipElement.style.overflowY = 'auto';
       this.tooltipElement.style.pointerEvents = 'none';
       document.body.appendChild(this.tooltipElement);
     }
@@ -929,11 +956,20 @@ export class VirtualGrid {
     this.tooltipElement.style.left = rect.left + 'px';
     this.tooltipElement.style.top = (rect.bottom + 4) + 'px';
 
-    // Update content
+    // Update content - show all matched functions
+    const content = matchedFunctions.map(({ name, help }) => `
+      <div style="padding: 6px 0; border-bottom: 1px solid #334155;">
+        <div style="font-weight: bold; color: #60a5fa; margin-bottom: 2px;">${name}</div>
+        <div style="font-family: monospace; color: #a5b4fc; margin-bottom: 2px; font-size: 11px;">${help.syntax}</div>
+        <div style="color: #cbd5e1; font-size: 10px;">${help.description}</div>
+      </div>
+    `).join('');
+
     this.tooltipElement.innerHTML = `
-      <div style="font-weight: bold; color: #60a5fa; margin-bottom: 4px;">${functionName}</div>
-      <div style="font-family: monospace; color: #a5b4fc; margin-bottom: 4px;">${help.syntax}</div>
-      <div style="color: #cbd5e1; font-size: 11px;">${help.description}</div>
+      <div style="font-size: 10px; color: #94a3b8; margin-bottom: 6px;">
+        ${matchedFunctions.length === 1 ? 'Função' : `${matchedFunctions.length} funções disponíveis`}
+      </div>
+      ${content}
     `;
 
     this.tooltipElement.style.display = 'block';

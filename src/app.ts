@@ -123,7 +123,6 @@ class DJDataForgeApp {
             <span class="company-badge" id="company-badge">${company?.name || 'Sem empresa'}</span>
           </div>
           <div class="header-right">
-            <button id="btn-toggle-panel" class="btn" title="Mostrar/Esconder Painel">👁️</button>
             <button id="btn-clear-session" class="btn" title="Limpar Sessão">🗑️</button>
             <button id="btn-settings" class="btn" title="Configurações">⚙️</button>
           </div>
@@ -255,19 +254,41 @@ class DJDataForgeApp {
           <!-- View Tab Content -->
           <div class="ribbon-content hidden" data-content="view">
             <div class="ribbon-group">
-              <div class="ribbon-group-title">Exibir</div>
+              <div class="ribbon-group-title">Mostrar/Ocultar</div>
               <div class="ribbon-buttons">
-                <button class="ribbon-btn">
-                  <span class="ribbon-icon">📏</span>
-                  <span class="ribbon-label">Régua</span>
+                <button id="btn-toggle-sidebar" class="ribbon-btn">
+                  <span class="ribbon-icon">📂</span>
+                  <span class="ribbon-label">Barra Lateral</span>
                 </button>
-                <button class="ribbon-btn">
+                <button id="btn-toggle-right-panel" class="ribbon-btn">
+                  <span class="ribbon-icon">📊</span>
+                  <span class="ribbon-label">Painel Info</span>
+                </button>
+                <button id="btn-toggle-formula-bar" class="ribbon-btn">
+                  <span class="ribbon-icon">ƒx</span>
+                  <span class="ribbon-label">Barra Fórmulas</span>
+                </button>
+                <button id="btn-toggle-gridlines" class="ribbon-btn">
                   <span class="ribbon-icon">🔲</span>
-                  <span class="ribbon-label">Linhas de Grade</span>
+                  <span class="ribbon-label">Linhas Grade</span>
                 </button>
-                <button class="ribbon-btn">
-                  <span class="ribbon-icon">🔍</span>
-                  <span class="ribbon-label">Zoom</span>
+              </div>
+            </div>
+
+            <div class="ribbon-group">
+              <div class="ribbon-group-title">Zoom</div>
+              <div class="ribbon-buttons">
+                <button id="btn-zoom-in" class="ribbon-btn">
+                  <span class="ribbon-icon">🔍+</span>
+                  <span class="ribbon-label">Ampliar</span>
+                </button>
+                <button id="btn-zoom-out" class="ribbon-btn">
+                  <span class="ribbon-icon">🔍−</span>
+                  <span class="ribbon-label">Reduzir</span>
+                </button>
+                <button id="btn-zoom-reset" class="ribbon-btn">
+                  <span class="ribbon-icon">100%</span>
+                  <span class="ribbon-label">Redefinir</span>
                 </button>
               </div>
             </div>
@@ -484,15 +505,19 @@ class DJDataForgeApp {
       this.showSettingsDialog();
     });
 
-    // Toggle panel button
-    document.getElementById('btn-toggle-panel')?.addEventListener('click', () => {
-      this.toggleRightPanel();
-    });
-
     // Clear session button
     document.getElementById('btn-clear-session')?.addEventListener('click', () => {
       this.clearSession();
     });
+
+    // View tab buttons
+    document.getElementById('btn-toggle-sidebar')?.addEventListener('click', () => this.toggleSidebar());
+    document.getElementById('btn-toggle-right-panel')?.addEventListener('click', () => this.toggleRightPanel());
+    document.getElementById('btn-toggle-formula-bar')?.addEventListener('click', () => this.toggleFormulaBar());
+    document.getElementById('btn-toggle-gridlines')?.addEventListener('click', () => this.toggleGridlines());
+    document.getElementById('btn-zoom-in')?.addEventListener('click', () => this.zoom(1.2));
+    document.getElementById('btn-zoom-out')?.addEventListener('click', () => this.zoom(0.8));
+    document.getElementById('btn-zoom-reset')?.addEventListener('click', () => this.zoom(1, true));
     
     // Formula input
     const formulaInput = document.getElementById('formula-input') as HTMLInputElement;
@@ -1138,6 +1163,19 @@ class DJDataForgeApp {
   // UI UTILITIES
   // ============================================================================
 
+  private toggleSidebar(): void {
+    const sidebar = document.querySelector('.sidebar') as HTMLElement;
+    if (!sidebar) return;
+
+    if (sidebar.style.display === 'none') {
+      sidebar.style.display = 'flex';
+      logger.info('[App] Sidebar shown');
+    } else {
+      sidebar.style.display = 'none';
+      logger.info('[App] Sidebar hidden');
+    }
+  }
+
   private toggleRightPanel(): void {
     const panel = document.querySelector('.panels') as HTMLElement;
     if (!panel) return;
@@ -1149,6 +1187,60 @@ class DJDataForgeApp {
       panel.style.display = 'none';
       logger.info('[App] Right panel hidden');
     }
+  }
+
+  private toggleFormulaBar(): void {
+    const formulaBar = document.querySelector('.formula-bar') as HTMLElement;
+    if (!formulaBar) return;
+
+    if (formulaBar.style.display === 'none') {
+      formulaBar.style.display = 'flex';
+      logger.info('[App] Formula bar shown');
+    } else {
+      formulaBar.style.display = 'none';
+      logger.info('[App] Formula bar hidden');
+    }
+  }
+
+  private toggleGridlines(): void {
+    if (!this.grid) return;
+
+    // Toggle gridlines rendering
+    // This requires modifying the grid's render method
+    // For now, we'll toggle the grid canvas border as a visual indicator
+    const canvas = document.getElementById('grid-canvas') as HTMLCanvasElement;
+    if (!canvas) return;
+
+    const currentBorder = canvas.style.border;
+    if (currentBorder && currentBorder !== 'none') {
+      canvas.style.border = 'none';
+      logger.info('[App] Gridlines hidden');
+    } else {
+      canvas.style.border = '1px solid #e2e8f0';
+      logger.info('[App] Gridlines shown');
+    }
+
+    this.grid.refresh();
+  }
+
+  private currentZoom: number = 1;
+
+  private zoom(factor: number, reset: boolean = false): void {
+    const gridContainer = document.querySelector('.grid-container') as HTMLElement;
+    if (!gridContainer) return;
+
+    if (reset) {
+      this.currentZoom = 1;
+    } else {
+      this.currentZoom *= factor;
+      // Limit zoom between 50% and 200%
+      this.currentZoom = Math.max(0.5, Math.min(2, this.currentZoom));
+    }
+
+    gridContainer.style.transform = `scale(${this.currentZoom})`;
+    gridContainer.style.transformOrigin = 'top left';
+
+    logger.info(`[App] Zoom set to ${Math.round(this.currentZoom * 100)}%`);
   }
 
   private clearSession(): void {

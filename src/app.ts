@@ -673,8 +673,10 @@ class DJDataForgeApp {
                 <li>${p.name} v${p.version}</li>
               `).join('')}
             </ul>
+            <button id="btn-import-plugin" class="btn">📦 Importar Plugin</button>
+            <input type="file" id="plugin-file-input" accept=".js" style="display: none;" />
           </div>
-          
+
           <div class="modal-actions">
             <button id="btn-close-settings" class="btn btn-primary">Fechar</button>
           </div>
@@ -701,6 +703,61 @@ class DJDataForgeApp {
         await kernel.companyManager.createCompany(name);
         this.refreshUI();
         document.getElementById('settings-modal')?.remove();
+      }
+    });
+
+    // Import plugin button
+    document.getElementById('btn-import-plugin')?.addEventListener('click', () => {
+      const input = document.getElementById('plugin-file-input') as HTMLInputElement;
+      input?.click();
+    });
+
+    document.getElementById('plugin-file-input')?.addEventListener('change', async (e) => {
+      const file = (e.target as HTMLInputElement).files?.[0];
+      if (!file) return;
+
+      try {
+        const text = await file.text();
+
+        // Create a module from the plugin code
+        const blob = new Blob([text], { type: 'application/javascript' });
+        const url = URL.createObjectURL(blob);
+
+        try {
+          // Dynamic import of the plugin
+          const module = await import(/* @vite-ignore */ url);
+
+          // Get the plugin class (usually default export)
+          const PluginClass = module.default || module.Plugin;
+
+          if (!PluginClass) {
+            throw new Error('Plugin deve exportar uma classe como default export');
+          }
+
+          // Create instance and get manifest
+          const pluginInstance = new PluginClass();
+
+          if (!pluginInstance.manifest) {
+            throw new Error('Plugin deve ter um manifest');
+          }
+
+          // Load the plugin
+          await kernel['pluginHost'].loadPlugin(module, pluginInstance.manifest);
+
+          logger.info('[App] Plugin imported successfully', { name: pluginInstance.manifest.name });
+          alert(`✅ Plugin "${pluginInstance.manifest.name}" importado com sucesso!`);
+
+          // Refresh the settings dialog
+          document.getElementById('settings-modal')?.remove();
+          this.showSettingsDialog();
+
+        } finally {
+          URL.revokeObjectURL(url);
+        }
+
+      } catch (error) {
+        logger.error('[App] Failed to import plugin', error);
+        alert(`❌ Erro ao importar plugin: ${error instanceof Error ? error.message : 'Erro desconhecido'}`);
       }
     });
   }
@@ -1037,7 +1094,7 @@ class DJDataForgeApp {
     }
 
     // If no range detected, show a default formula
-    const formula = range ? `=SUMA(${range})` : '=SUMA(A1:A10)';
+    const formula = range ? `=SOMA(${range})` : '=SOMA(A1:A10)';
 
     // Set the formula
     sheet.setCell(row, col, 0, {
@@ -1055,35 +1112,36 @@ class DJDataForgeApp {
   }
 
   private showFunctionList(category: 'math' | 'stats' | 'financial'): void {
-    // Define function lists by category
+    // Define function lists by category - Using correct Portuguese syntax
     const functions: Record<string, { name: string; description: string; syntax: string }[]> = {
       math: [
-        { name: 'SUMA', description: 'Soma valores', syntax: '=SUMA(A1:A10)' },
-        { name: 'PRODUTO', description: 'Multiplica valores', syntax: '=PRODUTO(A1:A10)' },
+        { name: 'SOMA', description: 'Soma valores', syntax: '=SOMA(A1:A10)' },
+        { name: 'MULT', description: 'Multiplica valores', syntax: '=MULT(A1:A10)' },
         { name: 'RAIZ', description: 'Raiz quadrada', syntax: '=RAIZ(A1)' },
-        { name: 'POTENCIA', description: 'Eleva à potência', syntax: '=POTENCIA(A1, 2)' },
+        { name: 'POTÊNCIA', description: 'Eleva à potência', syntax: '=POTÊNCIA(A1; 2)' },
         { name: 'ABS', description: 'Valor absoluto', syntax: '=ABS(A1)' },
-        { name: 'TRUNCAR', description: 'Trunca decimais', syntax: '=TRUNCAR(A1, 2)' },
-        { name: 'ARREDONDAR', description: 'Arredonda número', syntax: '=ARREDONDAR(A1, 2)' },
+        { name: 'TRUNCAR', description: 'Trunca decimais', syntax: '=TRUNCAR(A1; 2)' },
+        { name: 'ARREDONDAR', description: 'Arredonda número', syntax: '=ARREDONDAR(A1; 2)' },
         { name: 'INT', description: 'Parte inteira', syntax: '=INT(A1)' },
-        { name: 'SINAL', description: 'Sinal do número', syntax: '=SINAL(A1)' },
+        { name: 'CONCATENAR', description: 'Junta textos', syntax: '=CONCATENAR(A1; A2)' },
       ],
       stats: [
-        { name: 'MEDIA', description: 'Média aritmética', syntax: '=MEDIA(A1:A10)' },
-        { name: 'MEDIANA', description: 'Mediana', syntax: '=MEDIANA(A1:A10)' },
+        { name: 'MÉDIA', description: 'Média aritmética', syntax: '=MÉDIA(A1:A10)' },
+        { name: 'MED', description: 'Mediana', syntax: '=MED(A1:A10)' },
         { name: 'MODO', description: 'Valor mais frequente', syntax: '=MODO(A1:A10)' },
-        { name: 'MAXIMO', description: 'Valor máximo', syntax: '=MAXIMO(A1:A10)' },
-        { name: 'MINIMO', description: 'Valor mínimo', syntax: '=MINIMO(A1:A10)' },
-        { name: 'CONTAR', description: 'Conta números', syntax: '=CONTAR(A1:A10)' },
+        { name: 'MÁXIMO', description: 'Valor máximo', syntax: '=MÁXIMO(A1:A10)' },
+        { name: 'MÍNIMO', description: 'Valor mínimo', syntax: '=MÍNIMO(A1:A10)' },
+        { name: 'CONT.NÚM', description: 'Conta números', syntax: '=CONT.NÚM(A1:A10)' },
+        { name: 'CONT.VALORES', description: 'Conta valores', syntax: '=CONT.VALORES(A1:A10)' },
         { name: 'DESVPAD', description: 'Desvio padrão', syntax: '=DESVPAD(A1:A10)' },
-        { name: 'VARIANCIA', description: 'Variância', syntax: '=VARIANCIA(A1:A10)' },
+        { name: 'VAR', description: 'Variância', syntax: '=VAR(A1:A10)' },
       ],
       financial: [
-        { name: 'VP', description: 'Valor presente', syntax: '=VP(taxa, nper, pgto)' },
-        { name: 'VF', description: 'Valor futuro', syntax: '=VF(taxa, nper, pgto)' },
-        { name: 'PGTO', description: 'Pagamento', syntax: '=PGTO(taxa, nper, vp)' },
-        { name: 'TAXA', description: 'Taxa de juros', syntax: '=TAXA(nper, pgto, vp)' },
-        { name: 'NPER', description: 'Número de períodos', syntax: '=NPER(taxa, pgto, vp)' },
+        { name: 'VP', description: 'Valor presente', syntax: '=VP(taxa; nper; pgto)' },
+        { name: 'VF', description: 'Valor futuro', syntax: '=VF(taxa; nper; pgto)' },
+        { name: 'PGTO', description: 'Pagamento', syntax: '=PGTO(taxa; nper; vp)' },
+        { name: 'TAXA', description: 'Taxa de juros', syntax: '=TAXA(nper; pgto; vp)' },
+        { name: 'NPER', description: 'Número de períodos', syntax: '=NPER(taxa; pgto; vp)' },
       ]
     };
 
@@ -1174,6 +1232,13 @@ class DJDataForgeApp {
       sidebar.style.display = 'none';
       logger.info('[App] Sidebar hidden');
     }
+
+    // Force grid resize after layout change
+    setTimeout(() => {
+      if (this.grid) {
+        this.grid.refresh();
+      }
+    }, 50);
   }
 
   private toggleRightPanel(): void {
@@ -1187,6 +1252,13 @@ class DJDataForgeApp {
       panel.style.display = 'none';
       logger.info('[App] Right panel hidden');
     }
+
+    // Force grid resize after layout change
+    setTimeout(() => {
+      if (this.grid) {
+        this.grid.refresh();
+      }
+    }, 50);
   }
 
   private toggleFormulaBar(): void {
@@ -1200,6 +1272,13 @@ class DJDataForgeApp {
       formulaBar.style.display = 'none';
       logger.info('[App] Formula bar hidden');
     }
+
+    // Force grid resize after layout change
+    setTimeout(() => {
+      if (this.grid) {
+        this.grid.refresh();
+      }
+    }, 50);
   }
 
   private toggleGridlines(): void {

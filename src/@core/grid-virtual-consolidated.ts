@@ -877,29 +877,34 @@ export class VirtualGrid {
 
     const partialName = match[1];
 
-    // Formula syntax reference
+    // Formula syntax reference - Using correct Portuguese syntax
     const formulaHelp: Record<string, { syntax: string; description: string }> = {
-      'SUMA': { syntax: 'SUMA(número1, [número2], ...)', description: 'Soma todos os números fornecidos' },
-      'MEDIA': { syntax: 'MEDIA(número1, [número2], ...)', description: 'Calcula a média aritmética' },
-      'MAXIMO': { syntax: 'MAXIMO(número1, [número2], ...)', description: 'Retorna o maior valor' },
-      'MINIMO': { syntax: 'MINIMO(número1, [número2], ...)', description: 'Retorna o menor valor' },
-      'CONTAR': { syntax: 'CONTAR(valor1, [valor2], ...)', description: 'Conta quantos números há' },
+      'SOMA': { syntax: 'SOMA(número1, [número2], ...)', description: 'Soma todos os números fornecidos' },
+      'MÉDIA': { syntax: 'MÉDIA(número1, [número2], ...)', description: 'Calcula a média aritmética' },
+      'MÁXIMO': { syntax: 'MÁXIMO(número1, [número2], ...)', description: 'Retorna o maior valor' },
+      'MÍNIMO': { syntax: 'MÍNIMO(número1, [número2], ...)', description: 'Retorna o menor valor' },
+      'CONT.NÚM': { syntax: 'CONT.NÚM(valor1, [valor2], ...)', description: 'Conta quantos números há' },
+      'CONT.VALORES': { syntax: 'CONT.VALORES(valor1, [valor2], ...)', description: 'Conta quantos valores há' },
       'SE': { syntax: 'SE(teste_lógico, valor_se_verdadeiro, valor_se_falso)', description: 'Retorna um valor se verdadeiro, outro se falso' },
-      'PRODUTO': { syntax: 'PRODUTO(número1, [número2], ...)', description: 'Multiplica todos os números' },
+      'MULT': { syntax: 'MULT(número1, [número2], ...)', description: 'Multiplica todos os números' },
       'RAIZ': { syntax: 'RAIZ(número)', description: 'Retorna a raiz quadrada' },
-      'POTENCIA': { syntax: 'POTENCIA(número, potência)', description: 'Eleva um número a uma potência' },
+      'POTÊNCIA': { syntax: 'POTÊNCIA(número, potência)', description: 'Eleva um número a uma potência' },
       'ABS': { syntax: 'ABS(número)', description: 'Retorna o valor absoluto' },
       'ARREDONDAR': { syntax: 'ARREDONDAR(número, num_dígitos)', description: 'Arredonda um número' },
       'TRUNCAR': { syntax: 'TRUNCAR(número, [num_dígitos])', description: 'Trunca um número' },
       'INT': { syntax: 'INT(número)', description: 'Arredonda para baixo até o inteiro mais próximo' },
-      'MEDIANA': { syntax: 'MEDIANA(número1, [número2], ...)', description: 'Retorna a mediana' },
+      'MED': { syntax: 'MED(número1, [número2], ...)', description: 'Retorna a mediana' },
       'MODO': { syntax: 'MODO(número1, [número2], ...)', description: 'Retorna o valor mais frequente' },
       'DESVPAD': { syntax: 'DESVPAD(número1, [número2], ...)', description: 'Calcula o desvio padrão' },
-      'VARIANCIA': { syntax: 'VARIANCIA(número1, [número2], ...)', description: 'Calcula a variância' },
-      'VP': { syntax: 'VP(taxa, nper, pgto)', description: 'Valor presente de investimento' },
-      'VF': { syntax: 'VF(taxa, nper, pgto)', description: 'Valor futuro de investimento' },
-      'PGTO': { syntax: 'PGTO(taxa, nper, vp)', description: 'Pagamento de empréstimo' },
-      'SINAL': { syntax: 'SINAL(número)', description: 'Retorna o sinal do número' },
+      'VAR': { syntax: 'VAR(número1, [número2], ...)', description: 'Calcula a variância' },
+      'CONCATENAR': { syntax: 'CONCATENAR(texto1, [texto2], ...)', description: 'Junta textos' },
+      'MAIÚSCULA': { syntax: 'MAIÚSCULA(texto)', description: 'Converte para maiúsculas' },
+      'MINÚSCULA': { syntax: 'MINÚSCULA(texto)', description: 'Converte para minúsculas' },
+      'NÚM.CARACT': { syntax: 'NÚM.CARACT(texto)', description: 'Conta caracteres' },
+      'E': { syntax: 'E(lógico1, [lógico2], ...)', description: 'Retorna VERDADEIRO se todos forem verdadeiros' },
+      'OU': { syntax: 'OU(lógico1, [lógico2], ...)', description: 'Retorna VERDADEIRO se algum for verdadeiro' },
+      'NÃO': { syntax: 'NÃO(lógico)', description: 'Inverte o valor lógico' },
+      'PROCV': { syntax: 'PROCV(valor, tabela, coluna, [exato])', description: 'Procura valor em tabela' },
     };
 
     // Find matching functions (exact match or partial)
@@ -908,11 +913,11 @@ export class VirtualGrid {
     if (partialName === '') {
       // Show most common functions when just "=" is typed
       matchedFunctions = [
-        { name: 'SUMA', help: formulaHelp['SUMA'] },
-        { name: 'MEDIA', help: formulaHelp['MEDIA'] },
+        { name: 'SOMA', help: formulaHelp['SOMA'] },
+        { name: 'MÉDIA', help: formulaHelp['MÉDIA'] },
         { name: 'SE', help: formulaHelp['SE'] },
-        { name: 'MAXIMO', help: formulaHelp['MAXIMO'] },
-        { name: 'MINIMO', help: formulaHelp['MINIMO'] },
+        { name: 'MÁXIMO', help: formulaHelp['MÁXIMO'] },
+        { name: 'MÍNIMO', help: formulaHelp['MÍNIMO'] },
       ];
     } else {
       // Check for exact match first

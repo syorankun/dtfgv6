@@ -1245,19 +1245,13 @@ class DJDataForgeApp {
     if (!sidebar) return;
 
     if (sidebar.style.display === 'none') {
-      sidebar.style.display = 'flex';
+      sidebar.style.display = '';
       logger.info('[App] Sidebar shown');
     } else {
       sidebar.style.display = 'none';
       logger.info('[App] Sidebar hidden');
     }
-
-    // Force grid resize after layout change
-    setTimeout(() => {
-      if (this.grid) {
-        this.grid.resize();
-      }
-    }, 100);
+    // ResizeObserver will handle grid resize automatically
   }
 
   private toggleRightPanel(): void {
@@ -1265,19 +1259,13 @@ class DJDataForgeApp {
     if (!panel) return;
 
     if (panel.style.display === 'none') {
-      panel.style.display = 'flex';
+      panel.style.display = '';
       logger.info('[App] Right panel shown');
     } else {
       panel.style.display = 'none';
       logger.info('[App] Right panel hidden');
     }
-
-    // Force grid resize after layout change
-    setTimeout(() => {
-      if (this.grid) {
-        this.grid.resize();
-      }
-    }, 100);
+    // ResizeObserver will handle grid resize automatically
   }
 
   private toggleFormulaBar(): void {
@@ -1285,19 +1273,13 @@ class DJDataForgeApp {
     if (!formulaBar) return;
 
     if (formulaBar.style.display === 'none') {
-      formulaBar.style.display = 'flex';
+      formulaBar.style.display = '';
       logger.info('[App] Formula bar shown');
     } else {
       formulaBar.style.display = 'none';
       logger.info('[App] Formula bar hidden');
     }
-
-    // Force grid resize after layout change
-    setTimeout(() => {
-      if (this.grid) {
-        this.grid.resize();
-      }
-    }, 100);
+    // ResizeObserver will handle grid resize automatically
   }
 
   private toggleGridlines(): void {

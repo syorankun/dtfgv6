@@ -289,6 +289,7 @@ export class VirtualGrid {
   private scrollY = 0;
   private viewportWidth = 0;
   private viewportHeight = 0;
+  private resizeTimeout?: number;
 
   // Components
   private selectionManager = new SelectionManager();
@@ -334,18 +335,49 @@ export class VirtualGrid {
   // --------------------------------------------------------------------------
 
   private setupCanvas(): void {
-    const dpr = window.devicePixelRatio || 1;
-    const rect = this.canvas.getBoundingClientRect();
+    // Get parent container to calculate correct size
+    const container = this.canvas.parentElement;
+    if (!container) return;
 
-    this.canvas.width = rect.width * dpr;
-    this.canvas.height = rect.height * dpr;
+    // Force reflow to get accurate dimensions
+    container.offsetHeight; // Trigger reflow
+
+    const containerRect = container.getBoundingClientRect();
+    const dpr = window.devicePixelRatio || 1;
+
+    // Calculate actual available space
+    const width = Math.floor(containerRect.width);
+    const height = Math.floor(containerRect.height);
+
+    // Only update if dimensions actually changed
+    if (width === this.viewportWidth && height === this.viewportHeight) {
+      return;
+    }
+
+    // Update viewport dimensions
+    this.viewportWidth = width;
+    this.viewportHeight = height;
+
+    // Reset canvas completely
+    this.canvas.width = width * dpr;
+    this.canvas.height = height * dpr;
+
+    // Reset canvas style
+    this.canvas.style.width = width + "px";
+    this.canvas.style.height = height + "px";
+
+    // Reapply scaling
+    this.ctx.setTransform(1, 0, 0, 1, 0, 0); // Reset transform
     this.ctx.scale(dpr, dpr);
 
-    this.viewportWidth = rect.width;
-    this.viewportHeight = rect.height;
+    // Clamp scroll to new boundaries
+    if (this.sheet) {
+      const maxScrollY = Math.max(0, this.sheet.rowCount * this.cellHeight - this.viewportHeight + this.headerHeight);
+      const maxScrollX = Math.max(0, this.sheet.colCount * this.cellWidth - this.viewportWidth + this.headerWidth);
 
-    this.canvas.style.width = rect.width + "px";
-    this.canvas.style.height = rect.height + "px";
+      this.scrollY = Math.max(0, Math.min(maxScrollY, this.scrollY));
+      this.scrollX = Math.max(0, Math.min(maxScrollX, this.scrollX));
+    }
   }
 
   private setupEvents(): void {
@@ -362,12 +394,23 @@ export class VirtualGrid {
     // Wheel events
     this.canvas.addEventListener("wheel", this.handleWheel.bind(this));
 
-    // Resize observer
-    const resizeObserver = new ResizeObserver(() => {
-      this.setupCanvas();
-      this.render();
-    });
-    resizeObserver.observe(this.canvas);
+    // Resize observer on parent container for robust resize handling
+    const container = this.canvas.parentElement;
+    if (container) {
+      const resizeObserver = new ResizeObserver(() => {
+        // Debounce resize to avoid excessive redraws
+        if (this.resizeTimeout) {
+          clearTimeout(this.resizeTimeout);
+        }
+
+        this.resizeTimeout = window.setTimeout(() => {
+          this.setupCanvas();
+          this.render();
+        }, 50);
+      });
+
+      resizeObserver.observe(container);
+    }
   }
 
   // --------------------------------------------------------------------------
@@ -1257,8 +1300,34 @@ export class VirtualGrid {
   }
 
   resize(): void {
+    // Force immediate resize with reflow
+    const container = this.canvas.parentElement;
+    if (container) {
+      container.offsetHeight; // Force reflow
+    }
+
     this.setupCanvas();
     this.render();
+  }
+
+  forceResize(): void {
+    // Nuclear option - completely reset and redraw
+    if (this.resizeTimeout) {
+      clearTimeout(this.resizeTimeout);
+    }
+
+    const container = this.canvas.parentElement;
+    if (container) {
+      container.offsetHeight; // Force reflow
+    }
+
+    // Wait for layout to stabilize
+    requestAnimationFrame(() => {
+      this.setupCanvas();
+      requestAnimationFrame(() => {
+        this.render();
+      });
+    });
   }
 
   getSelection(): Selection {

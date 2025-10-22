@@ -295,6 +295,11 @@ export class VirtualGrid {
   private editingCol = -1;
   private editor?: HTMLInputElement;
 
+  // Formula visual feedback
+  private formulaReferencedCells: Set<string> = new Set();
+  private formulaReferenceColors = ['#FF6B6B', '#4ECDC4', '#45B7D1', '#FFA07A', '#98D8C8'];
+  private currentColorIndex = 0;
+
   // Events
   private onCellChange?: (row: number, col: number, value: any) => void;
   private onSelectionChange?: (selection: Selection) => void;
@@ -541,8 +546,55 @@ export class VirtualGrid {
       }
     }
 
+    // Render formula reference highlights (original visual style)
+    if (this.isEditingFormula && this.formulaReferencedCells.size > 0) {
+      this.renderFormulaReferences(startRow, endRow, startCol, endCol);
+    }
+
     // Render corner header
     this.renderer.renderHeader(0, 0, this.headerWidth, this.headerHeight, '', false);
+  }
+
+  private renderFormulaReferences(startRow: number, endRow: number, startCol: number, endCol: number): void {
+    const ctx = this.ctx;
+    let colorIdx = 0;
+
+    this.formulaReferencedCells.forEach(cellKey => {
+      const [rowStr, colStr] = cellKey.split(',');
+      const row = parseInt(rowStr);
+      const col = parseInt(colStr);
+
+      // Only render if in viewport
+      if (row >= startRow && row < endRow && col >= startCol && col < endCol) {
+        const x = this.headerWidth + (col * this.cellWidth) - this.scrollX;
+        const y = this.headerHeight + (row * this.cellHeight) - this.scrollY;
+        const color = this.formulaReferenceColors[colorIdx % this.formulaReferenceColors.length];
+
+        // Draw pulsing border effect (original style)
+        ctx.save();
+
+        // Outer glow
+        ctx.shadowColor = color;
+        ctx.shadowBlur = 8;
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 3;
+        ctx.strokeRect(x + 2, y + 2, this.cellWidth - 4, this.cellHeight - 4);
+
+        // Inner highlight
+        ctx.shadowBlur = 0;
+        ctx.fillStyle = color + '20'; // 20 = 12.5% opacity
+        ctx.fillRect(x + 1, y + 1, this.cellWidth - 2, this.cellHeight - 2);
+
+        // Corner indicator (small circle in top-right)
+        ctx.fillStyle = color;
+        ctx.beginPath();
+        ctx.arc(x + this.cellWidth - 8, y + 8, 4, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.restore();
+        colorIdx++;
+      }
+    });
   }
 
   private renderEmpty(): void {
@@ -569,6 +621,10 @@ export class VirtualGrid {
     this.isEditing = true;
     this.editingRow = row;
     this.editingCol = col;
+
+    // Clear formula reference tracking
+    this.formulaReferencedCells.clear();
+    this.currentColorIndex = 0;
 
     const cell = this.sheet.getCell(row, col);
     const value = initialValue ?? (cell?.formula || cell?.value || '');
@@ -632,6 +688,8 @@ export class VirtualGrid {
     this.isEditingFormula = false;
     this.editingRow = -1;
     this.editingCol = -1;
+    this.formulaReferencedCells.clear();
+    this.currentColorIndex = 0;
 
     if (save && this.sheet) {
       const value = editor.value.trim();
@@ -644,7 +702,7 @@ export class VirtualGrid {
           type: 'formula',
         });
 
-        // Trigger immediate recalculation
+        // Trigger immediate recalculation - DON'T render yet, wait for callback
         this.onCellChange?.(row, col, value);
       } else {
         // Try to parse as number
@@ -669,7 +727,11 @@ export class VirtualGrid {
     }
 
     this.canvas.focus();
-    this.render();
+
+    // Only render if not a formula (formulas will render after recalc via callback)
+    if (!save || !value.startsWith('=')) {
+      this.render();
+    }
   }
 
   // --------------------------------------------------------------------------
@@ -696,6 +758,10 @@ export class VirtualGrid {
     const newCursorPos = cursorPos + cellRef.length;
     this.editor.setSelectionRange(newCursorPos, newCursorPos);
     this.editor.focus();
+
+    // Add to visual feedback tracking
+    this.formulaReferencedCells.add(`${row},${col}`);
+    this.render(); // Re-render to show visual feedback
   }
 
   private extendRangeReferenceInFormula(row: number, col: number): void {
@@ -726,6 +792,10 @@ export class VirtualGrid {
       // Move cursor to the end
       this.editor.setSelectionRange(this.editor.value.length, this.editor.value.length);
       this.editor.focus();
+
+      // Add to visual feedback tracking
+      this.formulaReferencedCells.add(`${row},${col}`);
+      this.render(); // Re-render to show visual feedback
     }
   }
 

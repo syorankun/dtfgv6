@@ -587,7 +587,7 @@ export class DJDataForgeKernel {
   }
   
   private setupBeforeUnload(): void {
-    window.addEventListener("beforeunload", async (e) => {
+    window.addEventListener("beforeunload", async (_e) => {
       try {
         await this.saveAllWorkbooks();
         await this.saveSnapshot();

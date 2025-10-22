@@ -370,8 +370,7 @@ export class VirtualGrid {
   }
 
   private handleMouseMove(e: MouseEvent): void {
-    if (e.buttons === 1) {
-      // Left mouse button
+    if (e.buttons === 1) { // Left mouse button
       const rect = this.canvas.getBoundingClientRect();
       const x = e.clientX - rect.left;
       const y = e.clientY - rect.top;
@@ -404,50 +403,50 @@ export class VirtualGrid {
     if (this.isEditing) return;
 
     switch (e.key) {
-      case "ArrowUp":
+      case 'ArrowUp':
         e.preventDefault();
         this.selectionManager.moveSelection(-1, 0);
         this.onSelectionChange?.(this.selectionManager.getSelection());
         this.render();
         break;
-      case "ArrowDown":
-      case "Enter":
+      case 'ArrowDown':
+      case 'Enter':
         e.preventDefault();
         this.selectionManager.moveSelection(1, 0);
         this.onSelectionChange?.(this.selectionManager.getSelection());
         this.render();
         break;
-      case "ArrowLeft":
+      case 'ArrowLeft':
         e.preventDefault();
         this.selectionManager.moveSelection(0, -1);
         this.onSelectionChange?.(this.selectionManager.getSelection());
         this.render();
         break;
-      case "ArrowRight":
-      case "Tab":
+      case 'ArrowRight':
+      case 'Tab':
         e.preventDefault();
         this.selectionManager.moveSelection(0, 1);
         this.onSelectionChange?.(this.selectionManager.getSelection());
         this.render();
         break;
-      case "Delete":
-      case "Backspace":
+      case 'Delete':
+      case 'Backspace':
         e.preventDefault();
         this.deleteSelection();
         break;
-      case "c":
+      case 'c':
         if (e.ctrlKey || e.metaKey) {
           e.preventDefault();
           this.copySelection();
         }
         break;
-      case "v":
+      case 'v':
         if (e.ctrlKey || e.metaKey) {
           e.preventDefault();
           this.pasteSelection();
         }
         break;
-      case "F2":
+      case 'F2':
         e.preventDefault();
         const activeCell = this.selectionManager.getActiveCell();
         this.startEditing(activeCell.row, activeCell.col);
@@ -492,89 +491,52 @@ export class VirtualGrid {
 
     // Calculate visible cells
     const startCol = Math.floor(this.scrollX / this.cellWidth);
-    const endCol = Math.ceil(
-      (this.scrollX + this.viewportWidth) / this.cellWidth
-    );
+    const endCol = Math.ceil((this.scrollX + this.viewportWidth) / this.cellWidth);
     const startRow = Math.floor(this.scrollY / this.cellHeight);
-    const endRow = Math.ceil(
-      (this.scrollY + this.viewportHeight) / this.cellHeight
-    );
+    const endRow = Math.ceil((this.scrollY + this.viewportHeight) / this.cellHeight);
 
     // Render column headers
     for (let col = startCol; col < endCol; col++) {
-      const x = this.headerWidth + col * this.cellWidth - this.scrollX;
+      const x = this.headerWidth + (col * this.cellWidth) - this.scrollX;
       const label = this.sheet.getColumnName(col);
-      this.renderer.renderHeader(
-        x,
-        0,
-        this.cellWidth,
-        this.headerHeight,
-        label,
-        true
-      );
+      this.renderer.renderHeader(x, 0, this.cellWidth, this.headerHeight, label, true);
     }
 
     // Render row headers
     for (let row = startRow; row < endRow; row++) {
-      const y = this.headerHeight + row * this.cellHeight - this.scrollY;
+      const y = this.headerHeight + (row * this.cellHeight) - this.scrollY;
       const label = String(row + 1);
-      this.renderer.renderHeader(
-        0,
-        y,
-        this.headerWidth,
-        this.cellHeight,
-        label,
-        false
-      );
+      this.renderer.renderHeader(0, y, this.headerWidth, this.cellHeight, label, false);
     }
 
     // Render cells
     for (let row = startRow; row < endRow; row++) {
       for (let col = startCol; col < endCol; col++) {
-        const x = this.headerWidth + col * this.cellWidth - this.scrollX;
-        const y = this.headerHeight + row * this.cellHeight - this.scrollY;
+        const x = this.headerWidth + (col * this.cellWidth) - this.scrollX;
+        const y = this.headerHeight + (row * this.cellHeight) - this.scrollY;
 
         const cell = this.sheet.getCell(row, col);
-        const isInRange =
-          row >= range.startRow &&
-          row <= range.endRow &&
-          col >= range.startCol &&
-          col <= range.endCol;
-        const isActive =
-          row === selection.start.row && col === selection.start.col;
+        const isInRange = row >= range.startRow && row <= range.endRow &&
+                         col >= range.startCol && col <= range.endCol;
+        const isActive = row === selection.start.row && col === selection.start.col;
 
-        this.renderer.renderCell(
-          x,
-          y,
-          this.cellWidth,
-          this.cellHeight,
-          cell,
-          isInRange,
-          isActive
-        );
+        this.renderer.renderCell(x, y, this.cellWidth, this.cellHeight, cell, isInRange, isActive);
       }
     }
 
     // Render corner header
-    this.renderer.renderHeader(
-      0,
-      0,
-      this.headerWidth,
-      this.headerHeight,
-      "",
-      false
-    );
+    this.renderer.renderHeader(0, 0, this.headerWidth, this.headerHeight, '', false);
   }
 
   private renderEmpty(): void {
     this.ctx.clearRect(0, 0, this.viewportWidth, this.viewportHeight);
 
-    this.ctx.fillStyle = "#94a3b8";
-    this.ctx.font = "14px -apple-system, sans-serif";
-    this.ctx.textAlign = "center";
-    this.ctx.textBaseline = "middle";
+    this.ctx.fillStyle = '#94a3b8';
+    this.ctx.font = '14px -apple-system, sans-serif';
+    this.ctx.textAlign = 'center';
+    this.ctx.textBaseline = 'middle';
     this.ctx.fillText(
-      "Selecione uma planilha para visualizar",
+      'Selecione uma planilha para visualizar',
       this.viewportWidth / 2,
       this.viewportHeight / 2
     );
@@ -590,48 +552,44 @@ export class VirtualGrid {
     this.isEditing = true;
 
     const cell = this.sheet.getCell(row, col);
-    const value = initialValue ?? (cell?.formula || cell?.value || "");
+    const value = initialValue ?? (cell?.formula || cell?.value || '');
 
     // Create editor input
     const rect = this.canvas.getBoundingClientRect();
-    const x =
-      rect.left + this.headerWidth + col * this.cellWidth - this.scrollX;
-    const y =
-      rect.top + this.headerHeight + row * this.cellHeight - this.scrollY;
+    const x = rect.left + this.headerWidth + (col * this.cellWidth) - this.scrollX;
+    const y = rect.top + this.headerHeight + (row * this.cellHeight) - this.scrollY;
 
-    this.editor = document.createElement("input");
-    this.editor.type = "text";
+    this.editor = document.createElement('input');
+    this.editor.type = 'text';
     this.editor.value = String(value);
-    this.editor.style.position = "absolute";
-    this.editor.style.left = x + "px";
-    this.editor.style.top = y + "px";
-    this.editor.style.width = this.cellWidth + "px";
-    this.editor.style.height = this.cellHeight + "px";
-    this.editor.style.border = "2px solid #2563eb";
-    this.editor.style.outline = "none";
-    this.editor.style.fontSize = "13px";
-    this.editor.style.padding = "0 8px";
-    this.editor.style.zIndex = "1000";
+    this.editor.style.position = 'absolute';
+    this.editor.style.left = x + 'px';
+    this.editor.style.top = y + 'px';
+    this.editor.style.width = this.cellWidth + 'px';
+    this.editor.style.height = this.cellHeight + 'px';
+    this.editor.style.border = '2px solid #2563eb';
+    this.editor.style.outline = 'none';
+    this.editor.style.fontSize = '13px';
+    this.editor.style.padding = '0 8px';
+    this.editor.style.zIndex = '1000';
 
     document.body.appendChild(this.editor);
     this.editor.focus();
     this.editor.select();
 
     // Handle editor events
-    this.editor.addEventListener("blur", () =>
-      this.stopEditing(row, col, true)
-    );
-    this.editor.addEventListener("keydown", (e) => {
-      if (e.key === "Enter") {
+    this.editor.addEventListener('blur', () => this.stopEditing(row, col, true));
+    this.editor.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
         e.preventDefault();
         this.stopEditing(row, col, true);
         this.selectionManager.moveSelection(1, 0);
         this.onSelectionChange?.(this.selectionManager.getSelection());
         this.render();
-      } else if (e.key === "Escape") {
+      } else if (e.key === 'Escape') {
         e.preventDefault();
         this.stopEditing(row, col, false);
-      } else if (e.key === "Tab") {
+      } else if (e.key === 'Tab') {
         e.preventDefault();
         this.stopEditing(row, col, true);
         this.selectionManager.moveSelection(0, 1);
@@ -648,15 +606,15 @@ export class VirtualGrid {
       const value = this.editor.value;
 
       // Check if it's a formula
-      if (value.startsWith("=")) {
+      if (value.startsWith('=')) {
         this.sheet.setCell(row, col, value, {
           formula: value,
-          type: "formula",
+          type: 'formula',
         });
       } else {
         // Try to parse as number
         const numValue = parseFloat(value);
-        if (!isNaN(numValue) && value.trim() !== "") {
+        if (!isNaN(numValue) && value.trim() !== '') {
           this.sheet.setCell(row, col, numValue);
         } else {
           this.sheet.setCell(row, col, value);
@@ -699,8 +657,8 @@ export class VirtualGrid {
 
     for (let row = range.startRow; row <= range.endRow; row++) {
       for (let col = range.startCol; col <= range.endCol; col++) {
-        this.sheet.setCell(row, col, "");
-        this.onCellChange?.(row, col, "");
+        this.sheet.setCell(row, col, '');
+        this.onCellChange?.(row, col, '');
       }
     }
 
@@ -716,12 +674,8 @@ export class VirtualGrid {
       return null;
     }
 
-    const col = Math.floor(
-      (x - this.headerWidth + this.scrollX) / this.cellWidth
-    );
-    const row = Math.floor(
-      (y - this.headerHeight + this.scrollY) / this.cellHeight
-    );
+    const col = Math.floor((x - this.headerWidth + this.scrollX) / this.cellWidth);
+    const row = Math.floor((y - this.headerHeight + this.scrollY) / this.cellHeight);
 
     return { row, col };
   }
@@ -751,9 +705,7 @@ export class VirtualGrid {
     return this.selectionManager.getSelection();
   }
 
-  setCellChangeHandler(
-    handler: (row: number, col: number, value: any) => void
-  ): void {
+  setCellChangeHandler(handler: (row: number, col: number, value: any) => void): void {
     this.onCellChange = handler;
   }
 
@@ -771,22 +723,14 @@ export class VirtualGrid {
 
     if (cellX < this.scrollX) {
       this.scrollX = cellX;
-    } else if (
-      cellX + this.cellWidth >
-      this.scrollX + this.viewportWidth - this.headerWidth
-    ) {
-      this.scrollX =
-        cellX + this.cellWidth - this.viewportWidth + this.headerWidth;
+    } else if (cellX + this.cellWidth > this.scrollX + this.viewportWidth - this.headerWidth) {
+      this.scrollX = cellX + this.cellWidth - this.viewportWidth + this.headerWidth;
     }
 
     if (cellY < this.scrollY) {
       this.scrollY = cellY;
-    } else if (
-      cellY + this.cellHeight >
-      this.scrollY + this.viewportHeight - this.headerHeight
-    ) {
-      this.scrollY =
-        cellY + this.cellHeight - this.viewportHeight + this.headerHeight;
+    } else if (cellY + this.cellHeight > this.scrollY + this.viewportHeight - this.headerHeight) {
+      this.scrollY = cellY + this.cellHeight - this.viewportHeight + this.headerHeight;
     }
 
     this.render();

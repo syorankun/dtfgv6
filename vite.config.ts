@@ -5,25 +5,23 @@ export default defineConfig({
   resolve: {
     alias: {
       "@core": path.resolve(__dirname, "./src/@core"),
-      "@ui": path.resolve(__dirname, "./src/@ui"),
-      "@plugins": path.resolve(__dirname, "./src/@plugins"),
     },
   },
   build: {
     target: "es2020",
     outDir: "dist",
     sourcemap: true,
+    // Configuração para file:// protocol
     rollupOptions: {
       output: {
-        manualChunks: {
-          vendor: ["papaparse", "dayjs", "nanoid"],
-          xlsx: ["xlsx"],
-          charts: ["chart.js"],
-        },
+        // Inlines assets to avoid CORS issues with file://
+        inlineDynamicImports: true,
+        manualChunks: undefined,
       },
     },
     chunkSizeWarningLimit: 1500, // 1.5 MB
   },
+  base: "./", // Importante para file:// protocol
   server: {
     port: 5173,
     open: true,

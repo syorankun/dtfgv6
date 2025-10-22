@@ -709,9 +709,17 @@ export class CalcEngine {
         const coord = this.cellRefToCoord(ref);
         const cell = sheet.getCell(coord.row, coord.col);
 
-        if (cell?.formula && (options?.force || !this.cache.has(ref))) {
-          await this.evalCell(ref, sheet);
-          cellsProcessed++;
+        if (cell?.formula) {
+          // If force is true, clear cache first to ensure recalculation
+          if (options?.force) {
+            this.cache.delete(ref);
+          }
+
+          // Recalculate if not in cache or if force is true
+          if (options?.force || !this.cache.has(ref)) {
+            await this.evalCell(ref, sheet);
+            cellsProcessed++;
+          }
         }
       }
     } catch (error) {

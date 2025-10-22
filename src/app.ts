@@ -404,13 +404,19 @@ class DJDataForgeApp {
     // Handle cell changes
     this.grid.setCellChangeHandler(async (row, col, value) => {
       logger.debug('[App] Cell changed', { row, col, value });
-      
-      // Trigger recalculation if formula
-      if (sheet && String(value).startsWith('=')) {
-        await kernel.recalculate(sheet.id);
-        this.grid?.refresh();
+
+      // Always trigger recalculation after cell change
+      // This ensures formulas that depend on this cell are updated
+      if (sheet) {
+        try {
+          const result = await kernel.recalculate(sheet.id, undefined, { force: true });
+          logger.debug('[App] Recalculated', { cellsRecalc: result.cellsRecalc });
+          this.grid?.refresh();
+        } catch (error) {
+          logger.error('[App] Recalculation failed', error);
+        }
       }
-      
+
       this.updateCellInfo(row, col);
     });
     
@@ -663,19 +669,30 @@ class DJDataForgeApp {
     if (!sheet) return;
     
     // Set cell value
-    if (value.startsWith('=')) {
+    const trimmedValue = value.trim();
+    if (trimmedValue.startsWith('=')) {
       // Set formula with 0 as initial value - CalcEngine will compute it
       sheet.setCell(selection.start.row, selection.start.col, 0, {
-        formula: value,
+        formula: trimmedValue,
         type: 'formula',
       });
 
-      // Recalculate
-      await kernel.recalculate(sheet.id);
+      // Recalculate with force to ensure immediate update
+      try {
+        await kernel.recalculate(sheet.id, undefined, { force: true });
+        logger.debug('[App] Formula recalculated from formula bar');
+      } catch (error) {
+        logger.error('[App] Formula recalculation failed', error);
+      }
     } else {
-      sheet.setCell(selection.start.row, selection.start.col, value);
+      const numValue = parseFloat(trimmedValue);
+      if (!isNaN(numValue) && trimmedValue !== '') {
+        sheet.setCell(selection.start.row, selection.start.col, numValue);
+      } else {
+        sheet.setCell(selection.start.row, selection.start.col, trimmedValue);
+      }
     }
-    
+
     this.grid.refresh();
     this.updateCellInfo(selection.start.row, selection.start.col);
   }

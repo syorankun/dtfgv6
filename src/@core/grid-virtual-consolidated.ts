@@ -290,6 +290,9 @@ export class VirtualGrid {
 
   // Editor
   private isEditing = false;
+  private isEditingFormula = false;
+  private editingRow = -1;
+  private editingCol = -1;
   private editor?: HTMLInputElement;
 
   // Events
@@ -363,6 +366,14 @@ export class VirtualGrid {
 
     const cellPos = this.getCellAt(x, y);
     if (cellPos) {
+      // If editing a formula, add cell reference instead of changing selection
+      if (this.isEditingFormula && this.editor) {
+        this.addCellReferenceToFormula(cellPos.row, cellPos.col);
+        e.preventDefault();
+        this.editor.focus();
+        return;
+      }
+
       this.selectionManager.startSelection(cellPos.row, cellPos.col);
       this.onSelectionChange?.(this.selectionManager.getSelection());
       this.render();
@@ -377,6 +388,12 @@ export class VirtualGrid {
 
       const cellPos = this.getCellAt(x, y);
       if (cellPos) {
+        // If editing formula, extend the range reference
+        if (this.isEditingFormula && this.editor) {
+          this.extendRangeReferenceInFormula(cellPos.row, cellPos.col);
+          return;
+        }
+
         this.selectionManager.extendSelection(cellPos.row, cellPos.col);
         this.onSelectionChange?.(this.selectionManager.getSelection());
         this.render();
@@ -550,6 +567,8 @@ export class VirtualGrid {
     if (!this.sheet) return;
 
     this.isEditing = true;
+    this.editingRow = row;
+    this.editingCol = col;
 
     const cell = this.sheet.getCell(row, col);
     const value = initialValue ?? (cell?.formula || cell?.value || '');
@@ -577,7 +596,11 @@ export class VirtualGrid {
     this.editor.focus();
     this.editor.select();
 
+    // Check if editing a formula
+    this.updateFormulaEditingState();
+
     // Handle editor events
+    this.editor.addEventListener('input', () => this.updateFormulaEditingState());
     this.editor.addEventListener('blur', () => this.stopEditing(row, col, true));
     this.editor.addEventListener('keydown', (e) => {
       if (e.key === 'Enter') {
@@ -606,28 +629,34 @@ export class VirtualGrid {
     const editor = this.editor;
     this.editor = undefined;
     this.isEditing = false;
+    this.isEditingFormula = false;
+    this.editingRow = -1;
+    this.editingCol = -1;
 
     if (save && this.sheet) {
-      const value = editor.value;
+      const value = editor.value.trim();
 
       // Check if it's a formula
       if (value.startsWith('=')) {
-        // Set formula with 0 as initial value - CalcEngine will compute it
+        // Set formula - CalcEngine will compute it
         this.sheet.setCell(row, col, 0, {
           formula: value,
           type: 'formula',
         });
+
+        // Trigger immediate recalculation
+        this.onCellChange?.(row, col, value);
       } else {
         // Try to parse as number
         const numValue = parseFloat(value);
-        if (!isNaN(numValue) && value.trim() !== '') {
+        if (!isNaN(numValue) && value !== '') {
           this.sheet.setCell(row, col, numValue);
         } else {
           this.sheet.setCell(row, col, value);
         }
-      }
 
-      this.onCellChange?.(row, col, value);
+        this.onCellChange?.(row, col, value);
+      }
     }
 
     // Safely remove editor element with error handling
@@ -641,6 +670,68 @@ export class VirtualGrid {
 
     this.canvas.focus();
     this.render();
+  }
+
+  // --------------------------------------------------------------------------
+  // FORMULA EDITING HELPERS
+  // --------------------------------------------------------------------------
+
+  private updateFormulaEditingState(): void {
+    if (!this.editor) return;
+    this.isEditingFormula = this.editor.value.startsWith('=');
+  }
+
+  private addCellReferenceToFormula(row: number, col: number): void {
+    if (!this.editor || !this.sheet) return;
+
+    const cellRef = this.getCellReference(row, col);
+    const currentValue = this.editor.value;
+    const cursorPos = this.editor.selectionStart || currentValue.length;
+
+    // Insert cell reference at cursor position
+    const newValue = currentValue.substring(0, cursorPos) + cellRef + currentValue.substring(cursorPos);
+    this.editor.value = newValue;
+
+    // Move cursor after the inserted reference
+    const newCursorPos = cursorPos + cellRef.length;
+    this.editor.setSelectionRange(newCursorPos, newCursorPos);
+    this.editor.focus();
+  }
+
+  private extendRangeReferenceInFormula(row: number, col: number): void {
+    if (!this.editor || !this.sheet) return;
+
+    const cellRef = this.getCellReference(row, col);
+    const currentValue = this.editor.value;
+
+    // Find the last cell reference in the formula
+    const lastRefMatch = currentValue.match(/([A-Z]+\d+)(?!.*[A-Z]+\d+)/);
+
+    if (lastRefMatch) {
+      const lastRef = lastRefMatch[1];
+      const lastRefIndex = currentValue.lastIndexOf(lastRef);
+
+      // Check if it's already a range
+      const beforeLastRef = currentValue.substring(0, lastRefIndex);
+      if (beforeLastRef.endsWith(':')) {
+        // Replace the end of the range
+        const newValue = currentValue.substring(0, lastRefIndex) + cellRef;
+        this.editor.value = newValue;
+      } else {
+        // Convert to range
+        const newValue = currentValue.substring(0, lastRefIndex + lastRef.length) + ':' + cellRef + currentValue.substring(lastRefIndex + lastRef.length);
+        this.editor.value = newValue;
+      }
+
+      // Move cursor to the end
+      this.editor.setSelectionRange(this.editor.value.length, this.editor.value.length);
+      this.editor.focus();
+    }
+  }
+
+  private getCellReference(row: number, col: number): string {
+    if (!this.sheet) return '';
+    return this.sheet.getColumnName(col) + (row + 1);
   }
 
   // --------------------------------------------------------------------------

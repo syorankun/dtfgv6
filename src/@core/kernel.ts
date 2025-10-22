@@ -283,14 +283,7 @@ export class DJDataForgeKernel {
     this.sessionManager = new SessionManager();
     this.eventBus = new EventBus();
     this.pluginHost = new PluginHost(this, this.storageManager);
-    
-    logger.info(`[Kernel] DJ DataForge v${this.version} initialized`);
-  }this.calcEngine = new CalcEngine();
-    this.storageManager = new PersistenceManager();
-    this.companyManager = new CompanyManager(this.storageManager);
-    this.sessionManager = new SessionManager();
-    this.eventBus = new EventBus();
-    
+
     logger.info(`[Kernel] DJ DataForge v${this.version} initialized`);
   }
   
@@ -446,153 +439,11 @@ export class DJDataForgeKernel {
       this.state = "idle";
     }
   }
-      logger.warn("[Kernel] Already initialized");
-      return;
-    }
-    
-    try {
-      logger.info("[Kernel] Initializing...");
-      Perf.start("kernel-init");
-      
-      // 1. Initialize storage
-      await this.storageManager.init();
-      
-      // 2. Initialize company manager
-      await this.companyManager.init();
-      
-      // 3. Initialize calc engine
-      await this.calcEngine.init();
-      
-      // 4. Load workbooks for active company
-      const activeCompany = this.companyManager.getActiveCompany();
-      if (activeCompany) {
-        const workbooksData = await this.storageManager.getAllWorkbooks(activeCompany.id);
-        
-        for (const wbData of workbooksData) {
-          const wb = Workbook.deserialize(wbData);
-          this.workbookManager['workbooks'].set(wb.id, wb);
-        }
-        
-        logger.info("[Kernel] Workbooks loaded", { count: workbooksData.length });
-      }
-      
-      // 5. Start session
-      if (activeCompany) {
-        this.sessionManager.start(activeCompany.id);
-      }
-      
-      // 6. Try to recover from crash
-      await this.recoverFromCrash();
-      
-      // 7. Start auto-save
-      this.startAutoSave();
-      
-      // 8. Setup beforeunload
-      this.setupBeforeUnload();
-      
-      this.state = "ready";
-      
-      const duration = Perf.end("kernel-init");
-      
-      this.eventBus.emit("kernel:ready", {
-        version: this.version,
-        company: activeCompany?.name,
-        workbooks: this.workbookManager.listWorkbooks().length,
-        duration,
-      });
-      
-      logger.info("[Kernel] Ready");
-    } catch (error) {
-      logger.error("[Kernel] Init failed", error);
-      this.state = "shutdown";
-      throw error;
-    }
-  }
-  
-  async dispose(): Promise<void> {
-    logger.info("[Kernel] Shutting down...");
-    this.state = "shutdown";
-    
-    // Stop auto-save
-    if (this.autoSaveTimer) {
-      clearInterval(this.autoSaveTimer);
-    }
-    
-    // Save final snapshot
-    try {
-      await this.saveSnapshot();
-    } catch (error) {
-      logger.error("[Kernel] Final snapshot failed", error);
-    }
-    
-    // End session
-    this.sessionManager.end();
-    
-    // Clear event bus
-    this.eventBus.clear();
-    
-    this.eventBus.emit("kernel:shutdown");
-    logger.info("[Kernel] Shutdown complete");
-  }
-  
+
   // --------------------------------------------------------------------------
-  // PUBLIC API
+  // WORKBOOK OPERATIONS
   // --------------------------------------------------------------------------
-  
-  /**
-   * Get context for plugins
-   */
-  getContext(): KernelContext {
-    return {
-      kernel: this,
-      version: this.version,
-      workbookManager: this.workbookManager,
-      calcEngine: this.calcEngine,
-      transformPipeline: undefined, // TODO: implement
-      companyManager: this.companyManager,
-      eventBus: this.eventBus,
-      storage: this.storageManager,
-    };
-  }
-  
-  /**
-   * Recalculate sheet or cell
-   */
-  async recalculate(
-    sheetId: string,
-    cellRef?: string,
-    options?: { force?: boolean; async?: boolean }
-  ): Promise<{ duration: number; cellsRecalc: number }> {
-    if (this.state === "computing") {
-      logger.warn("[Kernel] Recalc already in progress");
-      return { duration: 0, cellsRecalc: 0 };
-    }
-    
-    this.state = "computing";
-    Perf.start(`recalc-${sheetId}`);
-    
-    try {
-      const sheet = this.workbookManager.getSheet(sheetId);
-      if (!sheet) throw new Error(`Sheet not found: ${sheetId}`);
-      
-      const cellsRecalc = await this.calcEngine.recalculate(sheet, cellRef, options);
-      const duration = Perf.end(`recalc-${sheetId}`);
-      
-      this.eventBus.emit("kernel:recalc-done", {
-        sheetId,
-        cellsRecalc,
-        duration,
-      });
-      
-      return { duration, cellsRecalc };
-    } catch (error) {
-      logger.error("[Kernel] Recalc failed", error);
-      throw error;
-    } finally {
-      this.state = "idle";
-    }
-  }
-  
+
   /**
    * Create new workbook
    */

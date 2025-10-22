@@ -612,7 +612,8 @@ export class VirtualGrid {
 
       // Check if it's a formula
       if (value.startsWith('=')) {
-        this.sheet.setCell(row, col, value, {
+        // Set formula with empty value - CalcEngine will compute it
+        this.sheet.setCell(row, col, '', {
           formula: value,
           type: 'formula',
         });

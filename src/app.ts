@@ -118,18 +118,166 @@ class DJDataForgeApp {
         <!-- Header -->
         <header class="app-header">
           <div class="header-left">
-            <h1>🔧 DJ DataForge v6 FULL</h1>
+            <h1>🔧 DJ DataForge v6</h1>
             <span class="company-badge" id="company-badge">${company?.name || 'Sem empresa'}</span>
           </div>
           <div class="header-right">
-            <div id="plugin-toolbar" class="plugin-toolbar"></div>
-            <button id="btn-import" class="btn">📥 Importar</button>
-            <button id="btn-export" class="btn">📤 Exportar</button>
-            <button id="btn-new-workbook" class="btn btn-primary">📄 Novo</button>
             <button id="btn-settings" class="btn">⚙️</button>
           </div>
         </header>
-        
+
+        <!-- Excel-Style Ribbon Menu -->
+        <div class="ribbon">
+          <div class="ribbon-tabs">
+            <button class="ribbon-tab active" data-tab="home">Início</button>
+            <button class="ribbon-tab" data-tab="insert">Inserir</button>
+            <button class="ribbon-tab" data-tab="formulas">Fórmulas</button>
+            <button class="ribbon-tab" data-tab="data">Dados</button>
+            <button class="ribbon-tab" data-tab="view">Exibir</button>
+          </div>
+
+          <!-- Home Tab Content -->
+          <div class="ribbon-content" data-content="home">
+            <div class="ribbon-group">
+              <div class="ribbon-group-title">Arquivo</div>
+              <div class="ribbon-buttons">
+                <button id="btn-new-workbook" class="ribbon-btn">
+                  <span class="ribbon-icon">📄</span>
+                  <span class="ribbon-label">Novo</span>
+                </button>
+                <button id="btn-import" class="ribbon-btn">
+                  <span class="ribbon-icon">📥</span>
+                  <span class="ribbon-label">Importar</span>
+                </button>
+                <button id="btn-export" class="ribbon-btn">
+                  <span class="ribbon-icon">📤</span>
+                  <span class="ribbon-label">Exportar</span>
+                </button>
+              </div>
+            </div>
+
+            <div class="ribbon-group">
+              <div class="ribbon-group-title">Formatação</div>
+              <div class="ribbon-buttons">
+                <button class="ribbon-btn">
+                  <span class="ribbon-icon"><b>N</b></span>
+                  <span class="ribbon-label">Negrito</span>
+                </button>
+                <button class="ribbon-btn">
+                  <span class="ribbon-icon"><i>I</i></span>
+                  <span class="ribbon-label">Itálico</span>
+                </button>
+                <button class="ribbon-btn">
+                  <span class="ribbon-icon">🎨</span>
+                  <span class="ribbon-label">Cor</span>
+                </button>
+              </div>
+            </div>
+
+            <div class="ribbon-group">
+              <div class="ribbon-group-title">Alinhamento</div>
+              <div class="ribbon-buttons">
+                <button class="ribbon-btn">
+                  <span class="ribbon-icon">⬅️</span>
+                  <span class="ribbon-label">Esquerda</span>
+                </button>
+                <button class="ribbon-btn">
+                  <span class="ribbon-icon">↔️</span>
+                  <span class="ribbon-label">Centro</span>
+                </button>
+                <button class="ribbon-btn">
+                  <span class="ribbon-icon">➡️</span>
+                  <span class="ribbon-label">Direita</span>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Insert Tab Content -->
+          <div class="ribbon-content hidden" data-content="insert">
+            <div class="ribbon-group">
+              <div class="ribbon-group-title">Ilustrações</div>
+              <div class="ribbon-buttons" id="plugin-toolbar">
+                <button id="btn-insert-chart" class="ribbon-btn">
+                  <span class="ribbon-icon">📊</span>
+                  <span class="ribbon-label">Gráfico</span>
+                </button>
+                <button id="btn-insert-pivot" class="ribbon-btn">
+                  <span class="ribbon-icon">🔄</span>
+                  <span class="ribbon-label">Tabela Dinâmica</span>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Formulas Tab Content -->
+          <div class="ribbon-content hidden" data-content="formulas">
+            <div class="ribbon-group">
+              <div class="ribbon-group-title">Biblioteca de Funções</div>
+              <div class="ribbon-buttons">
+                <button class="ribbon-btn">
+                  <span class="ribbon-icon">Σ</span>
+                  <span class="ribbon-label">AutoSoma</span>
+                </button>
+                <button class="ribbon-btn">
+                  <span class="ribbon-icon">📐</span>
+                  <span class="ribbon-label">Matemática</span>
+                </button>
+                <button class="ribbon-btn">
+                  <span class="ribbon-icon">📊</span>
+                  <span class="ribbon-label">Estatística</span>
+                </button>
+                <button class="ribbon-btn">
+                  <span class="ribbon-icon">💰</span>
+                  <span class="ribbon-label">Financeira</span>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Data Tab Content -->
+          <div class="ribbon-content hidden" data-content="data">
+            <div class="ribbon-group">
+              <div class="ribbon-group-title">Ferramentas de Dados</div>
+              <div class="ribbon-buttons">
+                <button class="ribbon-btn">
+                  <span class="ribbon-icon">🔍</span>
+                  <span class="ribbon-label">Filtrar</span>
+                </button>
+                <button class="ribbon-btn">
+                  <span class="ribbon-icon">↕️</span>
+                  <span class="ribbon-label">Ordenar</span>
+                </button>
+                <button class="ribbon-btn">
+                  <span class="ribbon-icon">🔗</span>
+                  <span class="ribbon-label">Validação</span>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- View Tab Content -->
+          <div class="ribbon-content hidden" data-content="view">
+            <div class="ribbon-group">
+              <div class="ribbon-group-title">Exibir</div>
+              <div class="ribbon-buttons">
+                <button class="ribbon-btn">
+                  <span class="ribbon-icon">📏</span>
+                  <span class="ribbon-label">Régua</span>
+                </button>
+                <button class="ribbon-btn">
+                  <span class="ribbon-icon">🔲</span>
+                  <span class="ribbon-label">Linhas de Grade</span>
+                </button>
+                <button class="ribbon-btn">
+                  <span class="ribbon-icon">🔍</span>
+                  <span class="ribbon-label">Zoom</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
         <!-- Formula Bar -->
         <div class="formula-bar">
           <div class="name-box" id="name-box">A1</div>
@@ -276,6 +424,26 @@ class DJDataForgeApp {
   }
   
   private setupEventListeners(): void {
+    // Ribbon tabs
+    document.querySelectorAll('.ribbon-tab').forEach(tab => {
+      tab.addEventListener('click', (e) => {
+        const target = e.target as HTMLElement;
+        const tabName = target.getAttribute('data-tab');
+        if (!tabName) return;
+
+        // Remove active class from all tabs and contents
+        document.querySelectorAll('.ribbon-tab').forEach(t => t.classList.remove('active'));
+        document.querySelectorAll('.ribbon-content').forEach(c => c.classList.add('hidden'));
+
+        // Add active class to clicked tab and show corresponding content
+        target.classList.add('active');
+        const content = document.querySelector(`[data-content="${tabName}"]`);
+        if (content) {
+          content.classList.remove('hidden');
+        }
+      });
+    });
+
     // New workbook button
     document.getElementById('btn-new-workbook')?.addEventListener('click', () => {
       const name = prompt("Nome do workbook:", "Novo Workbook");
@@ -496,11 +664,12 @@ class DJDataForgeApp {
     
     // Set cell value
     if (value.startsWith('=')) {
-      sheet.setCell(selection.start.row, selection.start.col, value, {
+      // Set formula with empty value - CalcEngine will compute it
+      sheet.setCell(selection.start.row, selection.start.col, '', {
         formula: value,
         type: 'formula',
       });
-      
+
       // Recalculate
       await kernel.recalculate(sheet.id);
     } else {

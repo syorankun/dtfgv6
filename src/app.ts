@@ -422,13 +422,20 @@ class DJDataForgeApp {
     this.grid.setCellChangeHandler(async (row, col, value) => {
       logger.debug('[App] Cell changed', { row, col, value });
 
+      // Get current sheet (not captured variable - fixes sheet switching bug)
+      const currentSheet = this.grid?.getSheet();
+
       // Always trigger recalculation after cell change
       // This ensures formulas that depend on this cell are updated
-      if (sheet) {
+      if (currentSheet) {
         try {
-          const result = await kernel.recalculate(sheet.id, undefined, { force: true });
+          const result = await kernel.recalculate(currentSheet.id, undefined, { force: true });
           logger.debug('[App] Recalculated', { cellsRecalc: result.cellsRecalc });
+
+          // Force multiple refreshes to ensure formulas are updated
           this.grid?.refresh();
+          setTimeout(() => this.grid?.refresh(), 50);
+          setTimeout(() => this.grid?.refresh(), 100);
         } catch (error) {
           logger.error('[App] Recalculation failed', error);
         }
@@ -532,7 +539,7 @@ class DJDataForgeApp {
     document.addEventListener('click', (e) => {
       const target = e.target as HTMLElement;
       const workbookItem = target.closest('.workbook-item');
-      
+
       if (workbookItem) {
         const workbookId = workbookItem.getAttribute('data-workbook-id');
         if (workbookId) {
@@ -541,7 +548,7 @@ class DJDataForgeApp {
           this.refreshUI();
         }
       }
-      
+
       const sheetItem = target.closest('.sheet-item');
       if (sheetItem) {
         const sheetId = sheetItem.getAttribute('data-sheet-id');
@@ -554,6 +561,18 @@ class DJDataForgeApp {
           }
           this.refreshUI();
         }
+      }
+    });
+
+    // Context menu for workbooks and sheets
+    document.addEventListener('contextmenu', (e) => {
+      const target = e.target as HTMLElement;
+      const workbookItem = target.closest('.workbook-item');
+      const sheetItem = target.closest('.sheet-item');
+
+      if (workbookItem || sheetItem) {
+        e.preventDefault();
+        this.showContextMenu(e.clientX, e.clientY, workbookItem, sheetItem);
       }
     });
 
@@ -1236,9 +1255,9 @@ class DJDataForgeApp {
     // Force grid resize after layout change
     setTimeout(() => {
       if (this.grid) {
-        this.grid.refresh();
+        this.grid.resize();
       }
-    }, 50);
+    }, 100);
   }
 
   private toggleRightPanel(): void {
@@ -1256,9 +1275,9 @@ class DJDataForgeApp {
     // Force grid resize after layout change
     setTimeout(() => {
       if (this.grid) {
-        this.grid.refresh();
+        this.grid.resize();
       }
-    }, 50);
+    }, 100);
   }
 
   private toggleFormulaBar(): void {
@@ -1276,9 +1295,9 @@ class DJDataForgeApp {
     // Force grid resize after layout change
     setTimeout(() => {
       if (this.grid) {
-        this.grid.refresh();
+        this.grid.resize();
       }
-    }, 50);
+    }, 100);
   }
 
   private toggleGridlines(): void {
@@ -1349,6 +1368,142 @@ class DJDataForgeApp {
       logger.error('[App] Failed to clear session', error);
       alert('❌ Erro ao limpar sessão. Veja o console para detalhes.');
     }
+  }
+
+  private showContextMenu(x: number, y: number, workbookItem?: Element | null, sheetItem?: Element | null): void {
+    // Remove existing context menu
+    document.getElementById('context-menu')?.remove();
+
+    const menu = document.createElement('div');
+    menu.id = 'context-menu';
+    menu.style.position = 'fixed';
+    menu.style.left = x + 'px';
+    menu.style.top = y + 'px';
+    menu.style.backgroundColor = 'white';
+    menu.style.border = '1px solid #cbd5e1';
+    menu.style.borderRadius = '6px';
+    menu.style.boxShadow = '0 4px 6px -1px rgba(0, 0, 0, 0.1)';
+    menu.style.zIndex = '10000';
+    menu.style.minWidth = '180px';
+    menu.style.padding = '4px 0';
+
+    if (workbookItem) {
+      const workbookId = workbookItem.getAttribute('data-workbook-id');
+      menu.innerHTML = `
+        <div class="context-menu-item" data-action="delete-workbook" data-id="${workbookId}">
+          <span style="color: #ef4444;">🗑️ Excluir Workbook</span>
+        </div>
+      `;
+    } else if (sheetItem) {
+      const sheetId = sheetItem.getAttribute('data-sheet-id');
+      menu.innerHTML = `
+        <div class="context-menu-item" data-action="delete-sheet" data-id="${sheetId}">
+          <span style="color: #ef4444;">🗑️ Excluir Sheet</span>
+        </div>
+      `;
+    }
+
+    document.body.appendChild(menu);
+
+    // Add styles for menu items
+    const style = document.createElement('style');
+    style.textContent = `
+      .context-menu-item {
+        padding: 8px 16px;
+        cursor: pointer;
+        font-size: 14px;
+      }
+      .context-menu-item:hover {
+        background-color: #f1f5f9;
+      }
+    `;
+    document.head.appendChild(style);
+
+    // Handle menu item clicks
+    menu.addEventListener('click', (e) => {
+      const target = e.target as HTMLElement;
+      const menuItem = target.closest('.context-menu-item') as HTMLElement;
+
+      if (menuItem) {
+        const action = menuItem.getAttribute('data-action');
+        const id = menuItem.getAttribute('data-id');
+
+        if (action === 'delete-workbook' && id) {
+          this.deleteWorkbook(id);
+        } else if (action === 'delete-sheet' && id) {
+          this.deleteSheet(id);
+        }
+      }
+
+      menu.remove();
+    });
+
+    // Close menu when clicking outside
+    const closeMenu = (e: MouseEvent) => {
+      if (!menu.contains(e.target as Node)) {
+        menu.remove();
+        document.removeEventListener('click', closeMenu);
+      }
+    };
+
+    setTimeout(() => {
+      document.addEventListener('click', closeMenu);
+    }, 100);
+  }
+
+  private deleteWorkbook(workbookId: string): void {
+    const wb = kernel.workbookManager['workbooks'].get(workbookId);
+    if (!wb) return;
+
+    const confirmed = confirm(`Tem certeza que deseja excluir o workbook "${wb.name}"?\n\nEsta ação não pode ser desfeita.`);
+    if (!confirmed) return;
+
+    kernel.workbookManager['workbooks'].delete(workbookId);
+
+    // If this was the active workbook, switch to another
+    if (kernel.workbookManager.getActiveWorkbook()?.id === workbookId) {
+      const workbooks = kernel.workbookManager.listWorkbooks();
+      if (workbooks.length > 0) {
+        kernel.workbookManager.setActiveWorkbook(workbooks[0].id);
+      }
+    }
+
+    this.refreshUI();
+    logger.info('[App] Workbook deleted', { id: workbookId });
+  }
+
+  private deleteSheet(sheetId: string): void {
+    const wb = kernel.workbookManager.getActiveWorkbook();
+    if (!wb) return;
+
+    const sheet = wb['sheets'].get(sheetId);
+    if (!sheet) return;
+
+    const sheetCount = wb.listSheets().length;
+    if (sheetCount <= 1) {
+      alert('Não é possível excluir a última sheet do workbook.');
+      return;
+    }
+
+    const confirmed = confirm(`Tem certeza que deseja excluir a sheet "${sheet.name}"?\n\nEsta ação não pode ser desfeita.`);
+    if (!confirmed) return;
+
+    wb['sheets'].delete(sheetId);
+
+    // If this was the active sheet, switch to another
+    if (wb.activeSheetId === sheetId) {
+      const sheets = wb.listSheets();
+      if (sheets.length > 0) {
+        wb.setActiveSheet(sheets[0].id);
+        const newSheet = wb.getActiveSheet();
+        if (newSheet && this.grid) {
+          this.grid.setSheet(newSheet);
+        }
+      }
+    }
+
+    this.refreshUI();
+    logger.info('[App] Sheet deleted', { id: sheetId });
   }
 }
 

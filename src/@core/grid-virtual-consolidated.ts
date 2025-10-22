@@ -302,6 +302,8 @@ export class VirtualGrid {
   private editingCol = -1;
   private editor?: HTMLInputElement;
   private tooltipElement?: HTMLDivElement;
+  private autocompleteElement?: HTMLDivElement;
+  private autocompleteSelectedIndex: number = -1;
 
   // Formula visual feedback
   private formulaReferencedCells: Set<string> = new Set();
@@ -794,11 +796,16 @@ export class VirtualGrid {
     this.formulaReferencedCells.clear();
     this.currentColorIndex = 0;
 
-    // Hide and cleanup tooltip
+    // Hide and cleanup tooltip and autocomplete
     this.hideFormulaTooltip();
+    this.hideFormulaAutocomplete();
     if (this.tooltipElement && this.tooltipElement.parentElement) {
       this.tooltipElement.remove();
       this.tooltipElement = undefined;
+    }
+    if (this.autocompleteElement && this.autocompleteElement.parentElement) {
+      this.autocompleteElement.remove();
+      this.autocompleteElement = undefined;
     }
 
     if (save && this.sheet) {
@@ -855,10 +862,12 @@ export class VirtualGrid {
     if (!this.editor) return;
     this.isEditingFormula = this.editor.value.startsWith('=');
 
-    // Update tooltip when editing formula
+    // Update autocomplete and tooltip when editing formula
     if (this.isEditingFormula) {
+      this.showFormulaAutocomplete();
       this.showFormulaTooltip();
     } else {
+      this.hideFormulaAutocomplete();
       this.hideFormulaTooltip();
     }
   }
@@ -984,6 +993,95 @@ export class VirtualGrid {
     if (this.tooltipElement) {
       this.tooltipElement.style.display = 'none';
     }
+  }
+
+  private showFormulaAutocomplete(): void {
+    if (!this.editor) return;
+
+    const formula = this.editor.value.toUpperCase();
+    const match = formula.match(/^=([A-Z]*)/);
+    if (!match) {
+      this.hideFormulaAutocomplete();
+      return;
+    }
+
+    const partialName = match[1];
+
+    // Lista de funções disponíveis
+    const allFunctions = [
+      'SOMA', 'MÉDIA', 'MÁXIMO', 'MÍNIMO', 'CONT.NÚM', 'CONT.VALORES',
+      'SE', 'MULT', 'RAIZ', 'POTÊNCIA', 'ABS', 'ARREDONDAR', 'TRUNCAR',
+      'INT', 'MED', 'MODO', 'DESVPAD', 'VAR', 'CONCATENAR', 'MAIÚSCULA',
+      'MINÚSCULA', 'NÚM.CARACT', 'E', 'OU', 'NÃO', 'PROCV'
+    ];
+
+    // Filtrar funções que começam com o texto digitado
+    const suggestions = partialName === ''
+      ? ['SOMA', 'MÉDIA', 'SE', 'MÁXIMO', 'MÍNIMO']
+      : allFunctions.filter(fn => fn.startsWith(partialName));
+
+    if (suggestions.length === 0 || (suggestions.length === 1 && suggestions[0] === partialName)) {
+      this.hideFormulaAutocomplete();
+      return;
+    }
+
+    // Criar ou atualizar autocomplete
+    if (!this.autocompleteElement) {
+      this.autocompleteElement = document.createElement('div');
+      this.autocompleteElement.style.position = 'absolute';
+      this.autocompleteElement.style.backgroundColor = 'white';
+      this.autocompleteElement.style.border = '1px solid #cbd5e1';
+      this.autocompleteElement.style.borderRadius = '4px';
+      this.autocompleteElement.style.boxShadow = '0 4px 6px -1px rgba(0, 0, 0, 0.1)';
+      this.autocompleteElement.style.zIndex = '10001';
+      this.autocompleteElement.style.maxHeight = '200px';
+      this.autocompleteElement.style.overflowY = 'auto';
+      this.autocompleteElement.style.fontSize = '13px';
+      document.body.appendChild(this.autocompleteElement);
+    }
+
+    // Posicionar autocomplete abaixo do editor
+    const rect = this.editor.getBoundingClientRect();
+    this.autocompleteElement.style.left = rect.left + 'px';
+    this.autocompleteElement.style.top = (rect.bottom + 2) + 'px';
+    this.autocompleteElement.style.minWidth = rect.width + 'px';
+
+    // Atualizar conteúdo
+    this.autocompleteElement.innerHTML = suggestions.map((fn, idx) => `
+      <div class="autocomplete-item" data-index="${idx}" data-function="${fn}"
+           style="padding: 6px 12px; cursor: pointer; background-color: ${idx === this.autocompleteSelectedIndex ? '#e0f2fe' : 'white'};">
+        ${fn}
+      </div>
+    `).join('');
+
+    this.autocompleteElement.style.display = 'block';
+
+    // Event listeners para itens
+    this.autocompleteElement.querySelectorAll('.autocomplete-item').forEach(item => {
+      item.addEventListener('mouseenter', (e) => {
+        const target = e.target as HTMLElement;
+        this.autocompleteSelectedIndex = parseInt(target.getAttribute('data-index') || '-1');
+        this.showFormulaAutocomplete(); // Re-render com novo índice
+      });
+
+      item.addEventListener('click', () => {
+        const fn = item.getAttribute('data-function');
+        if (fn && this.editor) {
+          this.editor.value = '=' + fn + '(';
+          this.editor.focus();
+          this.editor.setSelectionRange(this.editor.value.length, this.editor.value.length);
+          this.hideFormulaAutocomplete();
+          this.updateFormulaEditingState();
+        }
+      });
+    });
+  }
+
+  private hideFormulaAutocomplete(): void {
+    if (this.autocompleteElement) {
+      this.autocompleteElement.style.display = 'none';
+    }
+    this.autocompleteSelectedIndex = -1;
   }
 
   private addCellReferenceToFormula(row: number, col: number): void {
@@ -1155,6 +1253,11 @@ export class VirtualGrid {
   }
 
   refresh(): void {
+    this.render();
+  }
+
+  resize(): void {
+    this.setupCanvas();
     this.render();
   }
 

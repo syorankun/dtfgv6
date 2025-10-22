@@ -332,18 +332,18 @@ import type {
   }
   
   // ============================================================================
-  // BUILT-IN PLUGIN: FX-PACK (Financial Formulas)
+  // BUILT-IN PLUGIN: CHARTS
   // ============================================================================
-  
-  export class FXPackPlugin implements Plugin {
+
+  export class ChartsPlugin implements Plugin {
     manifest: PluginManifest = {
-      id: 'fx-pack',
-      name: 'FX Pack',
+      id: 'charts',
+      name: 'Charts',
       version: '1.0.0',
       author: 'DJ DataForge Team',
-      description: 'Fórmulas financeiras e estatísticas avançadas',
-      permissions: ['formula:register'],
-      entryPoint: 'fx-pack.js',
+      description: 'Criação de gráficos e visualizações',
+      permissions: ['read:workbook', 'ui:panel', 'ui:toolbar'],
+      entryPoint: 'charts.js',
     };
     
     async init(context: PluginContext): Promise<void> {
@@ -413,7 +413,24 @@ import type {
       context.ui.showToast('Pivot Table plugin carregado!', 'success');
       logger.info('[PivotPlugin] Initialized');
     }
-  }context: PluginContext): Promise<void> {
+  }
+
+  // ============================================================================
+  // BUILT-IN PLUGIN: FX-PACK (Financial Formulas)
+  // ============================================================================
+
+  export class FXPackPlugin implements Plugin {
+    manifest: PluginManifest = {
+      id: 'fx-pack',
+      name: 'FX Pack',
+      version: '1.0.0',
+      author: 'DJ DataForge Team',
+      description: 'Fórmulas financeiras e estatísticas avançadas',
+      permissions: ['formula:register'],
+      entryPoint: 'fx-pack.js',
+    };
+
+    async init(context: PluginContext): Promise<void> {
       const registry = context.kernel.calcEngine.getRegistry();
       
       // Financial functions
@@ -468,12 +485,8 @@ import type {
       }, { description: 'Mediana' });
       
       context.ui.showToast('FX Pack carregado com sucesso!', 'success');
-      
+
       logger.info('[FXPackPlugin] Initialized with financial and statistical functions');
     }
   }
-  
-  // ============================================================================
-  // BUILT-IN PLUGIN: CHARTS
-  // ============================================================================
   

@@ -326,3 +326,4 @@ export class VirtualGrid {
     });
     resizeObserver.observe(this.canvas);
   }
+}

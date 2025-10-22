@@ -11,7 +11,7 @@
  * Combined for now to reduce artifact count during initial development.
  */
 
-import type { Token, ASTNode, FunctionSpec } from "./types";
+import type { Token, ASTNode, FunctionSpec, CellType } from "./types";
 import type { Sheet } from "./workbook-consolidated";
 
 // ============================================================================
@@ -664,8 +664,6 @@ export class CalcEngine {
   private parser: FormulaParser;
   private registry: FormulaRegistry;
   private cache: Map<string, any> = new Map();
-  inferType: any;
-  coordToCellRef: any;
 
   constructor() {
     this.parser = new FormulaParser();
@@ -869,5 +867,24 @@ export class CalcEngine {
 
     const row = parseInt(match[2]) - 1;
     return { row, col };
+  }
+
+  private coordToCellRef(row: number, col: number): string {
+    let colRef = "";
+    let n = col + 1;
+    while (n > 0) {
+      colRef = String.fromCharCode(64 + (n % 26 || 26)) + colRef;
+      n = Math.floor((n - 1) / 26);
+    }
+    return `${colRef}${row + 1}`;
+  }
+
+  private inferType(value: any): CellType {
+    if (value === null || value === undefined) return "auto";
+    if (typeof value === "number") return "number";
+    if (typeof value === "string") return "string";
+    if (typeof value === "boolean") return "boolean";
+    if (value instanceof Date) return "date";
+    return "auto";
   }
 }

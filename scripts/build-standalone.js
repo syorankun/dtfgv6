@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 /**
- * Build Standalone Generator
+ * Build Standalone Generator - VERSÃO CORRIGIDA
  *
  * Este script cria um arquivo HTML único que funciona com file://
  * - Lê o HTML, CSS e JS gerados pelo Vite
@@ -21,7 +21,7 @@ const rootDir = path.resolve(__dirname, '..');
 const distDir = path.join(rootDir, 'dist-standalone');
 const htmlFile = path.join(distDir, 'index.html');
 
-console.log('🔧 Gerando build standalone...');
+console.log('🔧 Gerando build standalone...\n');
 
 // Verifica se o build existe
 if (!fs.existsSync(htmlFile)) {
@@ -29,64 +29,105 @@ if (!fs.existsSync(htmlFile)) {
   process.exit(1);
 }
 
-// Lê o HTML
+// Lê o HTML original
 let html = fs.readFileSync(htmlFile, 'utf-8');
+console.log(`📄 HTML original: ${html.length} caracteres`);
 
-// Encontra e inline todos os arquivos CSS
-const cssMatches = [];
-const cssRegex = /<link[^>]*href="([^"]*\.css)"[^>]*>/g;
-let cssMatch;
-while ((cssMatch = cssRegex.exec(html)) !== null) {
-  cssMatches.push({ tag: cssMatch[0], path: cssMatch[1] });
+// Função auxiliar para ler arquivos do dist
+function readDistFile(relativePath) {
+  const fullPath = path.join(distDir, relativePath);
+  if (!fs.existsSync(fullPath)) {
+    console.warn(`⚠️  Arquivo não encontrado: ${relativePath}`);
+    return null;
+  }
+  return fs.readFileSync(fullPath, 'utf-8');
 }
 
-// Faz replace de cada CSS (depois do loop para evitar problemas com índices)
-for (const match of cssMatches) {
-  const cssPath = path.join(distDir, match.path);
-  if (fs.existsSync(cssPath)) {
-    const css = fs.readFileSync(cssPath, 'utf-8');
-    html = html.replace(match.tag, `<style>${css}</style>`);
-    console.log(`✅ CSS inline: ${match.path}`);
+// 1. Processar CSS - encontrar TODAS as tags <link> de CSS
+console.log('\n📦 Processando CSS...');
+const cssLinkRegex = /<link\s+[^>]*rel=["']stylesheet["'][^>]*>/g;
+const cssLinks = [];
+let match;
+
+// Coletar todos os links
+while ((match = cssLinkRegex.exec(html)) !== null) {
+  const fullTag = match[0];
+  const hrefMatch = fullTag.match(/href=["']([^"']+)["']/);
+  if (hrefMatch) {
+    cssLinks.push({
+      fullTag: fullTag,
+      href: hrefMatch[1]
+    });
   }
 }
 
-// Encontra e inline todos os arquivos JS
-const jsMatches = [];
-const jsRegex = /<script[^>]*src="([^"]*\.js)"[^>]*><\/script>/g;
-let jsMatch;
-while ((jsMatch = jsRegex.exec(html)) !== null) {
-  jsMatches.push({ tag: jsMatch[0], path: jsMatch[1] });
+console.log(`   Encontrados ${cssLinks.length} link(s) CSS`);
+
+// Substituir cada link por <style> com conteúdo inline
+for (const link of cssLinks) {
+  const cssContent = readDistFile(link.href);
+  if (cssContent) {
+    html = html.replace(link.fullTag, `<style>${cssContent}</style>`);
+    console.log(`   ✅ CSS inline: ${link.href} (${cssContent.length} chars)`);
+  }
 }
 
-// Faz replace de cada JS (depois do loop)
-for (const match of jsMatches) {
-  const jsPath = path.join(distDir, match.path);
-  if (fs.existsSync(jsPath)) {
-    const js = fs.readFileSync(jsPath, 'utf-8');
-    // Mantém type="module" e crossorigin se existir
-    const typeMatch = match.tag.match(/type="([^"]*)"/);
+// 2. Processar JavaScript - encontrar TODAS as tags <script src>
+console.log('\n📦 Processando JavaScript...');
+const jsScriptRegex = /<script\s+([^>]*\s+)?src=["']([^"']+\.js)["']([^>]*)><\/script>/g;
+const jsScripts = [];
+
+// Coletar todos os scripts
+html.replace(jsScriptRegex, (fullMatch, beforeSrc, src, afterSrc) => {
+  jsScripts.push({
+    fullTag: fullMatch,
+    src: src,
+    beforeSrc: beforeSrc || '',
+    afterSrc: afterSrc || ''
+  });
+  return fullMatch;
+});
+
+console.log(`   Encontrados ${jsScripts.length} script(s) JavaScript`);
+
+// Substituir cada script por versão inline
+for (const script of jsScripts) {
+  const jsContent = readDistFile(script.src);
+  if (jsContent) {
+    // Preservar atributos como type="module"
+    const attrs = (script.beforeSrc + script.afterSrc).trim();
+    const typeMatch = attrs.match(/type=["']([^"']+)["']/);
     const type = typeMatch ? typeMatch[1] : 'module';
-    html = html.replace(match.tag, `<script type="${type}">${js}</script>`);
-    console.log(`✅ JS inline: ${match.path}`);
+
+    const inlineScript = `<script type="${type}">${jsContent}</script>`;
+    html = html.replace(script.fullTag, inlineScript);
+    console.log(`   ✅ JS inline: ${script.src} (${jsContent.length} chars)`);
   }
 }
 
-// Remove a pasta assets já que tudo está inline
+// 3. Remover a pasta assets
+console.log('\n🗑️  Limpando assets...');
 const assetsDir = path.join(distDir, 'assets');
 if (fs.existsSync(assetsDir)) {
   fs.rmSync(assetsDir, { recursive: true, force: true });
-  console.log('🗑️  Pasta assets removida (tudo inline agora)');
+  console.log('   ✅ Pasta assets removida');
 }
 
-// Remove arquivos .map
+// 4. Remover arquivos .map
 const files = fs.readdirSync(distDir);
+let mapsRemoved = 0;
 files.forEach(file => {
   if (file.endsWith('.map')) {
     fs.unlinkSync(path.join(distDir, file));
+    mapsRemoved++;
   }
 });
+if (mapsRemoved > 0) {
+  console.log(`   ✅ ${mapsRemoved} arquivo(s) .map removido(s)`);
+}
 
-// Adiciona comentário no início do HTML
+// 5. Adicionar comentário no início
+console.log('\n📝 Adicionando header...');
 const standaloneComment = `<!--
   ⚡ DJ DataForge v6 - STANDALONE BUILD
 
@@ -104,16 +145,19 @@ const standaloneComment = `<!--
 
 html = html.replace('<!DOCTYPE html>', `<!DOCTYPE html>\n${standaloneComment}`);
 
-// Salva o HTML final
+// 6. Salvar o HTML final
 fs.writeFileSync(htmlFile, html, 'utf-8');
 
 const sizeKB = Math.round(html.length / 1024);
 const sizeMB = (sizeKB / 1024).toFixed(2);
 
 console.log('\n✅ Build standalone concluído!');
+console.log(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`);
 console.log(`📦 Arquivo: dist-standalone/index.html`);
 console.log(`📊 Tamanho: ${sizeKB}KB (${sizeMB}MB)`);
-console.log('\n🚀 Você pode agora:');
-console.log('   1. Abrir dist-standalone/index.html diretamente no navegador');
-console.log('   2. Copiar para qualquer lugar (pen drive, email, etc)');
-console.log('   3. Usar sem internet ou servidor\n');
+console.log(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`);
+console.log('\n🚀 Como usar:');
+console.log('   1. Navegue até dist-standalone/');
+console.log('   2. Clique DUAS VEZES em index.html');
+console.log('   3. O arquivo abrirá no navegador');
+console.log('   4. Pronto! Sem erros de CORS! 🎉\n');

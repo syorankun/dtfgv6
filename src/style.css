@@ -811,7 +811,7 @@ body {
 }
 
 /* ============================================================================
-     EXCEL-STYLE RIBBON MENU
+     EXCEL-STYLE RIBBON MENU (Compact 70% smaller)
      ============================================================================ */
 
 .ribbon {
@@ -822,22 +822,22 @@ body {
 
 .ribbon-tabs {
   display: flex;
-  gap: 2px;
+  gap: 1px;
   background: var(--bg-tertiary);
-  padding: 0 var(--spacing-md);
-  border-bottom: 2px solid var(--border-color);
+  padding: 0 var(--spacing-sm);
+  border-bottom: 1px solid var(--border-color);
 }
 
 .ribbon-tab {
-  padding: var(--spacing-sm) var(--spacing-lg);
+  padding: 4px 12px;
   background: transparent;
   border: none;
-  border-bottom: 3px solid transparent;
+  border-bottom: 2px solid transparent;
   color: var(--text-secondary);
-  font-size: 13px;
+  font-size: 11px;
   font-weight: 500;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: all 0.15s;
   white-space: nowrap;
 }
 
@@ -854,16 +854,16 @@ body {
 
 .ribbon-content {
   display: flex;
-  gap: 1px;
-  padding: var(--spacing-md);
+  gap: 0;
+  padding: 4px 8px;
   background: var(--bg-secondary);
-  min-height: 100px;
+  min-height: 42px;
 }
 
 .ribbon-group {
   display: flex;
   flex-direction: column;
-  padding: var(--spacing-sm) var(--spacing-md);
+  padding: 2px 6px;
   border-right: 1px solid var(--border-color);
 }
 
@@ -872,17 +872,17 @@ body {
 }
 
 .ribbon-group-title {
-  font-size: 11px;
+  font-size: 9px;
   color: var(--text-tertiary);
   text-transform: uppercase;
-  letter-spacing: 0.05em;
-  margin-bottom: var(--spacing-sm);
+  letter-spacing: 0.03em;
+  margin-bottom: 3px;
   text-align: center;
 }
 
 .ribbon-buttons {
   display: flex;
-  gap: var(--spacing-xs);
+  gap: 2px;
   flex-wrap: wrap;
 }
 
@@ -891,13 +891,13 @@ body {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: var(--spacing-sm);
-  min-width: 60px;
+  padding: 3px 4px;
+  min-width: 36px;
   background: transparent;
   border: 1px solid transparent;
-  border-radius: var(--border-radius);
+  border-radius: 3px;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: all 0.15s;
 }
 
 .ribbon-btn:hover {
@@ -911,16 +911,17 @@ body {
 }
 
 .ribbon-icon {
-  font-size: 20px;
-  margin-bottom: 4px;
+  font-size: 14px;
+  margin-bottom: 1px;
   display: block;
 }
 
 .ribbon-label {
-  font-size: 11px;
+  font-size: 8px;
   color: var(--text-secondary);
   text-align: center;
-  line-height: 1.2;
+  line-height: 1.1;
+  max-width: 50px;
 }
 
 /* ============================================================================

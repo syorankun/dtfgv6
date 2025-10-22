@@ -592,6 +592,12 @@ export class FormulaRegistry {
     for (const arg of args) {
       if (Array.isArray(arg)) {
         result.push(...this.flattenNumbers(arg));
+      } else if (typeof arg === "object" && arg !== null && "value" in arg) {
+        // Handle Cell objects from getRange
+        const val = arg.value;
+        if (typeof val === "number" && !isNaN(val)) {
+          result.push(val);
+        }
       } else if (typeof arg === "number" && !isNaN(arg)) {
         result.push(arg);
       }

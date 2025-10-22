@@ -664,8 +664,8 @@ class DJDataForgeApp {
     
     // Set cell value
     if (value.startsWith('=')) {
-      // Set formula with empty value - CalcEngine will compute it
-      sheet.setCell(selection.start.row, selection.start.col, '', {
+      // Set formula with 0 as initial value - CalcEngine will compute it
+      sheet.setCell(selection.start.row, selection.start.col, 0, {
         formula: value,
         type: 'formula',
       });

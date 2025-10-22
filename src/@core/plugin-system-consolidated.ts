@@ -73,19 +73,22 @@ import type {
     
     addToolbarButton(config: ToolbarButtonConfig): void {
       this.toolbarButtons.set(config.id, config);
-      
+
       // Find toolbar container and add button
       const toolbar = document.getElementById('plugin-toolbar');
       if (toolbar) {
         const btn = document.createElement('button');
         btn.id = `plugin-btn-${config.id}`;
-        btn.className = 'btn plugin-btn';
+        btn.className = 'ribbon-btn';
         btn.title = config.tooltip || '';
-        btn.innerHTML = `${config.icon || ''} ${config.label}`;
+        btn.innerHTML = `
+          <span class="ribbon-icon">${config.icon || ''}</span>
+          <span class="ribbon-label">${config.label}</span>
+        `;
         btn.onclick = config.onClick;
         toolbar.appendChild(btn);
       }
-      
+
       logger.debug(`[Plugin] Toolbar button added`, { pluginId: this.pluginId, id: config.id });
     }
     

@@ -299,8 +299,6 @@ export class VirtualGrid {
   // Editor
   private isEditing = false;
   private isEditingFormula = false;
-  private editingRow = -1;
-  private editingCol = -1;
   private editor?: HTMLInputElement;
   private tooltipElement?: HTMLDivElement;
   private autocompleteElement?: HTMLDivElement;
@@ -309,7 +307,6 @@ export class VirtualGrid {
   // Formula visual feedback
   private formulaReferencedCells: Set<string> = new Set();
   private formulaReferenceColors = ['#FF6B6B', '#4ECDC4', '#45B7D1', '#FFA07A', '#98D8C8'];
-  private currentColorIndex = 0;
 
   // Events
   private onCellChange?: (row: number, col: number, value: any) => void;
@@ -766,12 +763,9 @@ export class VirtualGrid {
     if (!this.sheet) return;
 
     this.isEditing = true;
-    this.editingRow = row;
-    this.editingCol = col;
 
     // Clear formula reference tracking
     this.formulaReferencedCells.clear();
-    this.currentColorIndex = 0;
 
     const cell = this.sheet.getCell(row, col);
     const value = initialValue ?? (cell?.formula || cell?.value || '');
@@ -834,10 +828,7 @@ export class VirtualGrid {
     this.editor = undefined;
     this.isEditing = false;
     this.isEditingFormula = false;
-    this.editingRow = -1;
-    this.editingCol = -1;
     this.formulaReferencedCells.clear();
-    this.currentColorIndex = 0;
 
     // Hide and cleanup tooltip and autocomplete
     this.hideFormulaTooltip();

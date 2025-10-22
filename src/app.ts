@@ -478,7 +478,7 @@ class DJDataForgeApp {
     document.getElementById('btn-new-workbook')?.addEventListener('click', () => {
       const name = prompt("Nome do workbook:", "Novo Workbook");
       if (name) {
-        const wb = kernel.createWorkbook(name);
+        kernel.createWorkbook(name);
         // Don't call refreshUI here - the 'workbook:created' event will trigger it
         // This prevents duplicate rendering
       }
@@ -735,15 +735,31 @@ class DJDataForgeApp {
       const file = (e.target as HTMLInputElement).files?.[0];
       if (!file) return;
 
+      // Security and validation checks
       try {
+        // Validate file type
+        if (!file.name.endsWith('.js')) {
+          throw new Error('Arquivo deve ter extensão .js');
+        }
+
+        // Limit file size to 5MB to prevent memory issues
+        const MAX_SIZE = 5 * 1024 * 1024;
+        if (file.size > MAX_SIZE) {
+          throw new Error('Arquivo muito grande (máximo 5MB)');
+        }
+
         const text = await file.text();
 
-        // Create a module from the plugin code
+        // SECURITY NOTE: Using Blob URLs for plugin loading
+        // - Blob URLs are local and don't involve CORS
+        // - No network requests or cross-origin issues
+        // - URL is revoked after use to prevent memory leaks
+        // WARNING: Only load plugins from trusted sources!
         const blob = new Blob([text], { type: 'application/javascript' });
         const url = URL.createObjectURL(blob);
 
         try {
-          // Dynamic import of the plugin
+          // Dynamic import of the plugin (Vite ignore for blob URLs)
           const module = await import(/* @vite-ignore */ url);
 
           // Get the plugin class (usually default export)
@@ -753,11 +769,16 @@ class DJDataForgeApp {
             throw new Error('Plugin deve exportar uma classe como default export');
           }
 
-          // Create instance and get manifest
+          // Create instance and validate manifest
           const pluginInstance = new PluginClass();
 
           if (!pluginInstance.manifest) {
             throw new Error('Plugin deve ter um manifest');
+          }
+
+          // Validate manifest structure
+          if (!pluginInstance.manifest.name || !pluginInstance.manifest.version) {
+            throw new Error('Manifest deve conter name e version');
           }
 
           // Load the plugin
@@ -771,6 +792,7 @@ class DJDataForgeApp {
           this.showSettingsDialog();
 
         } finally {
+          // Always revoke the blob URL to prevent memory leaks
           URL.revokeObjectURL(url);
         }
 
@@ -778,6 +800,9 @@ class DJDataForgeApp {
         logger.error('[App] Failed to import plugin', error);
         alert(`❌ Erro ao importar plugin: ${error instanceof Error ? error.message : 'Erro desconhecido'}`);
       }
+
+      // Clear input to allow re-importing the same file
+      (e.target as HTMLInputElement).value = '';
     });
   }
   

@@ -624,7 +624,10 @@ export class VirtualGrid {
       this.onCellChange?.(row, col, value);
     }
 
-    this.editor.remove();
+    // Check if editor is still in DOM before removing (prevents race condition with blur events)
+    if (this.editor.parentElement) {
+      this.editor.remove();
+    }
     this.editor = undefined;
     this.isEditing = false;
     this.canvas.focus();

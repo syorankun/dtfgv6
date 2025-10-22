@@ -22,6 +22,7 @@ import './style.css';
 
 class DJDataForgeApp {
   private grid?: VirtualGrid;
+  private refreshTimeout?: number;
   
   async init(): Promise<void> {
     try {
@@ -122,7 +123,9 @@ class DJDataForgeApp {
             <span class="company-badge" id="company-badge">${company?.name || 'Sem empresa'}</span>
           </div>
           <div class="header-right">
-            <button id="btn-settings" class="btn">⚙️</button>
+            <button id="btn-toggle-panel" class="btn" title="Mostrar/Esconder Painel">👁️</button>
+            <button id="btn-clear-session" class="btn" title="Limpar Sessão">🗑️</button>
+            <button id="btn-settings" class="btn" title="Configurações">⚙️</button>
           </div>
         </header>
 
@@ -198,14 +201,7 @@ class DJDataForgeApp {
             <div class="ribbon-group">
               <div class="ribbon-group-title">Ilustrações</div>
               <div class="ribbon-buttons" id="plugin-toolbar">
-                <button id="btn-insert-chart" class="ribbon-btn">
-                  <span class="ribbon-icon">📊</span>
-                  <span class="ribbon-label">Gráfico</span>
-                </button>
-                <button id="btn-insert-pivot" class="ribbon-btn">
-                  <span class="ribbon-icon">🔄</span>
-                  <span class="ribbon-label">Tabela Dinâmica</span>
-                </button>
+                <!-- Plugin buttons will be added here dynamically -->
               </div>
             </div>
           </div>
@@ -455,8 +451,8 @@ class DJDataForgeApp {
       const name = prompt("Nome do workbook:", "Novo Workbook");
       if (name) {
         const wb = kernel.createWorkbook(name);
-        wb.addSheet("Sheet1");
-        this.refreshUI();
+        // Don't call refreshUI here - the 'workbook:created' event will trigger it
+        // This prevents duplicate rendering
       }
     });
     
@@ -486,6 +482,16 @@ class DJDataForgeApp {
     // Settings button
     document.getElementById('btn-settings')?.addEventListener('click', () => {
       this.showSettingsDialog();
+    });
+
+    // Toggle panel button
+    document.getElementById('btn-toggle-panel')?.addEventListener('click', () => {
+      this.toggleRightPanel();
+    });
+
+    // Clear session button
+    document.getElementById('btn-clear-session')?.addEventListener('click', () => {
+      this.clearSession();
     });
     
     // Formula input
@@ -801,34 +807,43 @@ class DJDataForgeApp {
   }
   
   private refreshUI(): void {
-    // Update workbook list
-    const workbookList = document.getElementById('workbook-list');
-    if (workbookList) {
-      workbookList.innerHTML = this.renderWorkbookList(kernel.workbookManager.listWorkbooks());
+    // Debounce to prevent duplicate rapid refreshes
+    if (this.refreshTimeout) {
+      clearTimeout(this.refreshTimeout);
     }
-    
-    // Update sheet list
-    const sheetList = document.getElementById('sheet-list');
-    if (sheetList) {
-      sheetList.innerHTML = this.renderSheetList();
-    }
-    
-    // Update company badge
-    const company = kernel.companyManager.getActiveCompany();
-    const companyBadge = document.getElementById('company-badge');
-    if (companyBadge) {
-      companyBadge.textContent = company?.name || 'Sem empresa';
-    }
-    
-    // Update grid
-    const wb = kernel.workbookManager.getActiveWorkbook();
-    const sheet = wb?.getActiveSheet();
-    if (sheet && this.grid) {
-      this.grid.setSheet(sheet);
-    }
-    
-    // Update console
-    this.setupConsoleLogger();
+
+    this.refreshTimeout = window.setTimeout(() => {
+      // Update workbook list
+      const workbookList = document.getElementById('workbook-list');
+      if (workbookList) {
+        workbookList.innerHTML = this.renderWorkbookList(kernel.workbookManager.listWorkbooks());
+      }
+
+      // Update sheet list
+      const sheetList = document.getElementById('sheet-list');
+      if (sheetList) {
+        sheetList.innerHTML = this.renderSheetList();
+      }
+
+      // Update company badge
+      const company = kernel.companyManager.getActiveCompany();
+      const companyBadge = document.getElementById('company-badge');
+      if (companyBadge) {
+        companyBadge.textContent = company?.name || 'Sem empresa';
+      }
+
+      // Update grid
+      const wb = kernel.workbookManager.getActiveWorkbook();
+      const sheet = wb?.getActiveSheet();
+      if (sheet && this.grid) {
+        this.grid.setSheet(sheet);
+      }
+
+      // Update console
+      this.setupConsoleLogger();
+
+      this.refreshTimeout = undefined;
+    }, 10); // 10ms debounce
   }
   
   private setupErrorHandler(): void {
@@ -1117,6 +1132,52 @@ class DJDataForgeApp {
     });
 
     logger.info(`[App] Showing ${category} functions list`);
+  }
+
+  // ============================================================================
+  // UI UTILITIES
+  // ============================================================================
+
+  private toggleRightPanel(): void {
+    const panel = document.querySelector('.panels') as HTMLElement;
+    if (!panel) return;
+
+    if (panel.style.display === 'none') {
+      panel.style.display = 'flex';
+      logger.info('[App] Right panel shown');
+    } else {
+      panel.style.display = 'none';
+      logger.info('[App] Right panel hidden');
+    }
+  }
+
+  private clearSession(): void {
+    const confirmed = confirm(
+      '⚠️ Isso irá limpar TODOS os dados da sessão atual:\n\n' +
+      '- Todos os workbooks serão removidos\n' +
+      '- Todos os dados não salvos serão perdidos\n' +
+      '- A página será recarregada\n\n' +
+      'Tem certeza que deseja continuar?'
+    );
+
+    if (!confirmed) return;
+
+    try {
+      // Clear all storage
+      localStorage.clear();
+      sessionStorage.clear();
+
+      logger.info('[App] Session data cleared');
+
+      // Show success message
+      alert('✅ Sessão limpa com sucesso! A página será recarregada.');
+
+      // Reload page
+      window.location.reload();
+    } catch (error) {
+      logger.error('[App] Failed to clear session', error);
+      alert('❌ Erro ao limpar sessão. Veja o console para detalhes.');
+    }
   }
 }
 

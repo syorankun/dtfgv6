@@ -301,6 +301,7 @@ export class VirtualGrid {
   private editingRow = -1;
   private editingCol = -1;
   private editor?: HTMLInputElement;
+  private tooltipElement?: HTMLDivElement;
 
   // Formula visual feedback
   private formulaReferencedCells: Set<string> = new Set();
@@ -793,6 +794,13 @@ export class VirtualGrid {
     this.formulaReferencedCells.clear();
     this.currentColorIndex = 0;
 
+    // Hide and cleanup tooltip
+    this.hideFormulaTooltip();
+    if (this.tooltipElement && this.tooltipElement.parentElement) {
+      this.tooltipElement.remove();
+      this.tooltipElement = undefined;
+    }
+
     if (save && this.sheet) {
       // Check if it's a formula
       if (editorValue.startsWith('=')) {
@@ -846,6 +854,95 @@ export class VirtualGrid {
   private updateFormulaEditingState(): void {
     if (!this.editor) return;
     this.isEditingFormula = this.editor.value.startsWith('=');
+
+    // Update tooltip when editing formula
+    if (this.isEditingFormula) {
+      this.showFormulaTooltip();
+    } else {
+      this.hideFormulaTooltip();
+    }
+  }
+
+  private showFormulaTooltip(): void {
+    if (!this.editor) return;
+
+    const formula = this.editor.value.toUpperCase();
+
+    // Extract function name (between = and ()
+    const match = formula.match(/^=([A-Z]+)/);
+    if (!match) {
+      this.hideFormulaTooltip();
+      return;
+    }
+
+    const functionName = match[1];
+
+    // Formula syntax reference
+    const formulaHelp: Record<string, { syntax: string; description: string }> = {
+      'SUMA': { syntax: 'SUMA(número1, [número2], ...)', description: 'Soma todos os números fornecidos' },
+      'MEDIA': { syntax: 'MEDIA(número1, [número2], ...)', description: 'Calcula a média aritmética' },
+      'MAXIMO': { syntax: 'MAXIMO(número1, [número2], ...)', description: 'Retorna o maior valor' },
+      'MINIMO': { syntax: 'MINIMO(número1, [número2], ...)', description: 'Retorna o menor valor' },
+      'CONTAR': { syntax: 'CONTAR(valor1, [valor2], ...)', description: 'Conta quantos números há' },
+      'SE': { syntax: 'SE(teste_lógico, valor_se_verdadeiro, valor_se_falso)', description: 'Retorna um valor se verdadeiro, outro se falso' },
+      'PRODUTO': { syntax: 'PRODUTO(número1, [número2], ...)', description: 'Multiplica todos os números' },
+      'RAIZ': { syntax: 'RAIZ(número)', description: 'Retorna a raiz quadrada' },
+      'POTENCIA': { syntax: 'POTENCIA(número, potência)', description: 'Eleva um número a uma potência' },
+      'ABS': { syntax: 'ABS(número)', description: 'Retorna o valor absoluto' },
+      'ARREDONDAR': { syntax: 'ARREDONDAR(número, num_dígitos)', description: 'Arredonda um número' },
+      'TRUNCAR': { syntax: 'TRUNCAR(número, [num_dígitos])', description: 'Trunca um número' },
+      'INT': { syntax: 'INT(número)', description: 'Arredonda para baixo até o inteiro mais próximo' },
+      'MEDIANA': { syntax: 'MEDIANA(número1, [número2], ...)', description: 'Retorna a mediana' },
+      'MODO': { syntax: 'MODO(número1, [número2], ...)', description: 'Retorna o valor mais frequente' },
+      'DESVPAD': { syntax: 'DESVPAD(número1, [número2], ...)', description: 'Calcula o desvio padrão' },
+      'VARIANCIA': { syntax: 'VARIANCIA(número1, [número2], ...)', description: 'Calcula a variância' },
+      'VP': { syntax: 'VP(taxa, nper, pgto)', description: 'Valor presente de investimento' },
+      'VF': { syntax: 'VF(taxa, nper, pgto)', description: 'Valor futuro de investimento' },
+      'PGTO': { syntax: 'PGTO(taxa, nper, vp)', description: 'Pagamento de empréstimo' },
+      'SINAL': { syntax: 'SINAL(número)', description: 'Retorna o sinal do número' },
+    };
+
+    const help = formulaHelp[functionName];
+    if (!help) {
+      this.hideFormulaTooltip();
+      return;
+    }
+
+    // Create or update tooltip
+    if (!this.tooltipElement) {
+      this.tooltipElement = document.createElement('div');
+      this.tooltipElement.style.position = 'absolute';
+      this.tooltipElement.style.backgroundColor = '#1e293b';
+      this.tooltipElement.style.color = '#f1f5f9';
+      this.tooltipElement.style.padding = '8px 12px';
+      this.tooltipElement.style.borderRadius = '6px';
+      this.tooltipElement.style.fontSize = '12px';
+      this.tooltipElement.style.zIndex = '10000';
+      this.tooltipElement.style.boxShadow = '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)';
+      this.tooltipElement.style.maxWidth = '400px';
+      this.tooltipElement.style.pointerEvents = 'none';
+      document.body.appendChild(this.tooltipElement);
+    }
+
+    // Position tooltip below editor
+    const rect = this.editor.getBoundingClientRect();
+    this.tooltipElement.style.left = rect.left + 'px';
+    this.tooltipElement.style.top = (rect.bottom + 4) + 'px';
+
+    // Update content
+    this.tooltipElement.innerHTML = `
+      <div style="font-weight: bold; color: #60a5fa; margin-bottom: 4px;">${functionName}</div>
+      <div style="font-family: monospace; color: #a5b4fc; margin-bottom: 4px;">${help.syntax}</div>
+      <div style="color: #cbd5e1; font-size: 11px;">${help.description}</div>
+    `;
+
+    this.tooltipElement.style.display = 'block';
+  }
+
+  private hideFormulaTooltip(): void {
+    if (this.tooltipElement) {
+      this.tooltipElement.style.display = 'none';
+    }
   }
 
   private addCellReferenceToFormula(row: number, col: number): void {

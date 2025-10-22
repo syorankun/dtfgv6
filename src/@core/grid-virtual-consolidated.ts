@@ -176,7 +176,7 @@ class CellRenderer {
     width: number,
     height: number,
     label: string,
-    isColumn: boolean
+    _isColumn: boolean
   ): void {
     const ctx = this.ctx;
     
@@ -325,5 +325,389 @@ export class VirtualGrid {
       this.render();
     });
     resizeObserver.observe(this.canvas);
+  }
+
+  // --------------------------------------------------------------------------
+  // EVENT HANDLERS
+  // --------------------------------------------------------------------------
+
+  private handleMouseDown(e: MouseEvent): void {
+    const rect = this.canvas.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+
+    const cellPos = this.getCellAt(x, y);
+    if (cellPos) {
+      this.selectionManager.startSelection(cellPos.row, cellPos.col);
+      this.onSelectionChange?.(this.selectionManager.getSelection());
+      this.render();
+    }
+  }
+
+  private handleMouseMove(e: MouseEvent): void {
+    if (e.buttons === 1) { // Left mouse button
+      const rect = this.canvas.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      const y = e.clientY - rect.top;
+
+      const cellPos = this.getCellAt(x, y);
+      if (cellPos) {
+        this.selectionManager.extendSelection(cellPos.row, cellPos.col);
+        this.onSelectionChange?.(this.selectionManager.getSelection());
+        this.render();
+      }
+    }
+  }
+
+  private handleMouseUp(_e: MouseEvent): void {
+    this.selectionManager.endSelection();
+  }
+
+  private handleDoubleClick(e: MouseEvent): void {
+    const rect = this.canvas.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+
+    const cellPos = this.getCellAt(x, y);
+    if (cellPos && this.sheet) {
+      this.startEditing(cellPos.row, cellPos.col);
+    }
+  }
+
+  private handleKeyDown(e: KeyboardEvent): void {
+    if (this.isEditing) return;
+
+    switch (e.key) {
+      case 'ArrowUp':
+        e.preventDefault();
+        this.selectionManager.moveSelection(-1, 0);
+        this.onSelectionChange?.(this.selectionManager.getSelection());
+        this.render();
+        break;
+      case 'ArrowDown':
+      case 'Enter':
+        e.preventDefault();
+        this.selectionManager.moveSelection(1, 0);
+        this.onSelectionChange?.(this.selectionManager.getSelection());
+        this.render();
+        break;
+      case 'ArrowLeft':
+        e.preventDefault();
+        this.selectionManager.moveSelection(0, -1);
+        this.onSelectionChange?.(this.selectionManager.getSelection());
+        this.render();
+        break;
+      case 'ArrowRight':
+      case 'Tab':
+        e.preventDefault();
+        this.selectionManager.moveSelection(0, 1);
+        this.onSelectionChange?.(this.selectionManager.getSelection());
+        this.render();
+        break;
+      case 'Delete':
+      case 'Backspace':
+        e.preventDefault();
+        this.deleteSelection();
+        break;
+      case 'c':
+        if (e.ctrlKey || e.metaKey) {
+          e.preventDefault();
+          this.copySelection();
+        }
+        break;
+      case 'v':
+        if (e.ctrlKey || e.metaKey) {
+          e.preventDefault();
+          this.pasteSelection();
+        }
+        break;
+      case 'F2':
+        e.preventDefault();
+        const activeCell = this.selectionManager.getActiveCell();
+        this.startEditing(activeCell.row, activeCell.col);
+        break;
+      default:
+        // Start editing on printable character
+        if (e.key.length === 1 && !e.ctrlKey && !e.metaKey) {
+          const activeCell = this.selectionManager.getActiveCell();
+          this.startEditing(activeCell.row, activeCell.col, e.key);
+        }
+        break;
+    }
+  }
+
+  private handleWheel(e: WheelEvent): void {
+    e.preventDefault();
+
+    this.scrollY += e.deltaY;
+    this.scrollX += e.deltaX;
+
+    // Clamp scroll
+    this.scrollY = Math.max(0, this.scrollY);
+    this.scrollX = Math.max(0, this.scrollX);
+
+    this.render();
+  }
+
+  // --------------------------------------------------------------------------
+  // RENDERING
+  // --------------------------------------------------------------------------
+
+  private render(): void {
+    if (!this.sheet) {
+      this.renderEmpty();
+      return;
+    }
+
+    this.ctx.clearRect(0, 0, this.viewportWidth, this.viewportHeight);
+
+    const selection = this.selectionManager.getSelection();
+    const range = this.selectionManager.getRange();
+
+    // Calculate visible cells
+    const startCol = Math.floor(this.scrollX / this.cellWidth);
+    const endCol = Math.ceil((this.scrollX + this.viewportWidth) / this.cellWidth);
+    const startRow = Math.floor(this.scrollY / this.cellHeight);
+    const endRow = Math.ceil((this.scrollY + this.viewportHeight) / this.cellHeight);
+
+    // Render column headers
+    for (let col = startCol; col < endCol; col++) {
+      const x = this.headerWidth + (col * this.cellWidth) - this.scrollX;
+      const label = this.sheet.getColumnName(col);
+      this.renderer.renderHeader(x, 0, this.cellWidth, this.headerHeight, label, true);
+    }
+
+    // Render row headers
+    for (let row = startRow; row < endRow; row++) {
+      const y = this.headerHeight + (row * this.cellHeight) - this.scrollY;
+      const label = String(row + 1);
+      this.renderer.renderHeader(0, y, this.headerWidth, this.cellHeight, label, false);
+    }
+
+    // Render cells
+    for (let row = startRow; row < endRow; row++) {
+      for (let col = startCol; col < endCol; col++) {
+        const x = this.headerWidth + (col * this.cellWidth) - this.scrollX;
+        const y = this.headerHeight + (row * this.cellHeight) - this.scrollY;
+
+        const cell = this.sheet.getCell(row, col);
+        const isInRange = row >= range.startRow && row <= range.endRow &&
+                         col >= range.startCol && col <= range.endCol;
+        const isActive = row === selection.start.row && col === selection.start.col;
+
+        this.renderer.renderCell(x, y, this.cellWidth, this.cellHeight, cell, isInRange, isActive);
+      }
+    }
+
+    // Render corner header
+    this.renderer.renderHeader(0, 0, this.headerWidth, this.headerHeight, '', false);
+  }
+
+  private renderEmpty(): void {
+    this.ctx.clearRect(0, 0, this.viewportWidth, this.viewportHeight);
+
+    this.ctx.fillStyle = '#94a3b8';
+    this.ctx.font = '14px -apple-system, sans-serif';
+    this.ctx.textAlign = 'center';
+    this.ctx.textBaseline = 'middle';
+    this.ctx.fillText(
+      'Selecione uma planilha para visualizar',
+      this.viewportWidth / 2,
+      this.viewportHeight / 2
+    );
+  }
+
+  // --------------------------------------------------------------------------
+  // EDITING
+  // --------------------------------------------------------------------------
+
+  private startEditing(row: number, col: number, initialValue?: string): void {
+    if (!this.sheet) return;
+
+    this.isEditing = true;
+
+    const cell = this.sheet.getCell(row, col);
+    const value = initialValue ?? (cell?.formula || cell?.value || '');
+
+    // Create editor input
+    const rect = this.canvas.getBoundingClientRect();
+    const x = rect.left + this.headerWidth + (col * this.cellWidth) - this.scrollX;
+    const y = rect.top + this.headerHeight + (row * this.cellHeight) - this.scrollY;
+
+    this.editor = document.createElement('input');
+    this.editor.type = 'text';
+    this.editor.value = String(value);
+    this.editor.style.position = 'absolute';
+    this.editor.style.left = x + 'px';
+    this.editor.style.top = y + 'px';
+    this.editor.style.width = this.cellWidth + 'px';
+    this.editor.style.height = this.cellHeight + 'px';
+    this.editor.style.border = '2px solid #2563eb';
+    this.editor.style.outline = 'none';
+    this.editor.style.fontSize = '13px';
+    this.editor.style.padding = '0 8px';
+    this.editor.style.zIndex = '1000';
+
+    document.body.appendChild(this.editor);
+    this.editor.focus();
+    this.editor.select();
+
+    // Handle editor events
+    this.editor.addEventListener('blur', () => this.stopEditing(row, col, true));
+    this.editor.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        this.stopEditing(row, col, true);
+        this.selectionManager.moveSelection(1, 0);
+        this.onSelectionChange?.(this.selectionManager.getSelection());
+        this.render();
+      } else if (e.key === 'Escape') {
+        e.preventDefault();
+        this.stopEditing(row, col, false);
+      } else if (e.key === 'Tab') {
+        e.preventDefault();
+        this.stopEditing(row, col, true);
+        this.selectionManager.moveSelection(0, 1);
+        this.onSelectionChange?.(this.selectionManager.getSelection());
+        this.render();
+      }
+    });
+  }
+
+  private stopEditing(row: number, col: number, save: boolean): void {
+    if (!this.isEditing || !this.editor) return;
+
+    if (save && this.sheet) {
+      const value = this.editor.value;
+
+      // Check if it's a formula
+      if (value.startsWith('=')) {
+        this.sheet.setCell(row, col, value, {
+          formula: value,
+          type: 'formula',
+        });
+      } else {
+        // Try to parse as number
+        const numValue = parseFloat(value);
+        if (!isNaN(numValue) && value.trim() !== '') {
+          this.sheet.setCell(row, col, numValue);
+        } else {
+          this.sheet.setCell(row, col, value);
+        }
+      }
+
+      this.onCellChange?.(row, col, value);
+    }
+
+    this.editor.remove();
+    this.editor = undefined;
+    this.isEditing = false;
+    this.canvas.focus();
+    this.render();
+  }
+
+  // --------------------------------------------------------------------------
+  // CLIPBOARD OPERATIONS
+  // --------------------------------------------------------------------------
+
+  private copySelection(): void {
+    if (!this.sheet) return;
+
+    const range = this.selectionManager.getRange();
+    this.clipboardManager.copy(this.sheet, range);
+  }
+
+  private pasteSelection(): void {
+    if (!this.sheet) return;
+
+    const activeCell = this.selectionManager.getActiveCell();
+    this.clipboardManager.paste(this.sheet, activeCell.row, activeCell.col);
+    this.render();
+  }
+
+  private deleteSelection(): void {
+    if (!this.sheet) return;
+
+    const range = this.selectionManager.getRange();
+
+    for (let row = range.startRow; row <= range.endRow; row++) {
+      for (let col = range.startCol; col <= range.endCol; col++) {
+        this.sheet.setCell(row, col, '');
+        this.onCellChange?.(row, col, '');
+      }
+    }
+
+    this.render();
+  }
+
+  // --------------------------------------------------------------------------
+  // UTILITIES
+  // --------------------------------------------------------------------------
+
+  private getCellAt(x: number, y: number): { row: number; col: number } | null {
+    if (x < this.headerWidth || y < this.headerHeight) {
+      return null;
+    }
+
+    const col = Math.floor((x - this.headerWidth + this.scrollX) / this.cellWidth);
+    const row = Math.floor((y - this.headerHeight + this.scrollY) / this.cellHeight);
+
+    return { row, col };
+  }
+
+  // --------------------------------------------------------------------------
+  // PUBLIC API
+  // --------------------------------------------------------------------------
+
+  setSheet(sheet: Sheet): void {
+    this.sheet = sheet;
+    this.scrollX = 0;
+    this.scrollY = 0;
+    this.selectionManager.startSelection(0, 0);
+    this.selectionManager.endSelection();
+    this.render();
+  }
+
+  getSheet(): Sheet | undefined {
+    return this.sheet;
+  }
+
+  refresh(): void {
+    this.render();
+  }
+
+  getSelection(): Selection {
+    return this.selectionManager.getSelection();
+  }
+
+  setCellChangeHandler(handler: (row: number, col: number, value: any) => void): void {
+    this.onCellChange = handler;
+  }
+
+  setSelectionChangeHandler(handler: (selection: Selection) => void): void {
+    this.onSelectionChange = handler;
+  }
+
+  focusCell(row: number, col: number): void {
+    this.selectionManager.startSelection(row, col);
+    this.selectionManager.endSelection();
+
+    // Scroll to cell if not visible
+    const cellX = col * this.cellWidth;
+    const cellY = row * this.cellHeight;
+
+    if (cellX < this.scrollX) {
+      this.scrollX = cellX;
+    } else if (cellX + this.cellWidth > this.scrollX + this.viewportWidth - this.headerWidth) {
+      this.scrollX = cellX + this.cellWidth - this.viewportWidth + this.headerWidth;
+    }
+
+    if (cellY < this.scrollY) {
+      this.scrollY = cellY;
+    } else if (cellY + this.cellHeight > this.scrollY + this.viewportHeight - this.headerHeight) {
+      this.scrollY = cellY + this.cellHeight - this.viewportHeight + this.headerHeight;
+    }
+
+    this.render();
   }
 }

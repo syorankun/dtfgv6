@@ -14,12 +14,12 @@
 import Papa from "papaparse";
 import * as XLSX from "xlsx";
 import { Sheet, Workbook } from "./workbook-consolidated";
-import { logger } from "./storage-utils-consolidated";
+// import { logger } from "./storage-utils-consolidated";
 import type {
-  FileFormat,
+  // FileFormat,
   ImportOptions,
   ExportOptions,
-  TransformStep,
+  // TransformStep,
   FilterCondition,
   SortSpec,
 } from "./types";
@@ -174,7 +174,7 @@ export class FileWriter {
   static exportXLSX(workbook: Workbook, options?: ExportOptions): Blob {
     const wb = XLSX.utils.book_new();
 
-    workbook.sheets.forEach((sheet, id) => {
+    workbook.sheets.forEach((sheet, _id) => {
       const data: any[][] = [];
 
       // Add headers
@@ -212,7 +212,7 @@ export class FileWriter {
   /**
    * Export sheet to JSON
    */
-  static exportJSON(sheet: Sheet, options?: ExportOptions): Blob {
+  static exportJSON(sheet: Sheet, _options?: ExportOptions): Blob {
     const data: any[] = [];
 
     // Get column names

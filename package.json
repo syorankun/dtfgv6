@@ -6,6 +6,9 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
+    "build:standalone": "npm run build:standalone:pre && npm run build:standalone:post",
+    "build:standalone:pre": "tsc && vite build --config vite.config.standalone.ts",
+    "build:standalone:post": "node scripts/build-standalone.js",
     "preview": "vite preview",
     "type-check": "tsc --noEmit",
     "lint": "eslint src --ext .ts",

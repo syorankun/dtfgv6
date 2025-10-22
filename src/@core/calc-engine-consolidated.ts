@@ -592,6 +592,12 @@ export class FormulaRegistry {
     for (const arg of args) {
       if (Array.isArray(arg)) {
         result.push(...this.flattenNumbers(arg));
+      } else if (typeof arg === "object" && arg !== null && "value" in arg) {
+        // Handle Cell objects from getRange
+        const val = arg.value;
+        if (typeof val === "number" && !isNaN(val)) {
+          result.push(val);
+        }
       } else if (typeof arg === "number" && !isNaN(arg)) {
         result.push(arg);
       }
@@ -703,9 +709,17 @@ export class CalcEngine {
         const coord = this.cellRefToCoord(ref);
         const cell = sheet.getCell(coord.row, coord.col);
 
-        if (cell?.formula && (options?.force || !this.cache.has(ref))) {
-          await this.evalCell(ref, sheet);
-          cellsProcessed++;
+        if (cell?.formula) {
+          // If force is true, clear cache first to ensure recalculation
+          if (options?.force) {
+            this.cache.delete(ref);
+          }
+
+          // Recalculate if not in cache or if force is true
+          if (options?.force || !this.cache.has(ref)) {
+            await this.evalCell(ref, sheet);
+            cellsProcessed++;
+          }
         }
       }
     } catch (error) {

@@ -811,6 +811,120 @@ body {
 }
 
 /* ============================================================================
+     EXCEL-STYLE RIBBON MENU (Compact 70% smaller)
+     ============================================================================ */
+
+.ribbon {
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border-color);
+  box-shadow: var(--shadow-sm);
+}
+
+.ribbon-tabs {
+  display: flex;
+  gap: 1px;
+  background: var(--bg-tertiary);
+  padding: 0 var(--spacing-sm);
+  border-bottom: 1px solid var(--border-color);
+}
+
+.ribbon-tab {
+  padding: 4px 12px;
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: var(--text-secondary);
+  font-size: 11px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s;
+  white-space: nowrap;
+}
+
+.ribbon-tab:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.ribbon-tab.active {
+  background: var(--bg-secondary);
+  color: var(--color-primary);
+  border-bottom-color: var(--color-primary);
+}
+
+.ribbon-content {
+  display: flex;
+  gap: 0;
+  padding: 4px 8px;
+  background: var(--bg-secondary);
+  min-height: 42px;
+}
+
+.ribbon-group {
+  display: flex;
+  flex-direction: column;
+  padding: 2px 6px;
+  border-right: 1px solid var(--border-color);
+}
+
+.ribbon-group:last-child {
+  border-right: none;
+}
+
+.ribbon-group-title {
+  font-size: 9px;
+  color: var(--text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  margin-bottom: 3px;
+  text-align: center;
+}
+
+.ribbon-buttons {
+  display: flex;
+  gap: 2px;
+  flex-wrap: wrap;
+}
+
+.ribbon-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 3px 4px;
+  min-width: 36px;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 3px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.ribbon-btn:hover {
+  background: var(--bg-hover);
+  border-color: var(--border-color);
+}
+
+.ribbon-btn:active {
+  transform: translateY(1px);
+  background: var(--bg-active);
+}
+
+.ribbon-icon {
+  font-size: 14px;
+  margin-bottom: 1px;
+  display: block;
+}
+
+.ribbon-label {
+  font-size: 8px;
+  color: var(--text-secondary);
+  text-align: center;
+  line-height: 1.1;
+  max-width: 50px;
+}
+
+/* ============================================================================
      RESPONSIVE
      ============================================================================ */
 
@@ -821,6 +935,14 @@ body {
 
   .panels {
     width: 250px;
+  }
+
+  .ribbon-group-title {
+    font-size: 10px;
+  }
+
+  .ribbon-btn {
+    min-width: 50px;
   }
 }
 
@@ -836,5 +958,19 @@ body {
 
   .panels {
     display: none;
+  }
+
+  .ribbon-tabs {
+    overflow-x: auto;
+  }
+
+  .ribbon-content {
+    flex-wrap: wrap;
+  }
+
+  .ribbon-group {
+    min-width: 100%;
+    border-right: none;
+    border-bottom: 1px solid var(--border-color);
   }
 }

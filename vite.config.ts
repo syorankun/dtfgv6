@@ -20,10 +20,18 @@ export default defineConfig({
       },
     },
     chunkSizeWarningLimit: 1500, // 1.5 MB
+    // Desabilita module preload polyfill que pode causar problemas em file://
+    modulePreload: {
+      polyfill: false,
+    },
   },
-  base: "./", // Importante para file:// protocol
+  base: "./", // Importante para file:// protocol - usa caminhos relativos
   server: {
     port: 5173,
+    open: true,
+  },
+  preview: {
+    port: 4173,
     open: true,
   },
   optimizeDeps: {

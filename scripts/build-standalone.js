@@ -67,9 +67,7 @@ console.log(`   Encontrados ${cssLinks.length} link(s) CSS`);
 for (const link of cssLinks) {
   const cssContent = readDistFile(link.href);
   if (cssContent) {
-    // Escapar </style> para evitar fechar a tag prematuramente
-    const escapedCSS = cssContent.replace(/<\/style>/gi, '<\\/style>');
-    html = html.replace(link.fullTag, `<style>${escapedCSS}</style>`);
+    html = html.replace(link.fullTag, `<style>${cssContent}</style>`);
     console.log(`   ✅ CSS inline: ${link.href} (${cssContent.length} chars)`);
   }
 }
@@ -101,11 +99,12 @@ for (const script of jsScripts) {
     const typeMatch = attrs.match(/type=["']([^"']+)["']/);
     const type = typeMatch ? typeMatch[1] : 'module';
 
-    // Escapar <script> e </script> para evitar interferência com HTML parsing
-    const escapedJS = jsContent
-      .replace(/<script/gi, '<\\script')
-      .replace(/<\/script>/gi, '<\\/script>');
+    // Escapar </script> para evitar que o parser HTML feche a tag prematuramente
+    // Usa <\/script> - o backslash escapa o / para o parser HTML
+    // Precisa de 4 backslashes no código: 2 para string literal + 2 para replace() = 1 no HTML
+    const escapedJS = jsContent.replace(/<\/script>/gi, '<\\\\/script>');
     const inlineScript = `<script type="${type}">${escapedJS}</script>`;
+
     html = html.replace(script.fullTag, inlineScript);
     console.log(`   ✅ JS inline: ${script.src} (${jsContent.length} chars)`);
   }

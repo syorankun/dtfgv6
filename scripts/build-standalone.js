@@ -67,7 +67,8 @@ console.log(`   Encontrados ${cssLinks.length} link(s) CSS`);
 for (const link of cssLinks) {
   const cssContent = readDistFile(link.href);
   if (cssContent) {
-    html = html.replace(link.fullTag, `<style>${cssContent}</style>`);
+    // Usar função callback para evitar interpretação de padrões especiais ($&, $1, etc)
+    html = html.replace(link.fullTag, () => `<style>${cssContent}</style>`);
     console.log(`   ✅ CSS inline: ${link.href} (${cssContent.length} chars)`);
   }
 }
@@ -101,11 +102,13 @@ for (const script of jsScripts) {
 
     // Escapar </script> para evitar que o parser HTML feche a tag prematuramente
     // Usa <\/script> - o backslash escapa o / para o parser HTML
-    // Precisa de 4 backslashes no código: 2 para string literal + 2 para replace() = 1 no HTML
-    const escapedJS = jsContent.replace(/<\/script>/gi, '<\\\\/script>');
+    const escapedJS = jsContent.replace(/<\/script>/gi, '<\\/script>');
     const inlineScript = `<script type="${type}">${escapedJS}</script>`;
 
-    html = html.replace(script.fullTag, inlineScript);
+    // CRÍTICO: Não usar string literal no replace, pois $& e outros padrões especiais
+    // ($1, $2, $`, $', $$) seriam interpretados como "insira o match aqui"
+    // Usar função callback para evitar interpretação de padrões especiais
+    html = html.replace(script.fullTag, () => inlineScript);
     console.log(`   ✅ JS inline: ${script.src} (${jsContent.length} chars)`);
   }
 }

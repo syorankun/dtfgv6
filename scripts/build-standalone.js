@@ -67,7 +67,9 @@ console.log(`   Encontrados ${cssLinks.length} link(s) CSS`);
 for (const link of cssLinks) {
   const cssContent = readDistFile(link.href);
   if (cssContent) {
-    html = html.replace(link.fullTag, `<style>${cssContent}</style>`);
+    // Escapar </style> para evitar fechar a tag prematuramente
+    const escapedCSS = cssContent.replace(/<\/style>/gi, '<\\/style>');
+    html = html.replace(link.fullTag, `<style>${escapedCSS}</style>`);
     console.log(`   ✅ CSS inline: ${link.href} (${cssContent.length} chars)`);
   }
 }
@@ -99,7 +101,11 @@ for (const script of jsScripts) {
     const typeMatch = attrs.match(/type=["']([^"']+)["']/);
     const type = typeMatch ? typeMatch[1] : 'module';
 
-    const inlineScript = `<script type="${type}">${jsContent}</script>`;
+    // Escapar <script> e </script> para evitar interferência com HTML parsing
+    const escapedJS = jsContent
+      .replace(/<script/gi, '<\\script')
+      .replace(/<\/script>/gi, '<\\/script>');
+    const inlineScript = `<script type="${type}">${escapedJS}</script>`;
     html = html.replace(script.fullTag, inlineScript);
     console.log(`   ✅ JS inline: ${script.src} (${jsContent.length} chars)`);
   }

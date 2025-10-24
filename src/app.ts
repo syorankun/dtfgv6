@@ -14,6 +14,7 @@ import { logger } from './@core/storage-utils-consolidated';
 import { VirtualGrid } from './@core/grid-virtual-consolidated';
 import { FileReader, FileWriter } from './@core/io-transform-consolidated';
 import { FXPackPlugin, ChartsPlugin, PivotPlugin } from './@core/plugin-system-consolidated';
+import { ProLeasePlugin } from './plugins/prolease-ifrs16-plugin';
 import './style.css';
 
 // ============================================================================
@@ -88,19 +89,25 @@ class DJDataForgeApp {
         { default: FXPackPlugin },
         new FXPackPlugin().manifest
       );
-      
+
       // Load Charts
       await kernel['pluginHost'].loadPlugin(
         { default: ChartsPlugin },
         new ChartsPlugin().manifest
       );
-      
+
       // Load Pivot
       await kernel['pluginHost'].loadPlugin(
         { default: PivotPlugin },
         new PivotPlugin().manifest
       );
-      
+
+      // Load ProLease IFRS 16
+      await kernel['pluginHost'].loadPlugin(
+        { default: ProLeasePlugin },
+        new ProLeasePlugin().manifest
+      );
+
       logger.info('[App] Built-in plugins loaded');
     } catch (error) {
       logger.error('[App] Failed to load plugins', error);

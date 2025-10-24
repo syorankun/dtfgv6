@@ -14,7 +14,6 @@ import { logger } from './@core/storage-utils-consolidated';
 import { VirtualGrid } from './@core/grid-virtual-consolidated';
 import { FileReader, FileWriter } from './@core/io-transform-consolidated';
 import { FXPackPlugin, ChartsPlugin, PivotPlugin } from './@core/plugin-system-consolidated';
-import { ProLeasePlugin } from './plugins/prolease-ifrs16-plugin';
 import './style.css';
 
 // ============================================================================
@@ -102,11 +101,8 @@ class DJDataForgeApp {
         new PivotPlugin().manifest
       );
 
-      // Load ProLease IFRS 16
-      await kernel['pluginHost'].loadPlugin(
-        { default: ProLeasePlugin },
-        new ProLeasePlugin().manifest
-      );
+      // Note: ProLease IFRS 16 plugin should be loaded externally via "Load Plugin" button
+      // using the prolease-ifrs16-plugin.js file
 
       logger.info('[App] Built-in plugins loaded');
     } catch (error) {

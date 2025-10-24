@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ProLease Plugin - Standalone Usage Example</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      max-width: 800px;
+      margin: 40px auto;
+      padding: 20px;
+      line-height: 1.6;
+      background: #f5f5f5;
+    }
+    .container {
+      background: white;
+      padding: 30px;
+      border-radius: 8px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+    h1 {
+      color: #2c3e50;
+      border-bottom: 2px solid #3498db;
+      padding-bottom: 10px;
+    }
+    h2 {
+      color: #34495e;
+      margin-top: 30px;
+    }
+    .code-block {
+      background: #f8f9fa;
+      border: 1px solid #e9ecef;
+      border-radius: 4px;
+      padding: 15px;
+      font-family: 'Courier New', monospace;
+      font-size: 14px;
+      overflow-x: auto;
+      margin: 15px 0;
+    }
+    .info {
+      background: #e3f2fd;
+      border-left: 4px solid #2196f3;
+      padding: 12px;
+      margin: 15px 0;
+    }
+    .warning {
+      background: #fff3cd;
+      border-left: 4px solid #ffc107;
+      padding: 12px;
+      margin: 15px 0;
+    }
+    .success {
+      background: #d4edda;
+      border-left: 4px solid #28a745;
+      padding: 12px;
+      margin: 15px 0;
+    }
+    button {
+      background: #3498db;
+      color: white;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 14px;
+      margin: 5px;
+    }
+    button:hover {
+      background: #2980b9;
+    }
+    #output {
+      background: #f8f9fa;
+      border: 1px solid #dee2e6;
+      border-radius: 4px;
+      padding: 15px;
+      margin-top: 15px;
+      min-height: 100px;
+      font-family: monospace;
+      font-size: 12px;
+      white-space: pre-wrap;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>📋 ProLease IFRS 16 Plugin - Standalone Usage</h1>
+
+    <div class="info">
+      <strong>ℹ️ Informação:</strong> Este exemplo demonstra como carregar e usar o plugin ProLease compilado individualmente.
+    </div>
+
+    <h2>1. Carregamento do Plugin (ES Module)</h2>
+    <div class="code-block">
+&lt;script type="module"&gt;
+  // Importar o plugin compilado
+  import { ProLeasePlugin, manifest } from './prolease-ifrs16-plugin.js';
+
+  // Criar instância do plugin
+  const plugin = new ProLeasePlugin();
+  console.log('Plugin manifest:', manifest);
+&lt;/script&gt;
+    </div>
+
+    <h2>2. Carregamento (IIFE - Script tradicional)</h2>
+    <div class="code-block">
+&lt;script src="./prolease-ifrs16-plugin.iife.js"&gt;&lt;/script&gt;
+&lt;script&gt;
+  // Acessar via global ProLeasePlugin
+  const { ProLeasePlugin, manifest } = window.ProLeasePlugin;
+  console.log('Plugin carregado:', manifest.name);
+&lt;/script&gt;
+    </div>
+
+    <h2>3. Integração com DataForge</h2>
+    <div class="code-block">
+// Assumindo que o DataForge v6 já está carregado
+import { ProLeasePlugin, manifest } from './prolease-ifrs16-plugin.js';
+
+// Registrar o plugin no kernel do DataForge
+await window.DJDataForgeKernel.pluginHost.loadPlugin(
+  { default: ProLeasePlugin },
+  manifest
+);
+    </div>
+
+    <div class="warning">
+      <strong>⚠️ Atenção:</strong> O plugin requer que o DataForge v6 esteja carregado primeiro,
+      pois ele depende dos módulos @core (types, storage, workbook, etc).
+    </div>
+
+    <h2>4. Teste Interativo</h2>
+    <p>Clique no botão abaixo para testar o carregamento do plugin:</p>
+
+    <button onclick="testPluginLoad()">🔍 Testar Carregamento</button>
+    <button onclick="showManifest()">📄 Ver Manifest</button>
+    <button onclick="clearOutput()">🗑️ Limpar</button>
+
+    <div id="output"></div>
+
+    <h2>5. Estrutura do Plugin</h2>
+    <div class="success">
+      <strong>✅ Arquivos Compilados:</strong>
+      <ul>
+        <li><code>prolease-ifrs16-plugin.js</code> - ES Module (22 KB, gzip: 6 KB)</li>
+        <li><code>prolease-ifrs16-plugin.iife.js</code> - IIFE/UMD (17 KB, gzip: 5.3 KB)</li>
+        <li><code>*.map</code> - Source maps para debugging</li>
+      </ul>
+    </div>
+
+    <h2>6. API do Plugin</h2>
+    <div class="code-block">
+// Métodos principais
+plugin.init(context)      // Inicializa o plugin
+plugin.dispose()          // Limpa recursos
+
+// Manifest
+manifest.id               // 'dj.ifrs16.prolease'
+manifest.name             // 'ProLease IFRS 16'
+manifest.version          // '6.0.0'
+manifest.permissions      // Array de permissões necessárias
+    </div>
+
+    <h2>7. Dependências Externas</h2>
+    <p>O plugin compilado <strong>não inclui</strong> os seguintes módulos (devem ser fornecidos pelo DataForge):</p>
+    <ul>
+      <li><code>@core/types</code> - Interfaces TypeScript</li>
+      <li><code>@core/plugin-system-consolidated</code> - Sistema de plugins</li>
+      <li><code>@core/workbook-consolidated</code> - Gerenciador de workbooks</li>
+      <li><code>@core/storage-utils-consolidated</code> - Persistência e logging</li>
+    </ul>
+  </div>
+
+  <script type="module">
+    // Exemplo de código que pode ser executado
+    window.testPluginLoad = async function() {
+      const output = document.getElementById('output');
+      output.textContent = 'Carregando plugin...\n';
+
+      try {
+        // Importar dinamicamente
+        const module = await import('./prolease-ifrs16-plugin.js');
+
+        output.textContent += '✅ Plugin carregado com sucesso!\n\n';
+        output.textContent += `Nome: ${module.manifest.name}\n`;
+        output.textContent += `Versão: ${module.manifest.version}\n`;
+        output.textContent += `ID: ${module.manifest.id}\n`;
+        output.textContent += `Autor: ${module.manifest.author}\n`;
+        output.textContent += `\nPermissões necessárias:\n`;
+        module.manifest.permissions.forEach(p => {
+          output.textContent += `  - ${p}\n`;
+        });
+
+        output.textContent += '\n⚠️ Para usar o plugin, o DataForge v6 deve estar carregado.\n';
+
+      } catch (error) {
+        output.textContent += `❌ Erro ao carregar: ${error.message}\n`;
+        output.textContent += '\nDetalhes: ' + error.stack;
+      }
+    };
+
+    window.showManifest = async function() {
+      const output = document.getElementById('output');
+      try {
+        const module = await import('./prolease-ifrs16-plugin.js');
+        output.textContent = 'MANIFEST DO PLUGIN:\n\n';
+        output.textContent += JSON.stringify(module.manifest, null, 2);
+      } catch (error) {
+        output.textContent = `❌ Erro: ${error.message}`;
+      }
+    };
+
+    window.clearOutput = function() {
+      document.getElementById('output').textContent = '';
+    };
+  </script>
+</body>
+</html>

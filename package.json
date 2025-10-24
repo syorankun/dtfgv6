@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
+    "build:plugin": "vite build --config vite.config.plugin.ts",
     "build:standalone": "npm run build:standalone:pre && npm run build:standalone:post",
     "build:standalone:pre": "tsc && vite build --config vite.config.standalone.ts",
     "build:standalone:post": "node scripts/build-standalone.js",
@@ -50,6 +51,7 @@
     "eslint": "^8.56.0",
     "playwright": "^1.40.1",
     "prettier": "^3.1.1",
+    "terser": "^5.44.0",
     "typescript": "^5.3.3",
     "vite": "^7.1.11",
     "vitest": "^1.0.4"

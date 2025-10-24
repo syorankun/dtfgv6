@@ -48,8 +48,8 @@ class ProLeaseIFRS16Plugin {
       this.registerFormulas();
       this.setupUI();
 
-      this.log(\`Ready with \${this.contracts.length} saved contracts\`);
-      context.ui.showToast(\`ProLease IFRS 16 loaded! \${this.contracts.length} contract(s)\`, 'success');
+      this.log(`Ready with ${this.contracts.length} saved contracts`);
+      context.ui.showToast(`ProLease IFRS 16 loaded! ${this.contracts.length} contract(s)`, 'success');
     } catch (error) {
       this.error('Initialization failed', error);
       context.ui.showToast('Failed to load ProLease plugin', 'error');
@@ -87,7 +87,7 @@ class ProLeaseIFRS16Plugin {
     try {
       const saved = await this.context.storage.get('contracts');
       this.contracts = saved || [];
-      this.log(\`Loaded \${this.contracts.length} contracts\`);
+      this.log(`Loaded ${this.contracts.length} contracts`);
     } catch (error) {
       this.error('Failed to load contracts', error);
       this.contracts = [];
@@ -97,7 +97,7 @@ class ProLeaseIFRS16Plugin {
   async saveContracts() {
     try {
       await this.context.storage.set('contracts', this.contracts);
-      this.log(\`Saved \${this.contracts.length} contracts\`);
+      this.log(`Saved ${this.contracts.length} contracts`);
     } catch (error) {
       this.error('Failed to save contracts', error);
       throw error;
@@ -162,7 +162,7 @@ class ProLeaseIFRS16Plugin {
   }
 
   renderControlPanel(container) {
-    container.innerHTML = \`
+    container.innerHTML = `
       <div class="prolease-panel" style="padding: 8px;">
         <button id="prolease-create-btn" class="prolease-btn-primary" style="
           width: 100%;
@@ -179,7 +179,7 @@ class ProLeaseIFRS16Plugin {
         </button>
 
         <div style="margin-bottom: 8px; font-size: 12px; color: #64748b; font-weight: 500;">
-          SAVED CONTRACTS (\${this.contracts.length})
+          SAVED CONTRACTS (${this.contracts.length})
         </div>
 
         <div id="prolease-contracts-list" style="
@@ -188,10 +188,10 @@ class ProLeaseIFRS16Plugin {
           border: 1px solid #e2e8f0;
           border-radius: 6px;
         ">
-          \${this.renderContractsList()}
+          ${this.renderContractsList()}
         </div>
       </div>
-    \`;
+    `;
 
     const createBtn = container.querySelector('#prolease-create-btn');
     createBtn?.addEventListener('click', () => this.handleNewContract());
@@ -201,32 +201,32 @@ class ProLeaseIFRS16Plugin {
 
   renderContractsList() {
     if (this.contracts.length === 0) {
-      return \`
+      return `
         <div style="padding: 20px; text-align: center; color: #94a3b8; font-size: 13px;">
           No contracts yet.<br>Click "Create New Contract" to begin.
         </div>
-      \`;
+      `;
     }
 
     return this.contracts
       .map(
-        (c) => \`
+        (c) => `
         <div class="contract-item" style="
           padding: 12px;
           border-bottom: 1px solid #e2e8f0;
           transition: background 0.2s;
         " onmouseover="this.style.background='#f8fafc'" onmouseout="this.style.background='transparent'">
           <div style="font-weight: 600; font-size: 14px; color: #1e293b; margin-bottom: 4px;">
-            \${this.escapeHtml(c.contractName)}
+            ${this.escapeHtml(c.contractName)}
           </div>
           <div style="font-size: 12px; color: #64748b; margin-bottom: 8px;">
-            📅 \${new Date(c.startDate).toLocaleDateString()} |
-            📊 \${c.termMonths} months |
-            💰 \${this.formatCurrency(c.totalRent)}/mo
+            📅 ${new Date(c.startDate).toLocaleDateString()} |
+            📊 ${c.termMonths} months |
+            💰 ${this.formatCurrency(c.totalRent)}/mo
           </div>
           <div style="display: flex; gap: 6px;">
             <button
-              data-contract-id="\${c.id}"
+              data-contract-id="${c.id}"
               data-action="recalc"
               style="
                 flex: 1;
@@ -242,7 +242,7 @@ class ProLeaseIFRS16Plugin {
               🔄 Recalculate
             </button>
             <button
-              data-contract-id="\${c.id}"
+              data-contract-id="${c.id}"
               data-action="delete"
               style="
                 padding: 6px 12px;
@@ -258,7 +258,7 @@ class ProLeaseIFRS16Plugin {
             </button>
           </div>
         </div>
-      \`
+      `
       )
       .join('');
   }
@@ -287,7 +287,7 @@ class ProLeaseIFRS16Plugin {
   handleNewContract() {
     this.log('Creating new contract');
 
-    const contractName = prompt('Contract Name:', \`Contract \${this.contracts.length + 1}\`);
+    const contractName = prompt('Contract Name:', `Contract ${this.contracts.length + 1}`);
     if (!contractName) {
       this.context.ui.showToast('Contract creation cancelled', 'info');
       return;
@@ -337,7 +337,7 @@ class ProLeaseIFRS16Plugin {
     this.saveContracts();
 
     this.log('Contract created', { id: contract.id, name: contractName });
-    this.context.ui.showToast(\`Contract "\${contractName}" created. Calculating...\`, 'info');
+    this.context.ui.showToast(`Contract "${contractName}" created. Calculating...`, 'info');
 
     this.calculateAndCreateSheet(contract);
     this.refreshControlPanel();
@@ -345,7 +345,7 @@ class ProLeaseIFRS16Plugin {
 
   handleRecalculate(contract) {
     this.log('Recalculating contract', { id: contract.id });
-    this.context.ui.showToast(\`Recalculating "\${contract.contractName}"...\`, 'info');
+    this.context.ui.showToast(`Recalculating "${contract.contractName}"...`, 'info');
     this.calculateAndCreateSheet(contract);
   }
 
@@ -355,7 +355,7 @@ class ProLeaseIFRS16Plugin {
     const contract = this.contracts.find((c) => c.id === contractId);
     if (!contract) return;
 
-    if (!confirm(\`Delete contract "\${contract.contractName}"?\\n\\nThis action cannot be undone.\`)) {
+    if (!confirm(`Delete contract "${contract.contractName}"?\n\nThis action cannot be undone.`)) {
       return;
     }
 
@@ -385,7 +385,7 @@ class ProLeaseIFRS16Plugin {
 
       if (error) {
         this.error('Calculation error:', error);
-        this.context.ui.showToast(\`Calculation error: \${error}\`, 'error');
+        this.context.ui.showToast(`Calculation error: ${error}`, 'error');
         return;
       }
 
@@ -406,7 +406,7 @@ class ProLeaseIFRS16Plugin {
         this.log('Created new workbook');
       }
 
-      const sheetName = \`IFRS16 - \${contract.contractName}\`;
+      const sheetName = `IFRS16 - ${contract.contractName}`;
       const sheets = Array.from(wb.sheets.values());
       let sheet = sheets.find((s) => s.name === sheetName);
 
@@ -449,7 +449,7 @@ class ProLeaseIFRS16Plugin {
         cols: headers.length,
       });
 
-      this.context.ui.showToast(\`Sheet "\${sheetName}" created with \${dataRows.length} rows!\`, 'success');
+      this.context.ui.showToast(`Sheet "${sheetName}" created with ${dataRows.length} rows!`, 'success');
     } catch (error) {
       this.error('Sheet population failed', error);
       this.context.ui.showToast('Failed to create sheet', 'error');
@@ -461,7 +461,7 @@ class ProLeaseIFRS16Plugin {
   // ========================================================================
 
   createCalculationWorker() {
-    const code = \`
+    const workerCode = `
       self.onmessage = function(event) {
         const { action, payload } = event.data || {};
         if (action !== 'calculate') return;
@@ -596,9 +596,9 @@ class ProLeaseIFRS16Plugin {
 
         return rows;
       }
-    \`;
+    `;
 
-    const blob = new Blob([code], { type: 'application/javascript' });
+    const blob = new Blob([workerCode], { type: 'application/javascript' });
     const url = URL.createObjectURL(blob);
     const worker = new Worker(url);
 
@@ -627,7 +627,7 @@ class ProLeaseIFRS16Plugin {
   }
 
   generateId() {
-    return \`\${Date.now()}-\${Math.random().toString(36).substr(2, 9)}\`;
+    return `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
   }
 
   escapeHtml(text) {

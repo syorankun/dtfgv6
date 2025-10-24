@@ -293,6 +293,7 @@ export interface KernelContext {
   companyManager: any;
   eventBus: any;
   storage: any;
+  getGrid: () => any;
 }
 
 // ============================================================================

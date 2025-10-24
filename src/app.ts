@@ -13,7 +13,8 @@ import { kernel } from './@core/kernel';
 import { logger } from './@core/storage-utils-consolidated';
 import { VirtualGrid } from './@core/grid-virtual-consolidated';
 import { FileReader, FileWriter } from './@core/io-transform-consolidated';
-import { FXPackPlugin, ChartsPlugin, PivotPlugin } from './@core/plugin-system-consolidated';
+import { FXPackPlugin, PivotPlugin } from './@core/plugin-system-consolidated';
+import { ChartsPlugin } from './plugins/charts-plugin';
 import { ProLeasePlugin } from './plugins/prolease-ifrs16-plugin';
 import './style.css';
 
@@ -24,6 +25,7 @@ import './style.css';
 class DJDataForgeApp {
   private grid?: VirtualGrid;
   private refreshTimeout?: number;
+  private originalSelectionChangeHandler: ((selection: any) => void) | undefined;
   
   async init(): Promise<void> {
     try {
@@ -426,6 +428,7 @@ class DJDataForgeApp {
     if (!canvas) return;
     
     this.grid = new VirtualGrid(canvas);
+    kernel.setGrid(this.grid);
     
     // Set initial sheet
     const wb = kernel.workbookManager.getActiveWorkbook();
@@ -936,7 +939,30 @@ class DJDataForgeApp {
     consoleEl.scrollTop = consoleEl.scrollHeight;
   }
   
-  private setupKernelEventListeners(): void {
+    private setupKernelEventListeners(): void {
+
+    kernel.eventBus.on('chart:start-range-selection', () => {
+      if (!this.grid) return;
+
+      this.originalSelectionChangeHandler = this.grid.getSelectionChangeHandler();
+
+      this.grid.setSelectionChangeHandler((selection: any) => {
+        const sheet = this.grid.getSheet();
+        if (sheet) {
+          const start = `${sheet.getColumnName(selection.start.col)}${selection.start.row + 1}`;
+          const end = `${sheet.getColumnName(selection.end.col)}${selection.end.row + 1}`;
+          const range = `${start}:${end}`;
+          kernel.eventBus.emit('chart:range-selected', range);
+        }
+      });
+    });
+
+    kernel.eventBus.on('chart:end-range-selection', () => {
+      if (!this.grid || !this.originalSelectionChangeHandler) return;
+
+      this.grid.setSelectionChangeHandler(this.originalSelectionChangeHandler);
+    });
+
     // Listen to workbook created
     kernel.eventBus.on('workbook:created', () => {
       this.refreshUI();

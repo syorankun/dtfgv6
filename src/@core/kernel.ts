@@ -274,6 +274,7 @@ export class DJDataForgeKernel {
   
   // Auto-save
   private autoSaveTimer?: number;
+  private grid?: any;
   
   private constructor() {
     this.workbookManager = new WorkbookManager();
@@ -315,9 +316,13 @@ export class DJDataForgeKernel {
       if (activeCompany) {
         const workbooksData = await this.storageManager.getAllWorkbooks(activeCompany.id);
         
-        for (const wbData of workbooksData) {
-          const wb = Workbook.deserialize(wbData);
-          this.workbookManager['workbooks'].set(wb.id, wb);
+        if (workbooksData.length > 0) {
+          for (const wbData of workbooksData) {
+            const wb = Workbook.deserialize(wbData);
+            this.workbookManager['workbooks'].set(wb.id, wb);
+          }
+        } else {
+          this.createWorkbook('Meu Primeiro Workbook');
         }
         
         logger.info("[Kernel] Workbooks loaded", { count: workbooksData.length });
@@ -381,6 +386,14 @@ export class DJDataForgeKernel {
     this.eventBus.emit("kernel:shutdown");
     logger.info("[Kernel] Shutdown complete");
   }
+
+  setGrid(grid: any): void {
+    this.grid = grid;
+  }
+
+  getGrid(): any {
+    return this.grid;
+  }
   
   // --------------------------------------------------------------------------
   // PUBLIC API
@@ -399,6 +412,7 @@ export class DJDataForgeKernel {
       companyManager: this.companyManager,
       eventBus: this.eventBus,
       storage: this.storageManager,
+      getGrid: this.getGrid.bind(this),
     };
   }
   

@@ -1416,6 +1416,14 @@ export class VirtualGrid {
     this.onSelectionChange = handler;
   }
 
+  getSelectionChangeHandler(): ((selection: Selection) => void) | undefined {
+    return this.onSelectionChange;
+  }
+
+  getSelectionChangeHandler(): ((selection: Selection) => void) | undefined {
+    return this.onSelectionChange;
+  }
+
   focusCell(row: number, col: number): void {
     this.selectionManager.startSelection(row, col);
     this.selectionManager.endSelection();

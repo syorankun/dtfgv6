@@ -86,6 +86,34 @@ export class Sheet {
     return name;
   }
 
+  private columnNameToIndex(name: string): number {
+    let index = 0;
+    for (let i = 0; i < name.length; i++) {
+      index = index * 26 + (name.charCodeAt(i) - 64);
+    }
+    return index - 1;
+  }
+
+  getRangeFromString(rangeStr: string): { start: { row: number; col: number }; end: { row: number; col: number } } | undefined {
+    const parts = rangeStr.split(':');
+    if (parts.length !== 2) return undefined;
+
+    const startCell = parts[0].match(/([A-Z]+)(\d+)/);
+    const endCell = parts[1].match(/([A-Z]+)(\d+)/);
+
+    if (!startCell || !endCell) return undefined;
+
+    const startCol = this.columnNameToIndex(startCell[1]);
+    const startRow = parseInt(startCell[2], 10) - 1;
+    const endCol = this.columnNameToIndex(endCell[1]);
+    const endRow = parseInt(endCell[2], 10) - 1;
+
+    return {
+      start: { row: startRow, col: startCol },
+      end: { row: endRow, col: endCol },
+    };
+  }
+
   // --------------------------------------------------------------------------
   // CELL OPERATIONS
   // --------------------------------------------------------------------------
@@ -472,6 +500,7 @@ export class Workbook {
       created: new Date(data.created),
       author: data.author,
     });
+    wb.id = data.id;
 
     wb.modified = new Date(data.modified);
     wb.companyId = data.companyId;

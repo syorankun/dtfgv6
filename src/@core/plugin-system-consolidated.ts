@@ -335,59 +335,6 @@ import type {
   }
   
   // ============================================================================
-  // BUILT-IN PLUGIN: CHARTS
-  // ============================================================================
-
-  export class ChartsPlugin implements Plugin {
-    manifest: PluginManifest = {
-      id: 'charts',
-      name: 'Charts',
-      version: '1.0.0',
-      author: 'DJ DataForge Team',
-      description: 'Criação de gráficos e visualizações',
-      permissions: ['read:workbook', 'ui:panel', 'ui:toolbar'],
-      entryPoint: 'charts.js',
-    };
-    
-    async init(context: PluginContext): Promise<void> {
-      // Add toolbar button
-      context.ui.addToolbarButton({
-        id: 'create-chart',
-        label: 'Criar Gráfico',
-        icon: '📊',
-        tooltip: 'Criar gráfico a partir dos dados selecionados',
-        onClick: () => {
-          this.createChart(context);
-        },
-      });
-      
-      // Add panel
-      context.ui.addPanel({
-        id: 'charts-panel',
-        title: '📊 Gráficos',
-        render: (container) => {
-          container.innerHTML = `
-            <div class="charts-panel-content">
-              <p style="color: #64748b; font-size: 12px;">
-                Selecione dados na planilha e clique em "Criar Gráfico"
-              </p>
-              <div id="chart-preview" style="margin-top: 12px;"></div>
-            </div>
-          `;
-        },
-      });
-      
-      context.ui.showToast('Charts plugin carregado!', 'success');
-      logger.info('[ChartsPlugin] Initialized');
-    }
-    
-    private createChart(context: PluginContext): void {
-      context.ui.showToast('Função de gráficos será implementada com Chart.js', 'info');
-      // TODO: Integrate Chart.js
-    }
-  }
-  
-  // ============================================================================
   // BUILT-IN PLUGIN: PIVOT TABLE
   // ============================================================================
   

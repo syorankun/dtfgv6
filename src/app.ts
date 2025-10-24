@@ -130,6 +130,7 @@ class DJDataForgeApp {
             <span class="company-badge" id="company-badge">${company?.name || 'Sem empresa'}</span>
           </div>
           <div class="header-right">
+            <button id="btn-toggle-dark-mode" class="btn" title="Alternar Modo Escuro">🌙</button>
             <button id="btn-clear-session" class="btn" title="Limpar Sessão">🗑️</button>
             <button id="btn-settings" class="btn" title="Configurações">⚙️</button>
           </div>
@@ -488,6 +489,11 @@ class DJDataForgeApp {
           content.classList.remove('hidden');
         }
       });
+    });
+
+    // Toggle dark mode button
+    document.getElementById('btn-toggle-dark-mode')?.addEventListener('click', () => {
+      document.body.classList.toggle('dark');
     });
 
     // New workbook button

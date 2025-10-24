@@ -19,7 +19,7 @@
 }
 
 :root {
-  /* Colors */
+  /* Light Theme (Default) */
   --color-primary: #2563eb;
   --color-primary-hover: #1d4ed8;
   --color-secondary: #64748b;
@@ -28,26 +28,43 @@
   --color-error: #ef4444;
   --color-info: #3b82f6;
 
-  /* Backgrounds */
   --bg-primary: #ffffff;
   --bg-secondary: #f8fafc;
   --bg-tertiary: #f1f5f9;
   --bg-hover: #e2e8f0;
   --bg-active: #cbd5e1;
 
-  /* Text */
   --text-primary: #0f172a;
   --text-secondary: #475569;
   --text-tertiary: #94a3b8;
 
-  /* Borders */
   --border-color: #e2e8f0;
   --border-radius: 6px;
 
-  /* Shadows */
   --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
   --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
   --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+
+  /* Dark Theme */
+  --dark-color-primary: #3b82f6;
+  --dark-color-primary-hover: #2563eb;
+  --dark-color-secondary: #94a3b8;
+  --dark-color-success: #10b981;
+  --dark-color-warning: #f59e0b;
+  --dark-color-error: #ef4444;
+  --dark-color-info: #3b82f6;
+
+  --dark-bg-primary: #1e293b;
+  --dark-bg-secondary: #0f172a;
+  --dark-bg-tertiary: #334155;
+  --dark-bg-hover: #475569;
+  --dark-bg-active: #64748b;
+
+  --dark-text-primary: #f8fafc;
+  --dark-text-secondary: #cbd5e1;
+  --dark-text-tertiary: #94a3b8;
+
+  --dark-border-color: #334155;
 
   /* Spacing */
   --spacing-xs: 4px;
@@ -62,6 +79,29 @@
     sans-serif;
   --font-mono: "Monaco", "Menlo", "Consolas", monospace;
 }
+
+body.dark {
+  --color-primary: var(--dark-color-primary);
+  --color-primary-hover: var(--dark-color-primary-hover);
+  --color-secondary: var(--dark-color-secondary);
+  --color-success: var(--dark-color-success);
+  --color-warning: var(--dark-color-warning);
+  --color-error: var(--dark-color-error);
+  --color-info: var(--dark-color-info);
+
+  --bg-primary: var(--dark-bg-primary);
+  --bg-secondary: var(--dark-bg-secondary);
+  --bg-tertiary: var(--dark-bg-tertiary);
+  --bg-hover: var(--dark-bg-hover);
+  --bg-active: var(--dark-bg-active);
+
+  --text-primary: var(--dark-text-primary);
+  --text-secondary: var(--dark-text-secondary);
+  --text-tertiary: var(--dark-text-tertiary);
+
+  --border-color: var(--dark-border-color);
+}
+
 
 body {
   font-family: var(--font-family);

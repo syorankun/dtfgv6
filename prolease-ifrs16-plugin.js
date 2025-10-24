@@ -48,8 +48,8 @@ class ProLeaseIFRS16Plugin {
       this.registerFormulas();
       this.setupUI();
 
-      this.log(\`Ready with \${this.contracts.length} saved contracts\`);
-      context.ui.showToast(\`ProLease IFRS 16 loaded! \${this.contracts.length} contract(s)\`, 'success');
+      this.log(`Ready with ${this.contracts.length} saved contracts`);
+      context.ui.showToast(`ProLease IFRS 16 loaded! ${this.contracts.length} contract(s)`, 'success');
     } catch (error) {
       this.error('Initialization failed', error);
       context.ui.showToast('Failed to load ProLease plugin', 'error');
@@ -87,7 +87,7 @@ class ProLeaseIFRS16Plugin {
     try {
       const saved = await this.context.storage.get('contracts');
       this.contracts = saved || [];
-      this.log(\`Loaded \${this.contracts.length} contracts\`);
+      this.log(`Loaded ${this.contracts.length} contracts`);
     } catch (error) {
       this.error('Failed to load contracts', error);
       this.contracts = [];
@@ -97,7 +97,7 @@ class ProLeaseIFRS16Plugin {
   async saveContracts() {
     try {
       await this.context.storage.set('contracts', this.contracts);
-      this.log(\`Saved \${this.contracts.length} contracts\`);
+      this.log(`Saved ${this.contracts.length} contracts`);
     } catch (error) {
       this.error('Failed to save contracts', error);
       throw error;
@@ -162,7 +162,7 @@ class ProLeaseIFRS16Plugin {
   }
 
   renderControlPanel(container) {
-    container.innerHTML = \`
+    container.innerHTML = `
       <div class="prolease-panel" style="padding: 8px;">
         <button id="prolease-create-btn" class="prolease-btn-primary" style="
           width: 100%;
@@ -175,11 +175,11 @@ class ProLeaseIFRS16Plugin {
           cursor: pointer;
           font-weight: 500;
         ">
-          ➕ Create New Contract
+          ➕ Novo Contrato de Arrendamento
         </button>
 
         <div style="margin-bottom: 8px; font-size: 12px; color: #64748b; font-weight: 500;">
-          SAVED CONTRACTS (\${this.contracts.length})
+          CONTRATOS SALVOS (${this.contracts.length})
         </div>
 
         <div id="prolease-contracts-list" style="
@@ -188,10 +188,10 @@ class ProLeaseIFRS16Plugin {
           border: 1px solid #e2e8f0;
           border-radius: 6px;
         ">
-          \${this.renderContractsList()}
+          ${this.renderContractsList()}
         </div>
       </div>
-    \`;
+    `;
 
     const createBtn = container.querySelector('#prolease-create-btn');
     createBtn?.addEventListener('click', () => this.handleNewContract());
@@ -201,32 +201,48 @@ class ProLeaseIFRS16Plugin {
 
   renderContractsList() {
     if (this.contracts.length === 0) {
-      return \`
+      return `
         <div style="padding: 20px; text-align: center; color: #94a3b8; font-size: 13px;">
-          No contracts yet.<br>Click "Create New Contract" to begin.
+          Nenhum contrato ainda.<br>Clique em "Novo Contrato" para começar.
         </div>
-      \`;
+      `;
     }
 
     return this.contracts
       .map(
-        (c) => \`
+        (c) => `
         <div class="contract-item" style="
           padding: 12px;
           border-bottom: 1px solid #e2e8f0;
           transition: background 0.2s;
         " onmouseover="this.style.background='#f8fafc'" onmouseout="this.style.background='transparent'">
           <div style="font-weight: 600; font-size: 14px; color: #1e293b; margin-bottom: 4px;">
-            \${this.escapeHtml(c.contractName)}
+            ${this.escapeHtml(c.contractName)}
           </div>
           <div style="font-size: 12px; color: #64748b; margin-bottom: 8px;">
-            📅 \${new Date(c.startDate).toLocaleDateString()} |
-            📊 \${c.termMonths} months |
-            💰 \${this.formatCurrency(c.totalRent)}/mo
+            📅 Início: ${new Date(c.startDate).toLocaleDateString('pt-BR')} |
+            📊 Prazo: ${c.termMonths} meses |
+            💰 Aluguel: ${this.formatCurrency(c.totalRent)}/mês
           </div>
           <div style="display: flex; gap: 6px;">
             <button
-              data-contract-id="\${c.id}"
+              data-contract-id="${c.id}"
+              data-action="edit"
+              style="
+                flex: 1;
+                padding: 6px 12px;
+                font-size: 12px;
+                background: #3b82f6;
+                color: white;
+                border: none;
+                border-radius: 4px;
+                cursor: pointer;
+                font-weight: 500;
+              ">
+              ✏️ Editar
+            </button>
+            <button
+              data-contract-id="${c.id}"
               data-action="recalc"
               style="
                 flex: 1;
@@ -239,10 +255,10 @@ class ProLeaseIFRS16Plugin {
                 cursor: pointer;
                 font-weight: 500;
               ">
-              🔄 Recalculate
+              🔄 Recalcular
             </button>
             <button
-              data-contract-id="\${c.id}"
+              data-contract-id="${c.id}"
               data-action="delete"
               style="
                 padding: 6px 12px;
@@ -258,12 +274,20 @@ class ProLeaseIFRS16Plugin {
             </button>
           </div>
         </div>
-      \`
+      `
       )
       .join('');
   }
 
   attachContractListeners(container) {
+    container.querySelectorAll('[data-action="edit"]').forEach((btn) => {
+      btn.addEventListener('click', (e) => {
+        const contractId = e.target.getAttribute('data-contract-id');
+        const contract = this.contracts.find((c) => c.id === contractId);
+        if (contract) this.handleEditContract(contract);
+      });
+    });
+
     container.querySelectorAll('[data-action="recalc"]').forEach((btn) => {
       btn.addEventListener('click', (e) => {
         const contractId = e.target.getAttribute('data-contract-id');
@@ -286,66 +310,231 @@ class ProLeaseIFRS16Plugin {
 
   handleNewContract() {
     this.log('Creating new contract');
+    this.showContractModal();
+  }
 
-    const contractName = prompt('Contract Name:', \`Contract \${this.contracts.length + 1}\`);
-    if (!contractName) {
-      this.context.ui.showToast('Contract creation cancelled', 'info');
-      return;
-    }
+  handleEditContract(contract) {
+    this.log('Editing contract', { id: contract.id });
+    this.showContractModal(contract);
+  }
 
-    if (this.contracts.some((c) => c.contractName === contractName)) {
-      this.context.ui.showToast('Contract name already exists', 'error');
-      return;
-    }
-
-    const termMonths = this.promptNumber('Term (months):', 36);
-    if (termMonths === null || termMonths <= 0) return;
-
-    const startDate = prompt('Start Date (YYYY-MM-DD):', new Date().toISOString().split('T')[0]);
-    if (!startDate) return;
-
-    const totalRent = this.promptNumber('Monthly Rent (gross):', 80000);
-    if (totalRent === null || totalRent <= 0) return;
-
-    const serviceDeductions = this.promptNumber('Monthly Service Deductions:', 5000);
-    if (serviceDeductions === null) return;
-
-    const discountRate = this.promptNumber('Annual Discount Rate (%):', 15);
-    if (discountRate === null) return;
-
-    const initialLandlordAllowance = this.promptNumber('Landlord Allowance:', 0);
-    if (initialLandlordAllowance === null) return;
-
-    const initialDirectCosts = this.promptNumber('Initial Direct Costs:', 30000);
-    if (initialDirectCosts === null) return;
-
-    const contract = {
-      id: this.generateId(),
-      contractName,
-      termMonths,
-      startDate,
-      totalRent,
-      serviceDeductions,
-      discountRate,
-      initialLandlordAllowance,
-      initialDirectCosts,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
+  showContractModal(existingContract = null) {
+    const isEdit = !!existingContract;
+    const defaultContract = existingContract || {
+      contractName: `Contrato ${this.contracts.length + 1}`,
+      termMonths: 36,
+      startDate: new Date().toISOString().split('T')[0],
+      totalRent: 80000,
+      serviceDeductions: 5000,
+      discountRate: 15,
+      initialLandlordAllowance: 0,
+      initialDirectCosts: 30000,
     };
 
-    this.contracts.push(contract);
-    this.saveContracts();
+    const modal = document.createElement('div');
+    modal.className = 'modal-overlay';
+    modal.innerHTML = `
+      <div class="modal" style="max-width: 600px;">
+        <h2>${isEdit ? '✏️ Editar Contrato' : '➕ Novo Contrato de Arrendamento'}</h2>
+        <p style="color: #64748b; margin-bottom: 24px;">
+          Preencha os dados do contrato para gerar a planilha IFRS 16
+        </p>
 
-    this.log('Contract created', { id: contract.id, name: contractName });
-    this.context.ui.showToast(\`Contract "\${contractName}" created. Calculating...\`, 'info');
+        <form id="contract-form">
+          <div class="form-group">
+            <label>Nome do Contrato *</label>
+            <input
+              type="text"
+              name="contractName"
+              class="form-control"
+              value="${this.escapeHtml(defaultContract.contractName)}"
+              required
+              placeholder="Ex: Aluguel Escritório São Paulo"
+            />
+          </div>
 
-    this.calculateAndCreateSheet(contract);
-    this.refreshControlPanel();
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+            <div class="form-group">
+              <label>Prazo (meses) *</label>
+              <input
+                type="number"
+                name="termMonths"
+                class="form-control"
+                value="${defaultContract.termMonths}"
+                min="1"
+                required
+                placeholder="36"
+              />
+            </div>
+
+            <div class="form-group">
+              <label>Data de Início *</label>
+              <input
+                type="date"
+                name="startDate"
+                class="form-control"
+                value="${defaultContract.startDate}"
+                required
+              />
+            </div>
+          </div>
+
+          <hr>
+
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+            <div class="form-group">
+              <label>Aluguel Mensal Bruto (R$) *</label>
+              <input
+                type="number"
+                name="totalRent"
+                class="form-control"
+                value="${defaultContract.totalRent}"
+                min="0"
+                step="0.01"
+                required
+                placeholder="80000"
+              />
+            </div>
+
+            <div class="form-group">
+              <label>Deduções de Serviços (R$)</label>
+              <input
+                type="number"
+                name="serviceDeductions"
+                class="form-control"
+                value="${defaultContract.serviceDeductions}"
+                min="0"
+                step="0.01"
+                placeholder="5000"
+              />
+            </div>
+          </div>
+
+          <hr>
+
+          <div class="form-group">
+            <label>Taxa de Desconto Anual (%) *</label>
+            <input
+              type="number"
+              name="discountRate"
+              class="form-control"
+              value="${defaultContract.discountRate}"
+              min="0"
+              step="0.01"
+              required
+              placeholder="15"
+            />
+            <div style="font-size: 12px; color: #64748b; margin-top: 4px;">
+              Taxa incremental de financiamento do arrendatário
+            </div>
+          </div>
+
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+            <div class="form-group">
+              <label>Benfeitorias do Locador (R$)</label>
+              <input
+                type="number"
+                name="initialLandlordAllowance"
+                class="form-control"
+                value="${defaultContract.initialLandlordAllowance}"
+                min="0"
+                step="0.01"
+                placeholder="0"
+              />
+            </div>
+
+            <div class="form-group">
+              <label>Custos Diretos Iniciais (R$)</label>
+              <input
+                type="number"
+                name="initialDirectCosts"
+                class="form-control"
+                value="${defaultContract.initialDirectCosts}"
+                min="0"
+                step="0.01"
+                placeholder="30000"
+              />
+            </div>
+          </div>
+
+          <div class="modal-actions">
+            <button type="button" id="cancel-btn" class="btn">Cancelar</button>
+            <button type="submit" class="btn btn-primary">
+              ${isEdit ? '💾 Salvar Alterações' : '➕ Criar Contrato'}
+            </button>
+          </div>
+        </form>
+      </div>
+    `;
+
+    document.body.appendChild(modal);
+
+    const form = modal.querySelector('#contract-form');
+    const cancelBtn = modal.querySelector('#cancel-btn');
+
+    cancelBtn.addEventListener('click', () => {
+      modal.remove();
+      this.context.ui.showToast('Operação cancelada', 'info');
+    });
+
+    modal.addEventListener('click', (e) => {
+      if (e.target === modal) {
+        modal.remove();
+        this.context.ui.showToast('Operação cancelada', 'info');
+      }
+    });
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const formData = new FormData(form);
+
+      const contractName = formData.get('contractName').trim();
+
+      if (!isEdit && this.contracts.some((c) => c.contractName === contractName)) {
+        this.context.ui.showToast('Já existe um contrato com este nome', 'error');
+        return;
+      }
+
+      const contract = {
+        id: existingContract?.id || this.generateId(),
+        contractName,
+        termMonths: Number(formData.get('termMonths')),
+        startDate: formData.get('startDate'),
+        totalRent: Number(formData.get('totalRent')),
+        serviceDeductions: Number(formData.get('serviceDeductions')),
+        discountRate: Number(formData.get('discountRate')),
+        initialLandlordAllowance: Number(formData.get('initialLandlordAllowance')),
+        initialDirectCosts: Number(formData.get('initialDirectCosts')),
+        createdAt: existingContract?.createdAt || new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+
+      if (isEdit) {
+        const index = this.contracts.findIndex(c => c.id === contract.id);
+        if (index !== -1) {
+          this.contracts[index] = contract;
+        }
+      } else {
+        this.contracts.push(contract);
+      }
+
+      await this.saveContracts();
+
+      this.log(isEdit ? 'Contract updated' : 'Contract created', { id: contract.id, name: contractName });
+      this.context.ui.showToast(
+        `Contrato "${contractName}" ${isEdit ? 'atualizado' : 'criado'}. Calculando...`,
+        'success'
+      );
+
+      modal.remove();
+      this.calculateAndCreateSheet(contract);
+      this.refreshControlPanel();
+    });
   }
 
   handleRecalculate(contract) {
     this.log('Recalculating contract', { id: contract.id });
-    this.context.ui.showToast(\`Recalculating "\${contract.contractName}"...\`, 'info');
+    this.context.ui.showToast(`Recalculando "${contract.contractName}"...`, 'info');
     this.calculateAndCreateSheet(contract);
   }
 
@@ -355,7 +544,7 @@ class ProLeaseIFRS16Plugin {
     const contract = this.contracts.find((c) => c.id === contractId);
     if (!contract) return;
 
-    if (!confirm(\`Delete contract "\${contract.contractName}"?\\n\\nThis action cannot be undone.\`)) {
+    if (!confirm(`Excluir o contrato "${contract.contractName}"?\n\nEsta ação não pode ser desfeita.`)) {
       return;
     }
 
@@ -363,7 +552,7 @@ class ProLeaseIFRS16Plugin {
     await this.saveContracts();
 
     this.log('Contract deleted', { id: contractId });
-    this.context.ui.showToast('Contract deleted', 'success');
+    this.context.ui.showToast('Contrato excluído com sucesso', 'success');
 
     this.refreshControlPanel();
   }
@@ -385,7 +574,7 @@ class ProLeaseIFRS16Plugin {
 
       if (error) {
         this.error('Calculation error:', error);
-        this.context.ui.showToast(\`Calculation error: \${error}\`, 'error');
+        this.context.ui.showToast(`Calculation error: ${error}`, 'error');
         return;
       }
 
@@ -406,7 +595,7 @@ class ProLeaseIFRS16Plugin {
         this.log('Created new workbook');
       }
 
-      const sheetName = \`IFRS16 - \${contract.contractName}\`;
+      const sheetName = `IFRS16 - ${contract.contractName}`;
       const sheets = Array.from(wb.sheets.values());
       let sheet = sheets.find((s) => s.name === sheetName);
 
@@ -449,7 +638,7 @@ class ProLeaseIFRS16Plugin {
         cols: headers.length,
       });
 
-      this.context.ui.showToast(\`Sheet "\${sheetName}" created with \${dataRows.length} rows!\`, 'success');
+      this.context.ui.showToast(`Sheet "${sheetName}" created with ${dataRows.length} rows!`, 'success');
     } catch (error) {
       this.error('Sheet population failed', error);
       this.context.ui.showToast('Failed to create sheet', 'error');
@@ -461,7 +650,7 @@ class ProLeaseIFRS16Plugin {
   // ========================================================================
 
   createCalculationWorker() {
-    const code = \`
+    const workerCode = `
       self.onmessage = function(event) {
         const { action, payload } = event.data || {};
         if (action !== 'calculate') return;
@@ -596,9 +785,9 @@ class ProLeaseIFRS16Plugin {
 
         return rows;
       }
-    \`;
+    `;
 
-    const blob = new Blob([code], { type: 'application/javascript' });
+    const blob = new Blob([workerCode], { type: 'application/javascript' });
     const url = URL.createObjectURL(blob);
     const worker = new Worker(url);
 
@@ -627,7 +816,7 @@ class ProLeaseIFRS16Plugin {
   }
 
   generateId() {
-    return \`\${Date.now()}-\${Math.random().toString(36).substr(2, 9)}\`;
+    return `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
   }
 
   escapeHtml(text) {
@@ -637,11 +826,11 @@ class ProLeaseIFRS16Plugin {
   }
 
   formatCurrency(value) {
-    return new Intl.NumberFormat('en-US', {
+    return new Intl.NumberFormat('pt-BR', {
       style: 'currency',
-      currency: 'USD',
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
+      currency: 'BRL',
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
     }).format(value);
   }
 }

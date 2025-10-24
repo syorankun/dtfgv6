@@ -312,6 +312,12 @@ export class VirtualGrid {
   private onCellChange?: (row: number, col: number, value: any) => void;
   private onSelectionChange?: (selection: Selection) => void;
 
+  // Scrollbars
+  private vScrollbar?: HTMLDivElement;
+  private hScrollbar?: HTMLDivElement;
+  private vScrollbarContent?: HTMLDivElement;
+  private hScrollbarContent?: HTMLDivElement;
+
   constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas;
     const ctx = canvas.getContext("2d");
@@ -321,6 +327,7 @@ export class VirtualGrid {
     this.renderer = new CellRenderer(ctx);
 
     this.setupCanvas();
+    this.setupScrollbars();
     this.setupEvents();
 
     // Initial render
@@ -374,6 +381,78 @@ export class VirtualGrid {
 
       this.scrollY = Math.max(0, Math.min(maxScrollY, this.scrollY));
       this.scrollX = Math.max(0, Math.min(maxScrollX, this.scrollX));
+    }
+
+    // Update scrollbar sizes
+    this.updateScrollbarSizes();
+  }
+
+  private setupScrollbars(): void {
+    // Get scrollbar elements
+    this.vScrollbar = document.getElementById('grid-scrollbar-vertical') as HTMLDivElement;
+    this.hScrollbar = document.getElementById('grid-scrollbar-horizontal') as HTMLDivElement;
+    this.vScrollbarContent = document.getElementById('grid-scrollbar-v-content') as HTMLDivElement;
+    this.hScrollbarContent = document.getElementById('grid-scrollbar-h-content') as HTMLDivElement;
+
+    if (!this.vScrollbar || !this.hScrollbar || !this.vScrollbarContent || !this.hScrollbarContent) {
+      logger.warn('[VirtualGrid] Scrollbar elements not found');
+      return;
+    }
+
+    // Vertical scrollbar event
+    this.vScrollbar.addEventListener('scroll', () => {
+      if (!this.sheet) return;
+      const maxScrollY = Math.max(0, this.sheet.rowCount * this.cellHeight - this.viewportHeight + this.headerHeight);
+      const scrollRatio = this.vScrollbar!.scrollTop / (this.vScrollbar!.scrollHeight - this.vScrollbar!.clientHeight || 1);
+      this.scrollY = scrollRatio * maxScrollY;
+      this.render();
+    });
+
+    // Horizontal scrollbar event
+    this.hScrollbar.addEventListener('scroll', () => {
+      if (!this.sheet) return;
+      const maxScrollX = Math.max(0, this.sheet.colCount * this.cellWidth - this.viewportWidth + this.headerWidth);
+      const scrollRatio = this.hScrollbar!.scrollLeft / (this.hScrollbar!.scrollWidth - this.hScrollbar!.clientWidth || 1);
+      this.scrollX = scrollRatio * maxScrollX;
+      this.render();
+    });
+  }
+
+  private updateScrollbarSizes(): void {
+    if (!this.sheet || !this.vScrollbarContent || !this.hScrollbarContent) return;
+
+    // Calculate total content size
+    const totalHeight = this.sheet.rowCount * this.cellHeight + this.headerHeight;
+    const totalWidth = this.sheet.colCount * this.cellWidth + this.headerWidth;
+
+    // Set scrollbar content sizes to match total content
+    this.vScrollbarContent.style.height = totalHeight + 'px';
+    this.hScrollbarContent.style.width = totalWidth + 'px';
+
+    // Sync scrollbar positions with current scroll
+    this.syncScrollbarsToCanvas();
+  }
+
+  private syncScrollbarsToCanvas(): void {
+    if (!this.sheet || !this.vScrollbar || !this.hScrollbar) return;
+
+    const maxScrollY = Math.max(0, this.sheet.rowCount * this.cellHeight - this.viewportHeight + this.headerHeight);
+    const maxScrollX = Math.max(0, this.sheet.colCount * this.cellWidth - this.viewportWidth + this.headerWidth);
+
+    if (maxScrollY > 0) {
+      const scrollRatioY = this.scrollY / maxScrollY;
+      const targetScrollTop = scrollRatioY * (this.vScrollbar.scrollHeight - this.vScrollbar.clientHeight);
+      if (Math.abs(this.vScrollbar.scrollTop - targetScrollTop) > 1) {
+        this.vScrollbar.scrollTop = targetScrollTop;
+      }
+    }
+
+    if (maxScrollX > 0) {
+      const scrollRatioX = this.scrollX / maxScrollX;
+      const targetScrollLeft = scrollRatioX * (this.hScrollbar.scrollWidth - this.hScrollbar.clientWidth);
+      if (Math.abs(this.hScrollbar.scrollLeft - targetScrollLeft) > 1) {
+        this.hScrollbar.scrollLeft = targetScrollLeft;
+      }
     }
   }
 
@@ -636,6 +715,9 @@ export class VirtualGrid {
 
     this.scrollY = Math.max(0, Math.min(maxScrollY, this.scrollY));
     this.scrollX = Math.max(0, Math.min(maxScrollX, this.scrollX));
+
+    // Sync scrollbars to match wheel scroll
+    this.syncScrollbarsToCanvas();
 
     this.render();
   }
@@ -1279,6 +1361,7 @@ export class VirtualGrid {
     this.scrollY = 0;
     this.selectionManager.startSelection(0, 0);
     this.selectionManager.endSelection();
+    this.updateScrollbarSizes();
     this.render();
   }
 

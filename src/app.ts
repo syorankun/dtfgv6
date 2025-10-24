@@ -330,7 +330,16 @@ class DJDataForgeApp {
           
           <!-- Grid Area -->
           <main class="grid-container">
-            <canvas id="grid-canvas" class="grid-canvas" tabindex="0"></canvas>
+            <div class="grid-wrapper">
+              <canvas id="grid-canvas" class="grid-canvas" tabindex="0"></canvas>
+              <div class="grid-scrollbar-vertical" id="grid-scrollbar-vertical">
+                <div class="grid-scrollbar-content" id="grid-scrollbar-v-content"></div>
+              </div>
+              <div class="grid-scrollbar-horizontal" id="grid-scrollbar-horizontal">
+                <div class="grid-scrollbar-content" id="grid-scrollbar-h-content"></div>
+              </div>
+              <div class="grid-scrollbar-corner"></div>
+            </div>
           </main>
           
           <!-- Panels (right side) -->

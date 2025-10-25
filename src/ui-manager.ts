@@ -41,12 +41,15 @@ export class UIManager {
         if (sheet) {
           const cell = sheet.getCell(selection.start.row, selection.start.col);
           const cellName = sheet.getColumnName(selection.start.col) + (selection.start.row + 1);
-          
+
           const nameBox = document.getElementById('name-box');
           if (nameBox) nameBox.textContent = cellName;
 
           const formulaInput = document.getElementById('formula-input') as HTMLInputElement;
           if (formulaInput) formulaInput.value = cell?.formula || cell?.value || '';
+
+          // Update cell info panel
+          this.updateCellInfo(selection.start.row, selection.start.col, sheet);
         }
       });
     }
@@ -230,10 +233,6 @@ export class UIManager {
                   <span class="ribbon-icon">📂</span>
                   <span class="ribbon-label">Barra Lateral</span>
                 </button>
-                <button id="btn-toggle-right-panel" class="ribbon-btn">
-                  <span class="ribbon-icon">📊</span>
-                  <span class="ribbon-label">Painel Info</span>
-                </button>
                 <button id="btn-toggle-formula-bar" class="ribbon-btn">
                   <span class="ribbon-icon">ƒx</span>
                   <span class="ribbon-label">Barra Fórmulas</span>
@@ -241,6 +240,20 @@ export class UIManager {
                 <button id="btn-toggle-gridlines" class="ribbon-btn">
                   <span class="ribbon-icon">🔲</span>
                   <span class="ribbon-label">Linhas Grade</span>
+                </button>
+              </div>
+            </div>
+
+            <div class="ribbon-group">
+              <div class="ribbon-group-title">Painéis</div>
+              <div class="ribbon-buttons">
+                <button id="btn-toggle-console-panel" class="ribbon-btn">
+                  <span class="ribbon-icon">📝</span>
+                  <span class="ribbon-label">Console</span>
+                </button>
+                <button id="btn-toggle-info-panel" class="ribbon-btn">
+                  <span class="ribbon-icon">ℹ️</span>
+                  <span class="ribbon-label">Info Célula</span>
                 </button>
               </div>
             </div>
@@ -311,20 +324,15 @@ export class UIManager {
           <!-- Panels (right side) -->
           <aside class="panels">
             <div id="plugin-panels"></div>
-            
-            <div class="panel">
+
+            <div class="panel panel-console hidden" id="panel-console">
               <h4>📝 Console</h4>
               <div id="console-logs" class="console-logs"></div>
             </div>
-            
-            <div class="panel">
-              <h4>ℹ️ Info</h4>
-              <div id="cell-info" class="cell-info">
-                <div><strong>Célula:</strong> <span id="info-cell">-</span></div>
-                <div><strong>Valor:</strong> <span id="info-value">-</span></div>
-                <div><strong>Fórmula:</strong> <span id="info-formula">-</span></div>
-                <div><strong>Tipo:</strong> <span id="info-type">-</span></div>
-              </div>
+
+            <div class="panel panel-info hidden" id="panel-info">
+              <h4>ℹ️ Info da Célula</h4>
+              <div id="cell-info" class="cell-info" style="font-size: 12px; line-height: 1.6;"></div>
             </div>
           </aside>
         </div>
@@ -342,13 +350,13 @@ export class UIManager {
       <input type="file" id="file-input" accept=".csv,.xlsx,.xls,.json" style="display: none;" />
     `;
 
-    // Ensure sidebar and panels are visible by default
+    // Ensure sidebar is visible by default
     document.querySelector('.sidebar')?.classList.remove('collapsed');
-    document.querySelector('.panels')?.classList.remove('collapsed');
 
     this.setupGrid();
     this.listenForUIChanges();
     this.setupEventListeners();
+    this.initConsoleLogger();
   }
 
   public listenForUIChanges() {
@@ -569,14 +577,54 @@ export class UIManager {
       sidebar?.classList.toggle('collapsed');
     });
 
-    document.getElementById('btn-toggle-right-panel')?.addEventListener('click', () => {
-      const panels = document.querySelector('.panels');
-      panels?.classList.toggle('collapsed');
-    });
-
     document.getElementById('btn-toggle-formula-bar')?.addEventListener('click', () => {
       const formulaBar = document.querySelector('.formula-bar');
       formulaBar?.classList.toggle('hidden');
+    });
+
+    // Panel toggle buttons
+    document.getElementById('btn-toggle-console-panel')?.addEventListener('click', () => {
+      const consolePanel = document.getElementById('panel-console');
+      const button = document.getElementById('btn-toggle-console-panel');
+      consolePanel?.classList.toggle('hidden');
+      const isVisible = !consolePanel?.classList.contains('hidden');
+
+      // Update button visual state
+      if (button) {
+        if (isVisible) {
+          button.classList.add('active');
+          button.style.background = 'var(--theme-color-primary)';
+          button.style.color = 'white';
+        } else {
+          button.classList.remove('active');
+          button.style.background = '';
+          button.style.color = '';
+        }
+      }
+
+      logger.info('[UIManager] Console panel toggled', { visible: isVisible });
+    });
+
+    document.getElementById('btn-toggle-info-panel')?.addEventListener('click', () => {
+      const infoPanel = document.getElementById('panel-info');
+      const button = document.getElementById('btn-toggle-info-panel');
+      infoPanel?.classList.toggle('hidden');
+      const isVisible = !infoPanel?.classList.contains('hidden');
+
+      // Update button visual state
+      if (button) {
+        if (isVisible) {
+          button.classList.add('active');
+          button.style.background = 'var(--theme-color-primary)';
+          button.style.color = 'white';
+        } else {
+          button.classList.remove('active');
+          button.style.background = '';
+          button.style.color = '';
+        }
+      }
+
+      logger.info('[UIManager] Info panel toggled', { visible: isVisible });
     });
 
     // Workbook list clicks
@@ -2077,6 +2125,278 @@ export class UIManager {
     // For now, just log
     logger.info('[UIManager] Gridlines toggled', { visible: this.gridlinesVisible });
     alert('Toggle gridlines: funcionalidade em desenvolvimento');
+  }
+
+  // --------------------------------------------------------------------------
+  // CELL INFO PANEL
+  // --------------------------------------------------------------------------
+
+  private updateCellInfo(row: number, col: number, sheet: any): void {
+    const cellInfoContainer = document.getElementById('cell-info');
+    if (!cellInfoContainer) return;
+
+    const cell = sheet.getCell(row, col);
+    const cellName = sheet.getColumnName(col) + (row + 1);
+    const column = sheet.columns.get(col);
+
+    // Build info HTML
+    const displayValue = cell?.value !== undefined && cell?.value !== null ? String(cell.value) : '';
+    const hasValue = displayValue !== '';
+    const hasFormula = !!cell?.formula;
+    const typeLabel = this.getCellTypeLabel(cell?.type || 'auto');
+
+    let infoHTML = `
+      <div style="padding: 8px; background: var(--theme-bg-tertiary); border-radius: 4px; margin-bottom: 8px;">
+        <div style="font-size: 14px; font-weight: 600; color: var(--theme-color-primary);">${cellName}</div>
+        <div style="font-size: 10px; color: var(--theme-text-tertiary); margin-top: 2px;">
+          ${column?.name || 'Sem nome'} • Linha ${row + 1}
+        </div>
+      </div>
+    `;
+
+    // Value section
+    if (hasFormula) {
+      infoHTML += `
+        <div style="margin-bottom: 8px;">
+          <div style="font-size: 10px; font-weight: 600; color: var(--theme-text-secondary); margin-bottom: 4px;">
+            📐 FÓRMULA
+          </div>
+          <div style="background: var(--theme-bg-tertiary); padding: 6px; border-radius: 3px; font-family: 'Consolas', monospace; font-size: 11px; word-break: break-all; color: var(--theme-color-success);">
+            ${this.escapeHtml(cell.formula)}
+          </div>
+        </div>
+        <div style="margin-bottom: 8px;">
+          <div style="font-size: 10px; font-weight: 600; color: var(--theme-text-secondary); margin-bottom: 4px;">
+            💡 VALOR CALCULADO
+          </div>
+          <div style="background: var(--theme-bg-tertiary); padding: 6px; border-radius: 3px; font-size: 11px;">
+            ${hasValue ? this.escapeHtml(displayValue) : '<span style="opacity: 0.5;">vazio</span>'}
+          </div>
+        </div>
+      `;
+    } else if (hasValue) {
+      infoHTML += `
+        <div style="margin-bottom: 8px;">
+          <div style="font-size: 10px; font-weight: 600; color: var(--theme-text-secondary); margin-bottom: 4px;">
+            📝 VALOR
+          </div>
+          <div style="background: var(--theme-bg-tertiary); padding: 6px; border-radius: 3px; font-size: 11px; word-break: break-all;">
+            ${this.escapeHtml(displayValue)}
+          </div>
+        </div>
+      `;
+    } else {
+      infoHTML += `
+        <div style="margin-bottom: 8px; padding: 12px; text-align: center; background: var(--theme-bg-tertiary); border-radius: 3px; opacity: 0.6;">
+          <div style="font-size: 20px;">📭</div>
+          <div style="font-size: 11px; margin-top: 4px;">Célula vazia</div>
+        </div>
+      `;
+    }
+
+    // Type and format info
+    infoHTML += `
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 4px; font-size: 11px;">
+        <div>
+          <div style="font-size: 9px; font-weight: 600; color: var(--theme-text-tertiary); margin-bottom: 2px;">TIPO</div>
+          <div style="background: var(--theme-bg-tertiary); padding: 4px; border-radius: 2px; text-align: center;">
+            ${typeLabel}
+          </div>
+        </div>
+        <div>
+          <div style="font-size: 9px; font-weight: 600; color: var(--theme-text-tertiary); margin-bottom: 2px;">FORMATO</div>
+          <div style="background: var(--theme-bg-tertiary); padding: 4px; border-radius: 2px; text-align: center;">
+            ${cell?.format?.numberFormat || 'Padrão'}
+          </div>
+        </div>
+      </div>
+    `;
+
+    // Additional info
+    if (cell?.format) {
+      const formatParts: string[] = [];
+      if (cell.format.bold) formatParts.push('<strong>Negrito</strong>');
+      if (cell.format.italic) formatParts.push('<em>Itálico</em>');
+      if (cell.format.underline) formatParts.push('<u>Sublinhado</u>');
+      if (cell.format.textColor) formatParts.push(`<span style="color: ${cell.format.textColor};">●</span> Cor`);
+      if (cell.format.bgColor) formatParts.push(`<span style="background: ${cell.format.bgColor}; padding: 0 4px;">■</span> Fundo`);
+
+      if (formatParts.length > 0) {
+        infoHTML += `
+          <div style="margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--theme-border-color);">
+            <div style="font-size: 9px; font-weight: 600; color: var(--theme-text-tertiary); margin-bottom: 4px;">FORMATAÇÃO</div>
+            <div style="font-size: 10px;">
+              ${formatParts.join(' • ')}
+            </div>
+          </div>
+        `;
+      }
+    }
+
+    cellInfoContainer.innerHTML = infoHTML;
+  }
+
+  private getCellTypeLabel(type: string): string {
+    const labels: Record<string, string> = {
+      'auto': 'Automático',
+      'text': 'Texto',
+      'number': 'Número',
+      'formula': 'Fórmula',
+      'date': 'Data',
+      'boolean': 'Booleano'
+    };
+    return labels[type] || type;
+  }
+
+  // --------------------------------------------------------------------------
+  // CONSOLE PANEL
+  // --------------------------------------------------------------------------
+
+  private consoleLogLevel: string = 'info';
+  private consoleMaxLogs: number = 100;
+
+  public initConsoleLogger(): void {
+    // Render console controls
+    const consoleContainer = document.getElementById('console-logs');
+    if (!consoleContainer) return;
+
+    // Add controls
+    const controlsHTML = `
+      <div style="display: flex; gap: 4px; padding: 4px; border-bottom: 1px solid var(--theme-border-color); background: var(--theme-bg-secondary);">
+        <select id="console-log-level" style="flex: 1; font-size: 11px; padding: 2px 4px; background: var(--theme-bg-primary); color: var(--theme-text-primary); border: 1px solid var(--theme-border-color); border-radius: 3px;">
+          <option value="debug">🔍 Debug</option>
+          <option value="info" selected>ℹ️ Info</option>
+          <option value="warn">⚠️ Warn</option>
+          <option value="error">❌ Error</option>
+        </select>
+        <button id="btn-export-console" style="padding: 2px 8px; font-size: 11px; background: var(--theme-bg-tertiary); color: var(--theme-text-primary); border: 1px solid var(--theme-border-color); border-radius: 3px; cursor: pointer;" title="Exportar logs">📥</button>
+        <button id="btn-clear-console" style="padding: 2px 8px; font-size: 11px; background: var(--theme-bg-tertiary); color: var(--theme-text-primary); border: 1px solid var(--theme-border-color); border-radius: 3px; cursor: pointer;" title="Limpar console">🗑️</button>
+      </div>
+      <div id="console-logs-content" style="max-height: 200px; overflow-y: auto; font-family: 'Consolas', 'Monaco', monospace; font-size: 11px; padding: 4px;"></div>
+    `;
+
+    consoleContainer.innerHTML = controlsHTML;
+
+    // Setup event listeners
+    document.getElementById('console-log-level')?.addEventListener('change', (e) => {
+      this.consoleLogLevel = (e.target as HTMLSelectElement).value;
+      this.refreshConsole();
+    });
+
+    document.getElementById('btn-export-console')?.addEventListener('click', () => {
+      this.exportConsoleLogs();
+    });
+
+    document.getElementById('btn-clear-console')?.addEventListener('click', () => {
+      logger.getHistory().length = 0;
+      this.refreshConsole();
+    });
+
+    // Hook into logger
+    this.startConsolePolling();
+
+    logger.info('[UIManager] Console logger initialized');
+  }
+
+  private startConsolePolling(): void {
+    // Poll logger history every 500ms
+    setInterval(() => {
+      this.refreshConsole();
+    }, 500);
+  }
+
+  private refreshConsole(): void {
+    const logsContent = document.getElementById('console-logs-content');
+    if (!logsContent) return;
+
+    const logs = logger.getHistory({ level: this.consoleLogLevel as any });
+    const recentLogs = logs.slice(-this.consoleMaxLogs);
+
+    logsContent.innerHTML = recentLogs.map(log => {
+      const icon = this.getLogIcon(log.level);
+      const color = this.getLogColor(log.level);
+      const time = new Date(log.timestamp).toLocaleTimeString('pt-BR', {
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit'
+      });
+
+      return `
+        <div style="padding: 2px 4px; border-bottom: 1px solid var(--theme-border-color); color: ${color};">
+          <span style="opacity: 0.7; font-size: 10px;">${time}</span>
+          <span>${icon}</span>
+          <span style="margin-left: 4px;">${this.escapeHtml(log.message)}</span>
+        </div>
+      `;
+    }).join('');
+
+    // Auto-scroll to bottom
+    logsContent.scrollTop = logsContent.scrollHeight;
+  }
+
+  private getLogIcon(level: string): string {
+    const icons: Record<string, string> = {
+      'debug': '🔍',
+      'info': 'ℹ️',
+      'warn': '⚠️',
+      'error': '❌'
+    };
+    return icons[level] || 'ℹ️';
+  }
+
+  private getLogColor(level: string): string {
+    const colors: Record<string, string> = {
+      'debug': 'var(--theme-text-tertiary)',
+      'info': 'var(--theme-text-primary)',
+      'warn': 'var(--theme-color-warning)',
+      'error': 'var(--theme-color-error)'
+    };
+    return colors[level] || 'var(--theme-text-primary)';
+  }
+
+  private exportConsoleLogs(): void {
+    const logs = logger.getHistory({ level: this.consoleLogLevel as any });
+
+    if (logs.length === 0) {
+      alert('Nenhum log para exportar.');
+      return;
+    }
+
+    const company = kernel.companyManager.getActiveCompany();
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+
+    let content = `DJ DataForge v6 - Console Logs Export\n`;
+    content += `===========================================\n`;
+    content += `Empresa: ${company?.name || 'N/A'}\n`;
+    content += `Data/Hora: ${new Date().toLocaleString('pt-BR')}\n`;
+    content += `Nível de Log: ${this.consoleLogLevel}\n`;
+    content += `Total de Logs: ${logs.length}\n`;
+    content += `===========================================\n\n`;
+
+    logs.forEach(log => {
+      const time = new Date(log.timestamp).toLocaleString('pt-BR');
+      const level = log.level.toUpperCase().padEnd(6);
+      content += `[${time}] [${level}] ${log.message}\n`;
+      if (log.data) {
+        content += `  Data: ${JSON.stringify(log.data, null, 2)}\n`;
+      }
+    });
+
+    const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `console-logs-${timestamp}.txt`;
+    a.click();
+    URL.revokeObjectURL(url);
+
+    logger.info('[UIManager] Console logs exported', { count: logs.length });
+  }
+
+  private escapeHtml(text: string): string {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
   }
 
   private renderPluginsList(plugins: any[]): string {

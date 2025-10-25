@@ -14,6 +14,13 @@
 import type { Token, ASTNode, FunctionSpec, CellType } from "./types";
 import type { Sheet } from "./workbook-consolidated";
 
+export class CircularReferenceError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "CircularReferenceError";
+  }
+}
+
 // ============================================================================
 // FORMULA PARSER
 // ============================================================================
@@ -633,7 +640,7 @@ export class DependencyGraph {
       if (visited.has(node)) return;
 
       if (visiting.has(node)) {
-        throw new Error(`Circular reference detected at ${node}`);
+        throw new CircularReferenceError(`Circular reference detected at ${node}`);
       }
 
       visiting.add(node);
@@ -808,7 +815,8 @@ export class CalcEngine {
       case "*":
         return a * b;
       case "/":
-        return b === 0 ? "#DIV/0!" : a / b;
+        if (b === 0) throw new Error("#DIV/0!");
+        return a / b;
       case "^":
         return Math.pow(a, b);
       case "%":

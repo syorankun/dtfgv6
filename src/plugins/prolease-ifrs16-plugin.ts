@@ -335,70 +335,108 @@ export class ProLeasePlugin implements Plugin {
     });
   }
 
+  private showContractModal(contract?: LeaseContract): void {
+    const isEditing = !!contract;
+    const modalId = 'prolease-modal';
+
+    // Remove existing modal
+    document.getElementById(modalId)?.remove();
+
+    const modalHTML = `
+      <div id="${modalId}" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 10001;">
+        <div style="background: white; border-radius: 8px; padding: 24px; width: 90%; max-width: 500px;">
+          <h3 style="margin-top: 0; margin-bottom: 20px;">${isEditing ? 'Edit Contract' : 'New IFRS 16 Contract'}</h3>
+          <form id="prolease-contract-form">
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+              <div style="grid-column: 1 / -1;">
+                <label>Contract Name</label>
+                <input type="text" name="contractName" value="${contract?.contractName || ''}" required>
+              </div>
+              <div>
+                <label>Term (months)</label>
+                <input type="number" name="termMonths" value="${contract?.termMonths || 36}" required>
+              </div>
+              <div>
+                <label>Start Date</label>
+                <input type="date" name="startDate" value="${contract?.startDate || new Date().toISOString().split('T')[0]}" required>
+              </div>
+              <div>
+                <label>Monthly Rent (gross)</label>
+                <input type="number" name="totalRent" value="${contract?.totalRent || 80000}" required>
+              </div>
+              <div>
+                <label>Monthly Service Deductions</label>
+                <input type="number" name="serviceDeductions" value="${contract?.serviceDeductions || 5000}" required>
+              </div>
+              <div>
+                <label>Annual Discount Rate (%)</label>
+                <input type="number" name="discountRate" value="${contract?.discountRate || 15}" step="0.01" required>
+              </div>
+              <div>
+                <label>Landlord Allowance</label>
+                <input type="number" name="initialLandlordAllowance" value="${contract?.initialLandlordAllowance || 0}" required>
+              </div>
+              <div style="grid-column: 1 / -1;">
+                <label>Initial Direct Costs</label>
+                <input type="number" name="initialDirectCosts" value="${contract?.initialDirectCosts || 30000}" required>
+              </div>
+            </div>
+            <div style="margin-top: 24px; display: flex; justify-content: flex-end; gap: 8px;">
+              <button type="button" id="prolease-modal-cancel">Cancel</button>
+              <button type="submit" class="prolease-btn-primary">${isEditing ? 'Save Changes' : 'Create Contract'}</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    `;
+
+    document.body.insertAdjacentHTML('beforeend', modalHTML);
+
+    const form = document.getElementById('prolease-contract-form') as HTMLFormElement;
+    form.onsubmit = (e) => {
+      e.preventDefault();
+      const formData = new FormData(form);
+      const newContract: LeaseContract = {
+        id: contract?.id || this.generateId(),
+        contractName: formData.get('contractName') as string,
+        termMonths: +(formData.get('termMonths') as string),
+        startDate: formData.get('startDate') as string,
+        totalRent: +(formData.get('totalRent') as string),
+        serviceDeductions: +(formData.get('serviceDeductions') as string),
+        discountRate: +(formData.get('discountRate') as string),
+        initialLandlordAllowance: +(formData.get('initialLandlordAllowance') as string),
+        initialDirectCosts: +(formData.get('initialDirectCosts') as string),
+        createdAt: contract?.createdAt || new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+
+      if (isEditing) {
+        const index = this.contracts.findIndex(c => c.id === newContract.id);
+        if (index !== -1) {
+          this.contracts[index] = newContract;
+        }
+      } else {
+        this.contracts.push(newContract);
+      }
+
+      this.saveContracts();
+      this.refreshControlPanel();
+      this.calculateAndCreateSheet(newContract);
+      document.getElementById(modalId)?.remove();
+    };
+
+    document.getElementById('prolease-modal-cancel')!.onclick = () => {
+      document.getElementById(modalId)?.remove();
+    };
+  }
+
   // ========================================================================
   // USER ACTIONS
   // ========================================================================
 
   private handleNewContract(): void {
     logger.info('[ProLeasePlugin] Creating new contract');
-
-    const contractName = prompt('Contract Name:', `Contract ${this.contracts.length + 1}`);
-    if (!contractName) {
-      this.context.ui.showToast('Contract creation cancelled', 'info');
-      return;
-    }
-
-    if (this.contracts.some((c) => c.contractName === contractName)) {
-      this.context.ui.showToast('Contract name already exists', 'error');
-      return;
-    }
-
-    const termMonths = this.promptNumber('Term (months):', 36);
-    if (termMonths === null || termMonths <= 0) return;
-
-    const startDate = prompt(
-      'Start Date (YYYY-MM-DD):',
-      new Date().toISOString().split('T')[0]
-    );
-    if (!startDate) return;
-
-    const totalRent = this.promptNumber('Monthly Rent (gross):', 80000);
-    if (totalRent === null || totalRent <= 0) return;
-
-    const serviceDeductions = this.promptNumber('Monthly Service Deductions:', 5000);
-    if (serviceDeductions === null) return;
-
-    const discountRate = this.promptNumber('Annual Discount Rate (%):', 15);
-    if (discountRate === null) return;
-
-    const initialLandlordAllowance = this.promptNumber('Landlord Allowance:', 0);
-    if (initialLandlordAllowance === null) return;
-
-    const initialDirectCosts = this.promptNumber('Initial Direct Costs:', 30000);
-    if (initialDirectCosts === null) return;
-
-    const contract: LeaseContract = {
-      id: this.generateId(),
-      contractName,
-      termMonths,
-      startDate,
-      totalRent,
-      serviceDeductions,
-      discountRate,
-      initialLandlordAllowance,
-      initialDirectCosts,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    };
-
-    this.contracts.push(contract);
-    this.saveContracts();
-
-    logger.info('[ProLeasePlugin] Contract created', { id: contract.id, name: contractName });
-    this.context.ui.showToast(`Contract "${contractName}" created. Calculating...`, 'info');
-
-    this.calculateAndCreateSheet(contract);
-    this.refreshControlPanel();
+    this.showContractModal();
   }
 
   private handleRecalculate(contract: LeaseContract): void {
@@ -710,13 +748,6 @@ export class ProLeasePlugin implements Plugin {
     if (panel) {
       this.renderControlPanel(panel as HTMLElement);
     }
-  }
-
-  private promptNumber(message: string, defaultValue: number): number | null {
-    const input = prompt(message, String(defaultValue));
-    if (input === null) return null;
-    const num = parseFloat(input);
-    return isNaN(num) ? null : num;
   }
 
   private generateId(): string {

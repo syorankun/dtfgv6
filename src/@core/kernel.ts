@@ -395,6 +395,10 @@ export class DJDataForgeKernel {
     return this.grid;
   }
   
+  getFormulaRegistry() {
+    return this.calcEngine.getRegistry();
+  }
+  
   // --------------------------------------------------------------------------
   // PUBLIC API
   // --------------------------------------------------------------------------
@@ -452,6 +456,13 @@ export class DJDataForgeKernel {
     } finally {
       this.state = "idle";
     }
+  }
+
+  async clearAllData(): Promise<void> {
+    logger.warn("[Kernel] Clearing all persistent data...");
+    await this.storageManager.clearAll();
+    this.eventBus.emit("kernel:data-cleared");
+    logger.info("[Kernel] All persistent data cleared. Reloading application.");
   }
 
   // --------------------------------------------------------------------------

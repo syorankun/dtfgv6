@@ -97,9 +97,16 @@ class SelectionManager {
 
 class CellRenderer {
   private ctx: CanvasRenderingContext2D;
+  private appElement: HTMLElement;
 
-  constructor(ctx: CanvasRenderingContext2D) {
+  constructor(ctx: CanvasRenderingContext2D, appElement: HTMLElement) {
     this.ctx = ctx;
+    this.appElement = appElement;
+  }
+
+  private getThemeColor(varName: string): string {
+    const computedStyle = getComputedStyle(this.appElement);
+    return computedStyle.getPropertyValue(varName).trim();
   }
 
   renderCell(
@@ -115,22 +122,22 @@ class CellRenderer {
 
     // Background
     if (isActive) {
-      ctx.fillStyle = "#fff9e6";
+      ctx.fillStyle = this.getThemeColor('--theme-bg-active'); // Usar variável de tema
     } else if (isSelected) {
-      ctx.fillStyle = "#e6f2ff";
+      ctx.fillStyle = this.getThemeColor('--theme-bg-hover'); // Usar variável de tema
     } else {
-      ctx.fillStyle = "#ffffff";
+      ctx.fillStyle = this.getThemeColor('--theme-bg-primary'); // Usar variável de tema
     }
     ctx.fillRect(x, y, width, height);
 
     // Border
-    ctx.strokeStyle = "#e2e8f0";
+    ctx.strokeStyle = this.getThemeColor('--theme-border-color'); // Usar variável de tema
     ctx.lineWidth = 1;
     ctx.strokeRect(x, y, width, height);
 
     // Active cell highlight
     if (isActive) {
-      ctx.strokeStyle = "#2563eb";
+      ctx.strokeStyle = this.getThemeColor('--theme-color-primary'); // Usar variável de tema
       ctx.lineWidth = 2;
       ctx.strokeRect(x, y, width, height);
     }
@@ -148,7 +155,7 @@ class CellRenderer {
       }
 
       // Text styling
-      ctx.fillStyle = cell.format?.textColor || "#0f172a";
+      ctx.fillStyle = cell.format?.textColor || this.getThemeColor('--theme-text-primary'); // Usar variável de tema
       ctx.font = `${cell.format?.bold ? "bold" : ""} ${cell.format?.italic ? "italic" : ""} 13px -apple-system, sans-serif`;
       ctx.textBaseline = "middle";
 
@@ -183,7 +190,7 @@ class CellRenderer {
 
       // Formula indicator
       if (cell.formula) {
-        ctx.fillStyle = "#2563eb";
+        ctx.fillStyle = this.getThemeColor('--theme-color-primary'); // Usar variável de tema
         ctx.font = "bold 9px monospace";
         ctx.textAlign = "left";
         ctx.fillText("fx", x + 2, y + 10);
@@ -202,16 +209,16 @@ class CellRenderer {
     const ctx = this.ctx;
 
     // Background
-    ctx.fillStyle = "#f8fafc";
+    ctx.fillStyle = this.getThemeColor('--theme-bg-tertiary'); // Usar variável de tema
     ctx.fillRect(x, y, width, height);
 
     // Border
-    ctx.strokeStyle = "#cbd5e1";
+    ctx.strokeStyle = this.getThemeColor('--theme-border-color'); // Usar variável de tema
     ctx.lineWidth = 1;
     ctx.strokeRect(x, y, width, height);
 
     // Text
-    ctx.fillStyle = "#475569";
+    ctx.fillStyle = this.getThemeColor('--theme-text-secondary'); // Usar variável de tema
     ctx.font = "bold 12px -apple-system, sans-serif";
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
@@ -318,14 +325,19 @@ export class VirtualGrid {
   private vScrollbarContent?: HTMLDivElement;
   private hScrollbarContent?: HTMLDivElement;
 
-  constructor(canvas: HTMLCanvasElement) {
+  private kernel: any;
+
+  private appElement: HTMLElement;
+
+  constructor(canvas: HTMLCanvasElement, kernel: any) {
     this.canvas = canvas;
+    this.kernel = kernel;
     const ctx = canvas.getContext("2d");
     if (!ctx) throw new Error("Canvas context not available");
 
     this.ctx = ctx;
-    this.renderer = new CellRenderer(ctx);
-
+    this.appElement = document.getElementById('app')!;
+    this.renderer = new CellRenderer(ctx, this.appElement);
     this.setupCanvas();
     this.setupScrollbars();
     this.setupEvents();
@@ -726,7 +738,7 @@ export class VirtualGrid {
   // RENDERING
   // --------------------------------------------------------------------------
 
-  private render(): void {
+  public render(): void {
     if (!this.sheet) {
       this.renderEmpty();
       return;
@@ -826,7 +838,7 @@ export class VirtualGrid {
   private renderEmpty(): void {
     this.ctx.clearRect(0, 0, this.viewportWidth, this.viewportHeight);
 
-    this.ctx.fillStyle = '#94a3b8';
+    this.ctx.fillStyle = this.getThemeColor('--theme-text-tertiary'); // Usar variável de tema
     this.ctx.font = '14px -apple-system, sans-serif';
     this.ctx.textAlign = 'center';
     this.ctx.textBaseline = 'middle';
@@ -865,11 +877,13 @@ export class VirtualGrid {
     this.editor.style.top = y + 'px';
     this.editor.style.width = this.cellWidth + 'px';
     this.editor.style.height = this.cellHeight + 'px';
-    this.editor.style.border = '2px solid #2563eb';
+    this.editor.style.border = '2px solid ' + this.getThemeColor('--theme-color-primary');
     this.editor.style.outline = 'none';
     this.editor.style.fontSize = '13px';
     this.editor.style.padding = '0 8px';
     this.editor.style.zIndex = '1000';
+    this.editor.style.backgroundColor = this.getThemeColor('--theme-bg-primary');
+    this.editor.style.color = this.getThemeColor('--theme-text-primary');
 
     document.body.appendChild(this.editor);
     this.editor.focus();
@@ -1002,59 +1016,28 @@ export class VirtualGrid {
 
     const partialName = match[1];
 
-    // Formula syntax reference - Using correct Portuguese syntax
-    const formulaHelp: Record<string, { syntax: string; description: string }> = {
-      'SOMA': { syntax: 'SOMA(número1, [número2], ...)', description: 'Soma todos os números fornecidos' },
-      'MÉDIA': { syntax: 'MÉDIA(número1, [número2], ...)', description: 'Calcula a média aritmética' },
-      'MÁXIMO': { syntax: 'MÁXIMO(número1, [número2], ...)', description: 'Retorna o maior valor' },
-      'MÍNIMO': { syntax: 'MÍNIMO(número1, [número2], ...)', description: 'Retorna o menor valor' },
-      'CONT.NÚM': { syntax: 'CONT.NÚM(valor1, [valor2], ...)', description: 'Conta quantos números há' },
-      'CONT.VALORES': { syntax: 'CONT.VALORES(valor1, [valor2], ...)', description: 'Conta quantos valores há' },
-      'SE': { syntax: 'SE(teste_lógico, valor_se_verdadeiro, valor_se_falso)', description: 'Retorna um valor se verdadeiro, outro se falso' },
-      'MULT': { syntax: 'MULT(número1, [número2], ...)', description: 'Multiplica todos os números' },
-      'RAIZ': { syntax: 'RAIZ(número)', description: 'Retorna a raiz quadrada' },
-      'POTÊNCIA': { syntax: 'POTÊNCIA(número, potência)', description: 'Eleva um número a uma potência' },
-      'ABS': { syntax: 'ABS(número)', description: 'Retorna o valor absoluto' },
-      'ARREDONDAR': { syntax: 'ARREDONDAR(número, num_dígitos)', description: 'Arredonda um número' },
-      'TRUNCAR': { syntax: 'TRUNCAR(número, [num_dígitos])', description: 'Trunca um número' },
-      'INT': { syntax: 'INT(número)', description: 'Arredonda para baixo até o inteiro mais próximo' },
-      'MED': { syntax: 'MED(número1, [número2], ...)', description: 'Retorna a mediana' },
-      'MODO': { syntax: 'MODO(número1, [número2], ...)', description: 'Retorna o valor mais frequente' },
-      'DESVPAD': { syntax: 'DESVPAD(número1, [número2], ...)', description: 'Calcula o desvio padrão' },
-      'VAR': { syntax: 'VAR(número1, [número2], ...)', description: 'Calcula a variância' },
-      'CONCATENAR': { syntax: 'CONCATENAR(texto1, [texto2], ...)', description: 'Junta textos' },
-      'MAIÚSCULA': { syntax: 'MAIÚSCULA(texto)', description: 'Converte para maiúsculas' },
-      'MINÚSCULA': { syntax: 'MINÚSCULA(texto)', description: 'Converte para minúsculas' },
-      'NÚM.CARACT': { syntax: 'NÚM.CARACT(texto)', description: 'Conta caracteres' },
-      'E': { syntax: 'E(lógico1, [lógico2], ...)', description: 'Retorna VERDADEIRO se todos forem verdadeiros' },
-      'OU': { syntax: 'OU(lógico1, [lógico2], ...)', description: 'Retorna VERDADEIRO se algum for verdadeiro' },
-      'NÃO': { syntax: 'NÃO(lógico)', description: 'Inverte o valor lógico' },
-      'PROCV': { syntax: 'PROCV(valor, tabela, coluna, [exato])', description: 'Procura valor em tabela' },
-    };
+    const registry = this.kernel.getFormulaRegistry();
+    const allFunctions = registry.list();
 
     // Find matching functions (exact match or partial)
     let matchedFunctions: Array<{ name: string; help: { syntax: string; description: string } }> = [];
 
     if (partialName === '') {
       // Show most common functions when just "=" is typed
-      matchedFunctions = [
-        { name: 'SOMA', help: formulaHelp['SOMA'] },
-        { name: 'MÉDIA', help: formulaHelp['MÉDIA'] },
-        { name: 'SE', help: formulaHelp['SE'] },
-        { name: 'MÁXIMO', help: formulaHelp['MÁXIMO'] },
-        { name: 'MÍNIMO', help: formulaHelp['MÍNIMO'] },
-      ];
+      const commonFunctions = ['SOMA', 'MÉDIA', 'SE', 'MÁXIMO', 'MÍNIMO'];
+      matchedFunctions = allFunctions
+        .filter((fn: any) => commonFunctions.includes(fn.name))
+        .map((fn: any) => ({ name: fn.name, help: { syntax: `${fn.name}(...)`, description: fn.description || '' } }));
     } else {
       // Check for exact match first
-      if (formulaHelp[partialName]) {
-        matchedFunctions = [{ name: partialName, help: formulaHelp[partialName] }];
+      const exactMatch = allFunctions.find((fn: any) => fn.name === partialName);
+      if (exactMatch) {
+        matchedFunctions = [{ name: exactMatch.name, help: { syntax: `${exactMatch.name}(...)`, description: exactMatch.description || '' } }];
       } else {
         // Find partial matches
-        Object.keys(formulaHelp).forEach(key => {
-          if (key.startsWith(partialName)) {
-            matchedFunctions.push({ name: key, help: formulaHelp[key] });
-          }
-        });
+        matchedFunctions = allFunctions
+          .filter((fn: any) => fn.name.startsWith(partialName))
+          .map((fn: any) => ({ name: fn.name, help: { syntax: `${fn.name}(...)`, description: fn.description || '' } }));
       }
     }
 
@@ -1067,8 +1050,8 @@ export class VirtualGrid {
     if (!this.tooltipElement) {
       this.tooltipElement = document.createElement('div');
       this.tooltipElement.style.position = 'absolute';
-      this.tooltipElement.style.backgroundColor = '#1e293b';
-      this.tooltipElement.style.color = '#f1f5f9';
+      this.tooltipElement.style.backgroundColor = this.getThemeColor('--theme-bg-secondary'); // Usar variável de tema
+      this.tooltipElement.style.color = this.getThemeColor('--theme-text-primary'); // Usar variável de tema
       this.tooltipElement.style.padding = '8px 12px';
       this.tooltipElement.style.borderRadius = '6px';
       this.tooltipElement.style.fontSize = '12px';
@@ -1123,18 +1106,13 @@ export class VirtualGrid {
 
     const partialName = match[1];
 
-    // Lista de funções disponíveis
-    const allFunctions = [
-      'SOMA', 'MÉDIA', 'MÁXIMO', 'MÍNIMO', 'CONT.NÚM', 'CONT.VALORES',
-      'SE', 'MULT', 'RAIZ', 'POTÊNCIA', 'ABS', 'ARREDONDAR', 'TRUNCAR',
-      'INT', 'MED', 'MODO', 'DESVPAD', 'VAR', 'CONCATENAR', 'MAIÚSCULA',
-      'MINÚSCULA', 'NÚM.CARACT', 'E', 'OU', 'NÃO', 'PROCV'
-    ];
+    const registry = this.kernel.getFormulaRegistry();
+    const allFunctions = registry.list().map((fn: any) => fn.name);
 
     // Filtrar funções que começam com o texto digitado
     const suggestions = partialName === ''
       ? ['SOMA', 'MÉDIA', 'SE', 'MÁXIMO', 'MÍNIMO']
-      : allFunctions.filter(fn => fn.startsWith(partialName));
+      : allFunctions.filter((fn: any) => fn.startsWith(partialName));
 
     if (suggestions.length === 0 || (suggestions.length === 1 && suggestions[0] === partialName)) {
       this.hideFormulaAutocomplete();
@@ -1145,8 +1123,8 @@ export class VirtualGrid {
     if (!this.autocompleteElement) {
       this.autocompleteElement = document.createElement('div');
       this.autocompleteElement.style.position = 'absolute';
-      this.autocompleteElement.style.backgroundColor = 'white';
-      this.autocompleteElement.style.border = '1px solid #cbd5e1';
+      this.autocompleteElement.style.backgroundColor = this.getThemeColor('--theme-bg-primary'); // Usar variável de tema
+      this.autocompleteElement.style.border = '1px solid ' + this.getThemeColor('--theme-border-color'); // Usar variável de tema
       this.autocompleteElement.style.borderRadius = '4px';
       this.autocompleteElement.style.boxShadow = '0 4px 6px -1px rgba(0, 0, 0, 0.1)';
       this.autocompleteElement.style.zIndex = '10001';
@@ -1163,7 +1141,7 @@ export class VirtualGrid {
     this.autocompleteElement.style.minWidth = rect.width + 'px';
 
     // Atualizar conteúdo
-    this.autocompleteElement.innerHTML = suggestions.map((fn, idx) => `
+    this.autocompleteElement.innerHTML = suggestions.map((fn: string, idx: number) => `
       <div class="autocomplete-item" data-index="${idx}" data-function="${fn}"
            style="padding: 6px 12px; cursor: pointer; background-color: ${idx === this.autocompleteSelectedIndex ? '#e0f2fe' : 'white'};">
         ${fn}
@@ -1420,10 +1398,6 @@ export class VirtualGrid {
     return this.onSelectionChange;
   }
 
-  getSelectionChangeHandler(): ((selection: Selection) => void) | undefined {
-    return this.onSelectionChange;
-  }
-
   focusCell(row: number, col: number): void {
     this.selectionManager.startSelection(row, col);
     this.selectionManager.endSelection();
@@ -1445,5 +1419,13 @@ export class VirtualGrid {
     }
 
     this.render();
+  }
+
+  private getThemeColor(varName: string): string {
+    if (this.appElement) {
+      const computedStyle = getComputedStyle(this.appElement);
+      return computedStyle.getPropertyValue(varName).trim();
+    }
+    return ''; // Retorna vazio ou uma cor padrão se não encontrar
   }
 }

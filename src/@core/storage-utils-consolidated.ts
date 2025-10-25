@@ -181,6 +181,22 @@ export class PersistenceManager {
     }
   }
 
+  async clearAll(): Promise<void> {
+    if (!this.db) throw new Error("DB not initialized");
+
+    try {
+      const tx = this.db.transaction(this.db.objectStoreNames, 'readwrite');
+      for (const storeName of this.db.objectStoreNames) {
+        tx.objectStore(storeName).clear();
+      }
+      await tx.done;
+      this.logger.warn("[Persistence] All data cleared");
+    } catch (error) {
+      this.logger.error("[Persistence] Failed to clear all data", error);
+      throw error;
+    }
+  }
+
   // --------------------------------------------------------------------------
   // WORKBOOK OPERATIONS
   // --------------------------------------------------------------------------

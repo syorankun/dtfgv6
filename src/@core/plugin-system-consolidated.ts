@@ -69,57 +69,23 @@ import type {
     private panels: Map<string, PanelConfig> = new Map();
     private menuItems: Map<string, MenuItemConfig> = new Map();
     
-    constructor(private pluginId: string) {}
+    constructor(private pluginId: string, private eventBus: any) {}
     
     addToolbarButton(config: ToolbarButtonConfig): void {
       this.toolbarButtons.set(config.id, config);
-
-      // Find toolbar container and add button
-      const toolbar = document.getElementById('plugin-toolbar');
-      if (toolbar) {
-        const btn = document.createElement('button');
-        btn.id = `plugin-btn-${config.id}`;
-        btn.className = 'ribbon-btn';
-        btn.title = config.tooltip || '';
-        btn.innerHTML = `
-          <span class="ribbon-icon">${config.icon || ''}</span>
-          <span class="ribbon-label">${config.label}</span>
-        `;
-        btn.onclick = config.onClick;
-        toolbar.appendChild(btn);
-      }
-
+      this.eventBus.emit('ui:add-toolbar-button', { pluginId: this.pluginId, config });
       logger.debug(`[Plugin] Toolbar button added`, { pluginId: this.pluginId, id: config.id });
     }
     
     addPanel(config: PanelConfig): void {
       this.panels.set(config.id, config);
-      
-      // Find panels container and add panel
-      const container = document.getElementById('plugin-panels');
-      if (container) {
-        const panel = document.createElement('div');
-        panel.id = `plugin-panel-${config.id}`;
-        panel.className = 'panel plugin-panel';
-        
-        const header = document.createElement('h4');
-        header.textContent = config.title;
-        panel.appendChild(header);
-        
-        const content = document.createElement('div');
-        content.className = 'panel-content';
-        panel.appendChild(content);
-        
-        config.render(content);
-        
-        container.appendChild(panel);
-      }
-      
+      this.eventBus.emit('ui:add-panel', { pluginId: this.pluginId, config });
       logger.debug(`[Plugin] Panel added`, { pluginId: this.pluginId, id: config.id });
     }
     
     addMenuItem(config: MenuItemConfig): void {
       this.menuItems.set(config.id, config);
+      this.eventBus.emit('ui:add-menu-item', { pluginId: this.pluginId, config });
       logger.debug(`[Plugin] Menu item added`, { pluginId: this.pluginId, id: config.id });
     }
     
@@ -303,7 +269,7 @@ import type {
     
     private createContext(manifest: PluginManifest): PluginContext {
       const storage = new PluginStorageAPIImpl(manifest.id, this.storage);
-      const ui = new PluginUIAPIImpl(manifest.id);
+      const ui = new PluginUIAPIImpl(manifest.id, this.kernel.eventBus);
       const events = new PluginEventAPIImpl(manifest.id, this.kernel.eventBus);
       
       return {

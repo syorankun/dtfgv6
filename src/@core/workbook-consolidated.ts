@@ -500,8 +500,6 @@ export class Workbook {
       created: new Date(data.created),
       author: data.author,
     });
-    wb.id = data.id;
-
     wb.modified = new Date(data.modified);
     wb.companyId = data.companyId;
     wb.activeSheetId = data.activeSheetId;

@@ -366,17 +366,24 @@ export class UIManager {
   }
 
   public listenForUIChanges() {
+    logger.info('[UIManager] Setting up UI change listeners');
+
     kernel.eventBus.on('ui:add-toolbar-button', ({ config }: { config: any }) => {
+      logger.debug('[UIManager] Received ui:add-toolbar-button event', { config });
       this.addToolbarButton(config);
     });
 
     kernel.eventBus.on('ui:add-panel', ({ config }: { config: any }) => {
+      logger.debug('[UIManager] Received ui:add-panel event', { config });
       this.addPanel(config);
     });
 
     kernel.eventBus.on('ui:add-menu-item', ({ config }: { config: any }) => {
+      logger.debug('[UIManager] Received ui:add-menu-item event', { config });
       this.addMenuItem(config);
     });
+
+    logger.info('[UIManager] UI change listeners set up successfully');
   }
 
   public addToolbarButton(config: any) {
@@ -384,6 +391,7 @@ export class UIManager {
     if (toolbar) {
       // Prevent duplication
       if (document.getElementById(`plugin-btn-${config.id}`)) {
+        logger.warn('[UIManager] Toolbar button already exists', { id: config.id });
         return;
       }
       const btn = document.createElement('button');
@@ -391,8 +399,21 @@ export class UIManager {
       btn.className = 'ribbon-btn';
       btn.title = config.tooltip || '';
       btn.innerHTML = '<span class="ribbon-icon">' + (config.icon || '') + '</span><span class="ribbon-label">' + config.label + '</span>';
-      btn.onclick = config.onClick;
+
+      // Use addEventListener instead of onclick for proper binding
+      btn.addEventListener('click', () => {
+        logger.debug('[UIManager] Toolbar button clicked', { id: config.id });
+        if (typeof config.onClick === 'function') {
+          config.onClick();
+        } else {
+          logger.error('[UIManager] onClick is not a function', { id: config.id, onClick: config.onClick });
+        }
+      });
+
       toolbar.appendChild(btn);
+      logger.info('[UIManager] Toolbar button added', { id: config.id, label: config.label });
+    } else {
+      logger.error('[UIManager] Plugin toolbar not found');
     }
   }
 

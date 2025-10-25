@@ -359,3 +359,83 @@ export interface CellCoordinate {
 }
 
 export type Comparator<T> = (a: T, b: T) => number;
+
+// ============================================================================
+// STRUCTURED TABLE TYPES (Phase 1)
+// ============================================================================
+
+export type TableColumnDataType =
+  | 'text'
+  | 'number'
+  | 'currency'
+  | 'percentage'
+  | 'date'
+  | 'datetime'
+  | 'boolean'
+  | 'category'
+  | 'email'
+  | 'url'
+  | 'auto';
+
+export type TableTotalFunction =
+  | 'none'
+  | 'sum'
+  | 'average'
+  | 'count'
+  | 'countNumbers'
+  | 'min'
+  | 'max'
+  | 'stdDev'
+  | 'var'
+  | 'median'
+  | 'product'
+  | 'countUnique';
+
+export interface TableColumn {
+  id: string;
+  name: string;
+  dataType: TableColumnDataType;
+  index: number;
+  totalFunction?: TableTotalFunction;
+  formula?: string; // For calculated columns
+  format?: CellFormat;
+  validation?: ValidationRule;
+}
+
+export interface TableStyle {
+  id: string;
+  name: string;
+  headerBg: string;
+  headerText: string;
+  evenRowBg: string;
+  oddRowBg: string;
+  borderColor: string;
+  totalRowBg: string;
+  highlightColor?: string;
+}
+
+export interface StructuredTable {
+  id: string;
+  name: string;
+  sheetId: string;
+  range: Range;
+  hasHeaders: boolean;
+  columns: TableColumn[];
+  style: TableStyle;
+  showTotalRow: boolean;
+  showHeaderRow: boolean;
+  showBandedRows: boolean;
+  showBandedColumns: boolean;
+  showFilterButtons: boolean;
+  created: Date;
+  modified: Date;
+}
+
+export interface TableCreationOptions {
+  range?: Range;
+  hasHeaders?: boolean;
+  autoDetectRange?: boolean;
+  styleName?: string;
+  tableName?: string;
+  analyzeDataTypes?: boolean;
+}

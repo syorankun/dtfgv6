@@ -125,6 +125,8 @@ class CellRenderer {
       ctx.fillStyle = this.getThemeColor('--theme-bg-active'); // Usar variável de tema
     } else if (isSelected) {
       ctx.fillStyle = this.getThemeColor('--theme-bg-hover'); // Usar variável de tema
+    } else if (cell?.format?.bgColor) {
+      ctx.fillStyle = cell.format.bgColor; // Apply cell's custom background color
     } else {
       ctx.fillStyle = this.getThemeColor('--theme-bg-primary'); // Usar variável de tema
     }

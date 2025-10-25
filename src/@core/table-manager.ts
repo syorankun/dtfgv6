@@ -722,58 +722,27 @@ export class TableManager {
   }
 
   /**
-   * Add filter/sort buttons to table headers with enhanced visual indicators
+   * Initialize filter/sort state tracking for table headers
+   * (Visual buttons are now rendered by VirtualGrid, not stored in cell values)
    */
-  addHeaderButtons(table: StructuredTable, sheet: Sheet): void {
+  addHeaderButtons(table: StructuredTable, _sheet: Sheet): void {
     if (!table.showFilterButtons || !table.showHeaderRow || !table.hasHeaders) {
       return;
     }
-
-    const { range } = table;
-    const headerRow = range.startRow;
 
     // Initialize filter/sort state tracking if not exists
     if (!(table as any).columnStates) {
       (table as any).columnStates = new Map();
     }
 
-    // Add intuitive filter/sort indicators to each header cell
-    for (let col = range.startCol; col <= range.endCol; col++) {
-      const cell = sheet.getCell(headerRow, col);
-      if (cell) {
-        const columnIndex = col - range.startCol;
-        const state = (table as any).columnStates.get(columnIndex) || { sorted: null, filtered: false };
-
-        // Build header text with visual indicators
-        const originalValue = cell.value ? String(cell.value).replace(/ [▼▲🔽🔼🔍✓]$/g, '').trim() : '';
-
-        let indicator = '';
-        if (state.sorted === 'asc') {
-          indicator = ' 🔼'; // Ascending sort indicator
-        } else if (state.sorted === 'desc') {
-          indicator = ' 🔽'; // Descending sort indicator
-        } else if (state.filtered) {
-          indicator = ' 🔍'; // Filter active indicator
-        } else {
-          indicator = ' ▼'; // Default dropdown indicator
-        }
-
-        cell.value = originalValue + indicator;
-
-        // Add subtle styling to indicate interactivity
-        if (cell.format) {
-          cell.format.underline = true; // Add underline to signal clickability
-        }
-      }
-    }
-
-    logger.info('[TableManager] Header buttons added with visual indicators', { tableId: table.id });
+    logger.info('[TableManager] Header button states initialized', { tableId: table.id });
   }
 
   /**
    * Update header button state after sort/filter operations
+   * (VirtualGrid will automatically re-render with the new state)
    */
-  updateHeaderButtonState(table: StructuredTable, sheet: Sheet, columnIndex: number, state: { sorted?: 'asc' | 'desc' | null, filtered?: boolean }): void {
+  updateHeaderButtonState(table: StructuredTable, _sheet: Sheet, columnIndex: number, state: { sorted?: 'asc' | 'desc' | null, filtered?: boolean }): void {
     if (!(table as any).columnStates) {
       (table as any).columnStates = new Map();
     }
@@ -781,8 +750,7 @@ export class TableManager {
     const currentState = (table as any).columnStates.get(columnIndex) || { sorted: null, filtered: false };
     (table as any).columnStates.set(columnIndex, { ...currentState, ...state });
 
-    // Refresh header buttons to show updated state
-    this.addHeaderButtons(table, sheet);
+    logger.debug('[TableManager] Header button state updated', { columnIndex, state });
   }
 
   /**
@@ -974,17 +942,23 @@ export class TableManager {
       });
     });
 
-    // Close menu when clicking outside
+    // Close menu when clicking outside - FIX: prevent immediate closure
     const closeHandler = (e: MouseEvent) => {
-      if (!menu.contains(e.target as Node)) {
-        menu.remove();
-        document.removeEventListener('click', closeHandler);
+      const target = e.target as Node;
+      // Ignore if clicking inside menu or on header cell buttons
+      if (menu.contains(target)) {
+        return;
       }
+      menu.remove();
+      document.removeEventListener('click', closeHandler);
+      document.removeEventListener('contextmenu', closeHandler);
     };
 
+    // Delay to prevent the same click that opened the menu from closing it
     setTimeout(() => {
-      document.addEventListener('click', closeHandler);
-    }, 100);
+      document.addEventListener('click', closeHandler, true); // Use capture phase
+      document.addEventListener('contextmenu', closeHandler, true);
+    }, 200); // Increased delay to 200ms
   }
 
   /**

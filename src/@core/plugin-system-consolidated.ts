@@ -321,76 +321,145 @@ import type {
   export class PivotPlugin implements Plugin {
     private tableManager?: any; // Will be initialized with TableManager
     private context?: PluginContext;
+    private panelContainer?: HTMLElement; // Reference to panel container for updates
 
     manifest: PluginManifest = {
-      id: 'pivot',
-      name: 'Tabelas & Pivot',
-      version: '2.0.0',
+      id: 'dataforge-table-studio',
+      name: '✨ DataForge Table Studio',
+      version: '3.0.0',
       author: 'DJ DataForge Team',
-      description: 'Tabelas estruturadas e tabelas dinâmicas para análise de dados',
+      description: 'Motor inteligente de tabelas: análise, formatação e insights automatizados',
       permissions: ['read:workbook', 'write:workbook', 'ui:panel', 'ui:toolbar'],
-      entryPoint: 'pivot.js',
+      entryPoint: 'table-studio.js',
     };
 
     async init(context: PluginContext): Promise<void> {
-      logger.info('[PivotPlugin] Starting initialization...');
+      logger.info('[TableStudio] 🚀 Starting initialization...');
       this.context = context;
 
       try {
-        // Dynamic import of TableManager to avoid circular dependencies
-        logger.debug('[PivotPlugin] Importing TableManager...');
+        // STEP 1: Import and get TableManager
+        logger.info('[TableStudio] 📦 Step 1/6: Importing TableManager...');
         const { TableManager } = await import('./table-manager');
         this.tableManager = TableManager.getInstance();
-        logger.debug('[PivotPlugin] TableManager singleton instance acquired');
+        logger.info('[TableStudio] ✅ TableManager acquired');
 
-        // Add "Create Table" button in Data tab
-        logger.debug('[PivotPlugin] Adding Create Table button...');
-        context.ui.addToolbarButton({
-          id: 'create-structured-table',
-          label: 'Criar Tabela',
-          icon: '📊',
-          tooltip: 'Criar tabela estruturada com formatação inteligente',
-          onClick: () => {
-            logger.info('[PivotPlugin] Create Table button clicked!');
-            this.showCreateTableDialog();
-          },
-        });
+        // STEP 2: Load persisted tables FIRST (before UI setup)
+        logger.info('[TableStudio] 📂 Step 2/6: Loading persisted tables...');
+        await this.loadTablesFromPersistence();
+        logger.info('[TableStudio] ✅ Tables loaded from persistence');
 
-        // Add "Table Tools" panel
-        logger.debug('[PivotPlugin] Adding Table Tools panel...');
-        context.ui.addPanel({
-          id: 'table-tools-panel',
-          title: '🔧 Ferramentas de Tabela',
-          render: (container: HTMLElement) => {
-            this.renderTableToolsPanel(container);
-          },
-          position: 'right',
-        });
-
-        // Configure TableManager in grid
+        // STEP 3: Configure TableManager in grid
+        logger.info('[TableStudio] ⚙️ Step 3/6: Configuring grid integration...');
         const grid = context.kernel.getGrid();
         if (grid && this.tableManager) {
           grid.setTableManager(this.tableManager);
-          logger.debug('[PivotPlugin] TableManager configured in grid');
+          logger.info('[TableStudio] ✅ TableManager configured in grid');
         }
 
-        // Listen for filter button clicks from grid
-        context.events.on('table:header-filter-click', (data: any) => {
-          logger.debug('[PivotPlugin] Filter button clicked from grid', data);
-          this.handleGridFilterButtonClick(data);
+        // STEP 4: Add toolbar buttons
+        logger.info('[TableStudio] 🎨 Step 4/6: Adding toolbar buttons...');
+
+        context.ui.addToolbarButton({
+          id: 'create-smart-table',
+          label: '✨ Nova Tabela',
+          icon: '✨',
+          tooltip: 'Criar tabela inteligente com detecção automática de dados',
+          onClick: () => this.showCreateTableDialog(),
         });
 
-        // Listen for selection changes to update panel
-        context.events.on('selection:changed', () => {
-          this.refreshTableToolsPanel();
+        context.ui.addToolbarButton({
+          id: 'table-styles-gallery',
+          label: '🎨 Estilos',
+          icon: '🎨',
+          tooltip: 'Galeria de estilos de tabela com preview',
+          onClick: () => this.showStylesGallery(),
         });
 
-        context.ui.showToast('Tabelas Estruturadas v2.0 carregado!', 'success');
-        logger.info('[PivotPlugin] Initialized successfully with structured tables');
+        context.ui.addToolbarButton({
+          id: 'table-convert-range',
+          label: '📐 Converter',
+          icon: '📐',
+          tooltip: 'Converter tabela para range normal ou vice-versa',
+          onClick: () => this.toggleTableConversion(),
+        });
+
+        context.ui.addToolbarButton({
+          id: 'table-resize',
+          label: '↔️ Redimensionar',
+          icon: '↔️',
+          tooltip: 'Redimensionar tabela dinamicamente',
+          onClick: () => this.showResizeTableDialog(),
+        });
+
+        logger.info('[TableStudio] ✅ Toolbar buttons added');
+
+        // STEP 5: Setup event listeners
+        logger.info('[TableStudio] 📡 Step 5/6: Setting up event listeners...');
+        this.setupEventListeners();
+        logger.info('[TableStudio] ✅ Event listeners configured');
+
+        // STEP 6: Add panel (will render with loaded tables)
+        logger.info('[TableStudio] 🖼️ Step 6/6: Adding Table Studio panel...');
+        context.ui.addPanel({
+          id: 'table-studio-panel',
+          title: '✨ Table Studio',
+          render: (container: HTMLElement) => {
+            this.panelContainer = container;
+            logger.info('[TableStudio] Panel render callback triggered');
+            this.renderTableStudioPanel(container);
+          },
+          position: 'right',
+        });
+        logger.info('[TableStudio] ✅ Panel added');
+
+        // Force initial render after short delay to ensure UI is ready
+        setTimeout(() => {
+          logger.info('[TableStudio] 🔄 Forcing initial panel render after delay...');
+          this.refreshTableStudioPanel();
+        }, 300);
+
+        context.ui.showToast('✨ DataForge Table Studio v3.0 ativado!', 'success');
+        logger.info('[TableStudio] ✅ Initialization complete! Plugin ready.');
       } catch (error) {
-        logger.error('[PivotPlugin] Initialization failed', error);
+        logger.error('[TableStudio] ❌ Initialization failed', error);
         context.ui.showToast('Erro ao carregar plugin de tabelas', 'error');
       }
+    }
+
+    /**
+     * Setup all event listeners for auto-refresh
+     */
+    private setupEventListeners(): void {
+      if (!this.context) return;
+
+      // Listen for filter button clicks from grid
+      this.context.events.on('table:header-filter-click', (data: any) => {
+        logger.debug('[TableStudio] Filter button clicked from grid', data);
+        this.handleGridFilterButtonClick(data);
+      });
+
+      // Listen for selection changes to update panel
+      this.context.events.on('selection:changed', () => {
+        logger.debug('[TableStudio] Selection changed - refreshing panel');
+        this.refreshTableStudioPanel();
+      });
+
+      // Listen for workbook changes
+      this.context.kernel.eventBus.on('workbook:loaded', () => {
+        logger.info('[TableStudio] Workbook loaded - refreshing panel');
+        this.refreshTableStudioPanel();
+      });
+
+      // Listen for sheet changes
+      this.context.kernel.eventBus.on('sheet:changed', () => {
+        logger.info('[TableStudio] Sheet changed - refreshing panel');
+        this.refreshTableStudioPanel();
+      });
+
+      logger.debug('[TableStudio] Event listeners registered', {
+        events: ['table:header-filter-click', 'selection:changed', 'workbook:loaded', 'sheet:changed']
+      });
     }
 
     private showCreateTableDialog(): void {
@@ -605,12 +674,33 @@ import type {
         const showTotalRow = (document.getElementById('show-total-row-checkbox') as HTMLInputElement)?.checked ?? false;
 
         // Create table
+        logger.info('[TableStudio] 🔨 Creating table...', {
+          sheetId: sheet.id,
+          sheetName: sheet.name,
+          options: { hasHeaders, analyzeTypes, styleName, tableName, showTotalRow }
+        });
+
         const table = this.tableManager.createTable(sheet, {
           autoDetectRange: true,
           hasHeaders,
           analyzeDataTypes: analyzeTypes,
           styleName,
           tableName
+        });
+
+        logger.info('[TableStudio] ✅ Table created by TableManager', {
+          tableId: table.id,
+          tableName: table.name,
+          sheetId: table.sheetId,
+          range: table.range,
+          columns: table.columns.length
+        });
+
+        // Verify table is in TableManager
+        const allTables = this.tableManager.listTables();
+        logger.info('[TableStudio] Tables in TableManager after creation', {
+          count: allTables.length,
+          tables: allTables.map((t: any) => ({ id: t.id, name: t.name }))
         });
 
         // Update table properties
@@ -627,7 +717,8 @@ import type {
               col.totalFunction = 'sum';
             }
           });
-          this.tableManager.applyTotals(table, sheet);
+          // CORREÇÃO CRÍTICA: Usar applyTotalsWithCalculation para forçar cálculo automático
+          await this.applyTotalsWithCalculation(table, sheet);
         }
 
         // Add header buttons (Google Sheets style)
@@ -636,16 +727,28 @@ import type {
         // Setup header click handler
         this.setupHeaderClickHandler(table, sheet);
 
-        // Refresh grid
+        // Refresh grid and force update of active table info
         const grid = this.context.kernel.getGrid();
         if (grid) {
+          logger.info('[TableStudio] Updating grid with new table...');
+
+          // Force grid to update active table info
+          if (typeof grid.updateActiveTableInfo === 'function') {
+            (grid as any).updateActiveTableInfo();
+            logger.info('[TableStudio] Grid active table info updated');
+          }
+
           grid.render();
+          logger.info('[TableStudio] Grid rendered with new table');
         }
 
-        // Recalculate formulas if totals were added
-        if (showTotalRow) {
-          this.context.kernel.calcEngine.recalculateSheet(sheet.id);
-        }
+        // CORREÇÃO CRÍTICA: Salvar tabela na persistência (IndexedDB)
+        await this.saveTablesToPersistence();
+        logger.info('[TableStudio] Table saved to persistence', { tableId: table.id });
+
+        // Force refresh the Table Studio panel to recognize the new table
+        logger.info('[TableStudio] Refreshing panel to recognize new table...');
+        this.refreshTableStudioPanel();
 
         // Close modal
         document.getElementById('create-table-modal')?.remove();
@@ -665,12 +768,7 @@ import type {
       }
     }
 
-    private showTableStylesDialog(): void {
-      if (!this.context) return;
-
-      this.context.ui.showToast('Galeria de estilos: em breve!', 'info');
-      // TODO: Implement styles gallery
-    }
+    // Removed showTableStylesDialog - feature to be implemented later
 
     private checkIfSheetHasData(sheet: any): boolean {
       for (let r = 0; r < Math.min(sheet.rowCount, 100); r++) {
@@ -874,24 +972,852 @@ import type {
     }
 
     /**
-     * Find table containing the active cell
+     * Show filter dialog with unique values
      */
-    private findTableAtCell(sheet: any, row: number, col: number): any {
-      if (!this.tableManager) return null;
+    private showFilterDialog(table: any, sheet: any, columnIndex: number, columnName: string, uniqueValues: string[]): void {
+      if (!this.context || !this.tableManager) return;
 
-      const tables = this.tableManager.listTables();
+      const modalId = 'filter-dialog-modal';
+      const existingModal = document.getElementById(modalId);
+      if (existingModal) {
+        existingModal.remove();
+      }
 
-      for (const table of tables) {
-        if (table.sheetId === sheet.id) {
-          const { range } = table;
-          if (row >= range.startRow && row <= range.endRow &&
-              col >= range.startCol && col <= range.endCol) {
-            return table;
+      const checkboxesHTML = uniqueValues.map(value => `
+        <label style="display: flex; align-items: center; padding: 8px; cursor: pointer; border-radius: 4px; transition: background 0.15s;">
+          <input type="checkbox" value="${value}" checked style="margin-right: 8px; cursor: pointer;">
+          <span>${value}</span>
+        </label>
+      `).join('');
+
+      const modalHTML = `
+        <div id="${modalId}" class="modal-overlay" style="background: rgba(0,0,0,0.5); backdrop-filter: blur(4px); display: flex; align-items: center; justify-content: center; position: fixed; top: 0; left: 0; right: 0; bottom: 0; z-index: 10000;">
+          <div class="modal" style="background: var(--theme-bg-primary); border-radius: 8px; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.3); max-width: 400px; width: 90%; max-height: 80vh; overflow: auto;">
+            <div style="padding: 20px; border-bottom: 1px solid var(--theme-border-color); display: flex; justify-content: space-between; align-items: center;">
+              <h3 style="margin: 0; font-size: 18px; color: var(--theme-text-primary);">🔍 Filtrar ${columnName}</h3>
+              <button id="close-filter-modal" style="background: none; border: none; font-size: 24px; cursor: pointer; color: var(--theme-text-secondary);">&times;</button>
+            </div>
+            <div style="padding: 20px; max-height: 400px; overflow-y: auto;">
+              <div id="filter-values-list" style="display: flex; flex-direction: column; gap: 4px;">
+                ${checkboxesHTML}
+              </div>
+            </div>
+            <div style="padding: 16px 20px; border-top: 1px solid var(--theme-border-color); display: flex; gap: 12px; justify-content: flex-end;">
+              <button id="clear-all-filter" style="padding: 8px 16px; background: var(--theme-bg-secondary); color: var(--theme-text-primary); border: 1px solid var(--theme-border-color); border-radius: 4px; cursor: pointer; font-size: 14px;">Desmarcar Todos</button>
+              <button id="select-all-filter" style="padding: 8px 16px; background: var(--theme-bg-secondary); color: var(--theme-text-primary); border: 1px solid var(--theme-border-color); border-radius: 4px; cursor: pointer; font-size: 14px;">Marcar Todos</button>
+              <button id="apply-filter-btn" style="padding: 8px 16px; background: var(--theme-color-primary); color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 14px;">Aplicar Filtro</button>
+            </div>
+          </div>
+        </div>
+      `;
+
+      document.body.insertAdjacentHTML('beforeend', modalHTML);
+
+      // Event listeners
+      document.getElementById('close-filter-modal')?.addEventListener('click', () => {
+        document.getElementById(modalId)?.remove();
+      });
+
+      document.getElementById('select-all-filter')?.addEventListener('click', () => {
+        const checkboxes = document.querySelectorAll('#filter-values-list input[type="checkbox"]');
+        checkboxes.forEach(cb => (cb as HTMLInputElement).checked = true);
+      });
+
+      document.getElementById('clear-all-filter')?.addEventListener('click', () => {
+        const checkboxes = document.querySelectorAll('#filter-values-list input[type="checkbox"]');
+        checkboxes.forEach(cb => (cb as HTMLInputElement).checked = false);
+      });
+
+      document.getElementById('apply-filter-btn')?.addEventListener('click', () => {
+        const checkboxes = document.querySelectorAll('#filter-values-list input[type="checkbox"]');
+        const selectedValues = new Set<string>();
+        checkboxes.forEach(cb => {
+          const input = cb as HTMLInputElement;
+          if (input.checked) {
+            selectedValues.add(input.value);
           }
+        });
+
+        // Apply filter
+        this.applyColumnFilter(table, sheet, columnIndex, selectedValues);
+
+        // Update button state
+        this.tableManager?.updateHeaderButtonState(table, sheet, columnIndex, { filtered: selectedValues.size < uniqueValues.length });
+
+        // Re-render grid
+        this.context?.kernel.getGrid()?.render();
+
+        document.getElementById(modalId)?.remove();
+      });
+    }
+
+    /**
+     * Apply filter to column based on selected values
+     */
+    private applyColumnFilter(table: any, sheet: any, columnIndex: number, selectedValues: Set<string>): void {
+      if (!this.tableManager) return;
+
+      const { range, hasHeaders } = table;
+      const dataStartRow = hasHeaders ? range.startRow + 1 : range.startRow;
+      const dataEndRow = table.showTotalRow ? range.endRow - 1 : range.endRow;
+      const filterCol = range.startCol + columnIndex;
+
+      // Store original visibility state if not exists
+      if (!(table as any).hiddenRows) {
+        (table as any).hiddenRows = new Set();
+      }
+
+      // Apply filter
+      for (let row = dataStartRow; row <= dataEndRow; row++) {
+        const cell = sheet.getCell(row, filterCol);
+        const cellValue = cell?.value != null ? String(cell.value) : '';
+
+        if (selectedValues.has(cellValue)) {
+          (table as any).hiddenRows.delete(row);
+        } else {
+          (table as any).hiddenRows.add(row);
         }
       }
 
+      logger.info('[PivotPlugin] Column filter applied', {
+        tableId: table.id,
+        columnIndex,
+        selectedCount: selectedValues.size,
+        hiddenRows: (table as any).hiddenRows.size
+      });
+
+      this.context?.ui.showToast('Filtro aplicado com sucesso!', 'success');
+    }
+
+    /**
+     * ═══════════════════════════════════════════════════════════════════════
+     * PARTE 1 - FEATURE 1: GALERIA DE ESTILOS COM PREVIEW
+     * ═══════════════════════════════════════════════════════════════════════
+     */
+    private showStylesGallery(): void {
+      if (!this.context || !this.tableManager) return;
+
+      const sheet = this.context.kernel.workbookManager.getActiveSheet();
+      if (!sheet) {
+        this.context.ui.showToast('Selecione uma planilha primeiro', 'warning');
+        return;
+      }
+
+      const grid = this.context.kernel.getGrid();
+      const activeTable = grid ? this.findTableAtCell(sheet, grid.activeRow, grid.activeCol) : null;
+
+      if (!activeTable) {
+        this.context.ui.showToast('Selecione uma célula dentro de uma tabela para aplicar estilos', 'warning');
+        return;
+      }
+
+      // Get all available styles
+      const styles = this.tableManager.getAvailableStyles();
+      const currentStyle = activeTable.style.id;
+
+      // Generate style cards with visual previews
+      const stylesHTML = styles.map((style: any) => `
+        <div class="style-card" data-style-id="${style.id}" style="
+          padding: 16px;
+          background: var(--theme-bg-secondary);
+          border-radius: 8px;
+          cursor: pointer;
+          transition: all 0.3s ease;
+          border: 3px solid ${currentStyle === style.id ? '#667eea' : 'transparent'};
+          position: relative;
+        ">
+          ${currentStyle === style.id ? '<div style="position: absolute; top: 8px; right: 8px; background: #667eea; color: white; border-radius: 50%; width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 700;">✓</div>' : ''}
+
+          <!-- Preview da tabela em miniatura -->
+          <div style="margin-bottom: 12px; border-radius: 4px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.15);">
+            <!-- Header Preview -->
+            <div style="background: ${style.headerBg}; color: ${style.headerText}; padding: 8px; font-weight: 700; font-size: 11px; text-align: center; border-bottom: 1px solid ${style.borderColor};">
+              ${style.name}
+            </div>
+            <!-- Even Row Preview -->
+            <div style="background: ${style.evenRowBg}; padding: 6px 8px; font-size: 10px; border-bottom: 1px solid ${style.borderColor}; color: var(--theme-text-primary);">Linha Par • Exemplo</div>
+            <!-- Odd Row Preview -->
+            <div style="background: ${style.oddRowBg}; padding: 6px 8px; font-size: 10px; border-bottom: 1px solid ${style.borderColor}; color: var(--theme-text-primary);">Linha Ímpar • Exemplo</div>
+            <!-- Total Row Preview -->
+            <div style="background: ${style.totalRowBg}; color: ${style.headerText}; padding: 6px 8px; font-size: 10px; font-weight: 700; text-align: right;">Total: 1.234</div>
+          </div>
+
+          <div style="font-weight: 600; font-size: 14px; color: var(--theme-text-primary); margin-bottom: 4px; text-align: center;">${style.name}</div>
+          <div style="font-size: 11px; color: var(--theme-text-secondary); text-align: center;">
+            ${currentStyle === style.id ? '✓ Estilo Atual' : 'Clique para aplicar'}
+          </div>
+        </div>
+      `).join('');
+
+      const modalHTML = `
+        <div id="styles-gallery-modal" class="modal-overlay" style="background: rgba(0,0,0,0.75); backdrop-filter: blur(10px); display: flex; align-items: center; justify-content: center; position: fixed; top: 0; left: 0; right: 0; bottom: 0; z-index: 10000; animation: fadeIn 0.2s ease;">
+          <div class="modal" style="background: var(--theme-bg-primary); border-radius: 16px; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.5); max-width: 950px; width: 95%; max-height: 90vh; overflow: hidden; animation: slideUp 0.3s ease;">
+            <!-- Header -->
+            <div style="padding: 28px; border-bottom: 2px solid var(--theme-border-color); background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; position: sticky; top: 0; z-index: 1;">
+              <div style="display: flex; justify-content: space-between; align-items: center;">
+                <div>
+                  <h3 style="margin: 0 0 8px 0; font-size: 28px; font-weight: 700; letter-spacing: -0.5px;">🎨 Galeria de Estilos</h3>
+                  <p style="margin: 0; opacity: 0.95; font-size: 15px;">Escolha um estilo para "${activeTable.name}"</p>
+                </div>
+                <button id="close-styles-gallery" style="background: rgba(255,255,255,0.25); border: none; font-size: 32px; cursor: pointer; color: white; width: 44px; height: 44px; border-radius: 50%; transition: all 0.2s; display: flex; align-items: center; justify-content: center; line-height: 1;">&times;</button>
+              </div>
+            </div>
+
+            <!-- Content -->
+            <div style="padding: 28px; overflow-y: auto; max-height: calc(90vh - 180px);">
+              <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 18px;">
+                ${stylesHTML}
+              </div>
+            </div>
+
+            <!-- Footer -->
+            <div style="padding: 20px 28px; border-top: 2px solid var(--theme-border-color); background: var(--theme-bg-secondary); position: sticky; bottom: 0;">
+              <div style="display: flex; align-items: center; justify-content: space-between;">
+                <div style="font-size: 13px; color: var(--theme-text-secondary);">
+                  💡 <strong>Dica:</strong> O estilo será aplicado imediatamente
+                </div>
+                <div style="font-size: 12px; color: var(--theme-text-secondary);">
+                  ${styles.length} estilos disponíveis
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <style>
+          @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+          }
+          @keyframes slideUp {
+            from { transform: translateY(30px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+          }
+          #close-styles-gallery:hover {
+            background: rgba(255,255,255,0.35) !important;
+            transform: rotate(90deg);
+          }
+        </style>
+      `;
+
+      document.body.insertAdjacentHTML('beforeend', modalHTML);
+
+      // Event listeners
+      document.getElementById('close-styles-gallery')?.addEventListener('click', () => {
+        document.getElementById('styles-gallery-modal')?.remove();
+      });
+
+      // Style card handlers
+      const styleCards = document.querySelectorAll('.style-card');
+      styleCards.forEach(card => {
+        card.addEventListener('mouseenter', () => {
+          const styleId = card.getAttribute('data-style-id');
+          if (styleId !== currentStyle) {
+            (card as HTMLElement).style.borderColor = '#667eea80';
+            (card as HTMLElement).style.transform = 'translateY(-6px) scale(1.02)';
+            (card as HTMLElement).style.boxShadow = '0 12px 28px rgba(102, 126, 234, 0.35)';
+          }
+        });
+        card.addEventListener('mouseleave', () => {
+          const styleId = card.getAttribute('data-style-id');
+          if (styleId !== currentStyle) {
+            (card as HTMLElement).style.borderColor = 'transparent';
+            (card as HTMLElement).style.transform = 'translateY(0) scale(1)';
+            (card as HTMLElement).style.boxShadow = 'none';
+          }
+        });
+        card.addEventListener('click', () => {
+          const styleId = card.getAttribute('data-style-id');
+          if (styleId && styleId !== currentStyle) {
+            this.applyStyleToTable(activeTable, sheet, styleId);
+            document.getElementById('styles-gallery-modal')?.remove();
+          }
+        });
+      });
+    }
+
+    /**
+     * Apply selected style to table
+     */
+    private async applyStyleToTable(table: any, sheet: any, styleId: string): Promise<void> {
+      if (!this.tableManager || !this.context) return;
+
+      const styles = this.tableManager.getAvailableStyles();
+      const newStyle = styles.find((s: any) => s.id === styleId);
+
+      if (!newStyle) return;
+
+      try {
+        table.style = newStyle;
+        this.tableManager.applyTableFormatting(table, sheet);
+
+        const grid = this.context.kernel.getGrid();
+        if (grid) grid.render();
+
+        // CORREÇÃO CRÍTICA: Salvar alterações na persistência
+        await this.saveTablesToPersistence();
+
+        this.context.ui.showToast(`✨ Estilo "${newStyle.name}" aplicado com sucesso!`, 'success');
+        this.refreshTableStudioPanel();
+
+        logger.info('[TableStudio] Style applied', { tableId: table.id, style: newStyle.id });
+      } catch (error) {
+        logger.error('[TableStudio] Failed to apply style', error);
+        this.context.ui.showToast(`Erro ao aplicar estilo: ${error}`, 'error');
+      }
+    }
+
+    /**
+     * ═══════════════════════════════════════════════════════════════════════
+     * PARTE 1 - FEATURE 2: CONVERSÃO TABELA <-> RANGE
+     * ═══════════════════════════════════════════════════════════════════════
+     */
+    private toggleTableConversion(): void {
+      if (!this.context || !this.tableManager) return;
+
+      const sheet = this.context.kernel.workbookManager.getActiveSheet();
+      if (!sheet) {
+        this.context.ui.showToast('Selecione uma planilha primeiro', 'warning');
+        return;
+      }
+
+      const grid = this.context.kernel.getGrid();
+      const activeTable = grid ? this.findTableAtCell(sheet, grid.activeRow, grid.activeCol) : null;
+
+      if (activeTable) {
+        // Convert table to range
+        this.convertTableToRange(activeTable, sheet);
+      } else {
+        // Convert range to table (open create dialog)
+        this.showCreateTableDialog();
+      }
+    }
+
+    /**
+     * Convert table to normal range
+     */
+    private async convertTableToRange(table: any, _sheet: any): Promise<void> {
+      if (!this.context || !this.tableManager) return;
+
+      const confirmMsg = `Converter tabela "${table.name}" para intervalo normal?\n\n` +
+                        `⚠️ Isso removerá:\n` +
+                        `• Formatação estruturada da tabela\n` +
+                        `• Botões de filtro/ordenação\n` +
+                        `• Linha de totais (se houver)\n\n` +
+                        `✓ Será mantido:\n` +
+                        `• Todos os dados das células\n` +
+                        `• Formatação individual das células`;
+
+      if (!window.confirm(confirmMsg)) return;
+
+      try {
+        // Remove table from manager
+        this.tableManager.deleteTable(table.id);
+
+        const grid = this.context.kernel.getGrid();
+        if (grid) grid.render();
+
+        // CORREÇÃO CRÍTICA: Salvar alterações na persistência
+        await this.saveTablesToPersistence();
+
+        this.context.ui.showToast(`✓ Tabela convertida para intervalo normal!`, 'success');
+        this.refreshTableStudioPanel();
+
+        logger.info('[TableStudio] Table converted to range', { tableId: table.id });
+      } catch (error) {
+        logger.error('[TableStudio] Failed to convert table to range', error);
+        this.context.ui.showToast(`Erro ao converter: ${error}`, 'error');
+      }
+    }
+
+    /**
+     * ═══════════════════════════════════════════════════════════════════════
+     * PARTE 1 - FEATURE 3: REDIMENSIONAMENTO DINÂMICO
+     * ═══════════════════════════════════════════════════════════════════════
+     */
+    private showResizeTableDialog(): void {
+      if (!this.context || !this.tableManager) return;
+
+      const sheet = this.context.kernel.workbookManager.getActiveSheet();
+      if (!sheet) {
+        this.context.ui.showToast('Selecione uma planilha primeiro', 'warning');
+        return;
+      }
+
+      const grid = this.context.kernel.getGrid();
+      const activeTable = grid ? this.findTableAtCell(sheet, grid.activeRow, grid.activeCol) : null;
+
+      if (!activeTable) {
+        this.context.ui.showToast('Selecione uma célula dentro de uma tabela', 'warning');
+        return;
+      }
+
+      const { range } = activeTable;
+      const currentRows = range.endRow - range.startRow + 1;
+      const currentCols = range.endCol - range.startCol + 1;
+      const minRows = activeTable.hasHeaders ? 2 : 1;
+
+      const modalHTML = `
+        <div id="resize-table-modal" class="modal-overlay" style="background: rgba(0,0,0,0.75); backdrop-filter: blur(10px); display: flex; align-items: center; justify-content: center; position: fixed; top: 0; left: 0; right: 0; bottom: 0; z-index: 10000;">
+          <div class="modal" style="background: var(--theme-bg-primary); border-radius: 16px; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.5); max-width: 550px; width: 90%;">
+            <!-- Header -->
+            <div style="padding: 28px; border-bottom: 2px solid var(--theme-border-color); background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border-radius: 16px 16px 0 0;">
+              <div style="display: flex; justify-content: space-between; align-items: center;">
+                <div>
+                  <h3 style="margin: 0 0 8px 0; font-size: 26px; font-weight: 700;">↔️ Redimensionar Tabela</h3>
+                  <p style="margin: 0; opacity: 0.95; font-size: 14px;">${activeTable.name}</p>
+                </div>
+                <button id="close-resize-modal" style="background: rgba(255,255,255,0.25); border: none; font-size: 32px; cursor: pointer; color: white; width: 42px; height: 42px; border-radius: 50%; transition: all 0.2s;">&times;</button>
+              </div>
+            </div>
+
+            <!-- Content -->
+            <div style="padding: 28px;">
+              <!-- Current Size Info -->
+              <div style="margin-bottom: 24px; padding: 20px; background: linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%); border-radius: 12px; border: 2px solid rgba(102, 126, 234, 0.2);">
+                <div style="font-weight: 700; margin-bottom: 14px; color: var(--theme-text-primary); font-size: 15px;">📐 Tamanho Atual</div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+                  <div style="text-align: center; padding: 16px; background: var(--theme-bg-primary); border-radius: 8px;">
+                    <div style="color: var(--theme-text-secondary); margin-bottom: 6px; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px;">Linhas</div>
+                    <div style="font-size: 32px; font-weight: 700; color: #667eea;">${currentRows}</div>
+                  </div>
+                  <div style="text-align: center; padding: 16px; background: var(--theme-bg-primary); border-radius: 8px;">
+                    <div style="color: var(--theme-text-secondary); margin-bottom: 6px; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px;">Colunas</div>
+                    <div style="font-size: 32px; font-weight: 700; color: #764ba2;">${currentCols}</div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- New Size Inputs -->
+              <div style="margin-bottom: 20px;">
+                <label style="display: block; margin-bottom: 10px; font-weight: 600; color: var(--theme-text-primary); font-size: 14px;">📏 Novo Número de Linhas</label>
+                <input type="number" id="new-rows" min="${minRows}" value="${currentRows}" style="
+                  width: 100%;
+                  padding: 14px;
+                  border: 2px solid var(--theme-border-color);
+                  border-radius: 8px;
+                  font-size: 18px;
+                  font-weight: 600;
+                  background: var(--theme-bg-secondary);
+                  color: var(--theme-text-primary);
+                  transition: all 0.2s;
+                " onfocus="this.style.borderColor='#667eea'; this.style.boxShadow='0 0 0 3px rgba(102, 126, 234, 0.1)'" onblur="this.style.borderColor='var(--theme-border-color)'; this.style.boxShadow='none'">
+                <div style="font-size: 12px; color: var(--theme-text-secondary); margin-top: 6px;">
+                  ${activeTable.hasHeaders ? '⚠️ Mínimo 2 linhas (cabeçalho + dados)' : '⚠️ Mínimo 1 linha'}
+                </div>
+              </div>
+
+              <div style="margin-bottom: 24px;">
+                <label style="display: block; margin-bottom: 10px; font-weight: 600; color: var(--theme-text-primary); font-size: 14px;">📏 Novo Número de Colunas</label>
+                <input type="number" id="new-cols" min="1" value="${currentCols}" style="
+                  width: 100%;
+                  padding: 14px;
+                  border: 2px solid var(--theme-border-color);
+                  border-radius: 8px;
+                  font-size: 18px;
+                  font-weight: 600;
+                  background: var(--theme-bg-secondary);
+                  color: var(--theme-text-primary);
+                  transition: all 0.2s;
+                " onfocus="this.style.borderColor='#667eea'; this.style.boxShadow='0 0 0 3px rgba(102, 126, 234, 0.1)'" onblur="this.style.borderColor='var(--theme-border-color)'; this.style.boxShadow='none'">
+                <div style="font-size: 12px; color: var(--theme-text-secondary); margin-top: 6px;">⚠️ Mínimo 1 coluna</div>
+              </div>
+
+              <!-- Warning -->
+              <div style="padding: 16px; background: rgba(239, 68, 68, 0.1); border-radius: 8px; border-left: 4px solid #ef4444;">
+                <div style="font-size: 13px; color: var(--theme-text-primary); line-height: 1.6;">
+                  <strong style="color: #ef4444;">⚠️ Atenção:</strong><br>
+                  • Reduzir o tamanho pode resultar em <strong>perda de dados</strong><br>
+                  • Expandir adicionará células vazias automaticamente
+                </div>
+              </div>
+            </div>
+
+            <!-- Footer -->
+            <div style="padding: 20px 28px; border-top: 2px solid var(--theme-border-color); background: var(--theme-bg-secondary); border-radius: 0 0 16px 16px; display: flex; gap: 12px; justify-content: flex-end;">
+              <button id="cancel-resize-btn" style="padding: 12px 24px; background: var(--theme-bg-primary); color: var(--theme-text-primary); border: 2px solid var(--theme-border-color); border-radius: 8px; cursor: pointer; font-weight: 600; font-size: 14px; transition: all 0.2s;">Cancelar</button>
+              <button id="apply-resize-btn" style="padding: 12px 24px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: 600; font-size: 14px; transition: all 0.2s; box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);">↔️ Redimensionar</button>
+            </div>
+          </div>
+        </div>
+      `;
+
+      document.body.insertAdjacentHTML('beforeend', modalHTML);
+
+      // Event listeners
+      document.getElementById('close-resize-modal')?.addEventListener('click', () => {
+        document.getElementById('resize-table-modal')?.remove();
+      });
+      document.getElementById('cancel-resize-btn')?.addEventListener('click', () => {
+        document.getElementById('resize-table-modal')?.remove();
+      });
+      document.getElementById('apply-resize-btn')?.addEventListener('click', () => {
+        const newRows = parseInt((document.getElementById('new-rows') as HTMLInputElement).value);
+        const newCols = parseInt((document.getElementById('new-cols') as HTMLInputElement).value);
+
+        if (isNaN(newRows) || isNaN(newCols) || newRows < minRows || newCols < 1) {
+          this.context?.ui.showToast('❌ Valores inválidos!', 'error');
+          return;
+        }
+
+        this.resizeTable(activeTable, sheet, newRows, newCols);
+        document.getElementById('resize-table-modal')?.remove();
+      });
+    }
+
+    /**
+     * Resize table to new dimensions
+     */
+    private async resizeTable(table: any, sheet: any, newRows: number, newCols: number): Promise<void> {
+      if (!this.context || !this.tableManager) return;
+
+      try {
+        const { range, hasHeaders } = table;
+        const minRows = hasHeaders ? 2 : 1;
+
+        if (newRows < minRows) {
+          this.context.ui.showToast(`❌ A tabela precisa de pelo menos ${minRows} linhas!`, 'error');
+          return;
+        }
+
+        // Update range
+        const newEndRow = range.startRow + newRows - 1;
+        const newEndCol = range.startCol + newCols - 1;
+
+        table.range.endRow = newEndRow;
+        table.range.endCol = newEndCol;
+
+        // Update columns if needed
+        const currentCols = table.columns.length;
+        if (newCols > currentCols) {
+          // Add new columns
+          for (let i = currentCols; i < newCols; i++) {
+            const colName = sheet.getColumnName(range.startCol + i);
+            table.columns.push({
+              id: `col_${Date.now()}_${i}`,
+              name: hasHeaders ? `Nova${i + 1}` : colName,
+              dataType: 'auto',
+              index: i,
+              format: {}
+            });
+          }
+        } else if (newCols < currentCols) {
+          // Remove columns
+          table.columns.splice(newCols);
+        }
+
+        // Reapply formatting
+        this.tableManager.applyTableFormatting(table, sheet);
+        this.tableManager.addHeaderButtons(table, sheet);
+
+        if (table.showTotalRow) {
+          // CORREÇÃO CRÍTICA: Usar applyTotalsWithCalculation
+          await this.applyTotalsWithCalculation(table, sheet);
+        }
+
+        const grid = this.context.kernel.getGrid();
+        if (grid) grid.render();
+
+        // CORREÇÃO CRÍTICA: Salvar alterações na persistência
+        await this.saveTablesToPersistence();
+
+        this.context.ui.showToast(`✓ Tabela redimensionada para ${newRows} × ${newCols}!`, 'success');
+        this.refreshTableStudioPanel();
+
+        logger.info('[TableStudio] Table resized', { tableId: table.id, newRows, newCols });
+      } catch (error) {
+        logger.error('[TableStudio] Failed to resize table', error);
+        this.context.ui.showToast(`❌ Erro ao redimensionar: ${error}`, 'error');
+      }
+    }
+    /**
+     * ═══════════════════════════════════════════════════════════════════════
+     * CORREÇÃO CRÍTICA: MELHOR RECONHECIMENTO DE TABELAS
+     * ═══════════════════════════════════════════════════════════════════════
+     */
+    private findTableAtCell(sheet: any, row: number, col: number): any {
+      if (!this.tableManager) {
+        logger.error('[TableStudio] ❌ TableManager not initialized!');
+        return null;
+      }
+
+      const tables = this.tableManager.listTables();
+      logger.info('[TableStudio] 🔍 Finding table at cell', {
+        row,
+        col,
+        sheetId: sheet?.id,
+        totalTables: tables.length,
+        tablesInSystem: tables.map((t: any) => ({ id: t.id, name: t.name, sheetId: t.sheetId }))
+      });
+
+      if (tables.length === 0) {
+        logger.warn('[TableStudio] ⚠️ No tables registered in TableManager! Tables array is empty.');
+        return null;
+      }
+
+      // First, filter tables by sheet ID
+      const tablesInSheet = tables.filter((t: any) => t.sheetId === sheet.id);
+      logger.info('[TableStudio] Tables in current sheet', {
+        count: tablesInSheet.length,
+        tables: tablesInSheet.map((t: any) => ({
+          id: t.id,
+          name: t.name,
+          range: t.range
+        }))
+      });
+
+      if (tablesInSheet.length === 0) {
+        logger.warn('[TableStudio] ⚠️ No tables found in current sheet', { currentSheetId: sheet.id });
+        return null;
+      }
+
+      // Search for table containing the cell
+      for (const table of tablesInSheet) {
+        const { range } = table;
+        const isInRange = row >= range.startRow && row <= range.endRow &&
+                         col >= range.startCol && col <= range.endCol;
+
+        logger.debug('[TableStudio] Checking table', {
+          tableName: table.name,
+          range: range,
+          cellPosition: { row, col },
+          isInRange
+        });
+
+        if (isInRange) {
+          logger.info('[TableStudio] ✅ Table FOUND at cell!', {
+            tableId: table.id,
+            tableName: table.name,
+            range: range,
+            cellPosition: { row, col }
+          });
+          return table;
+        }
+      }
+
+      logger.warn('[TableStudio] ⚠️ No table found at cell position', { row, col });
       return null;
+    }
+
+    /**
+     * ═══════════════════════════════════════════════════════════════════════
+     * CORREÇÃO CRÍTICA: PERSISTÊNCIA DE TABELAS NO INDEXEDDB
+     * ═══════════════════════════════════════════════════════════════════════
+     */
+    private async saveTablesToPersistence(): Promise<void> {
+      if (!this.tableManager || !this.context) {
+        logger.error('[TableStudio] ❌ Cannot save tables - TableManager or context missing');
+        return;
+      }
+
+      try {
+        const tables = this.tableManager.listTables();
+
+        logger.info('[TableStudio] 💾 Saving tables to persistence...', {
+          count: tables.length,
+          tableIds: tables.map((t: any) => t.id),
+          tableNames: tables.map((t: any) => t.name)
+        });
+
+        const tablesData = tables.map((table: any) => ({
+          id: table.id,
+          name: table.name,
+          sheetId: table.sheetId,
+          range: table.range,
+          hasHeaders: table.hasHeaders,
+          columns: table.columns,
+          style: table.style,
+          showTotalRow: table.showTotalRow,
+          showHeaderRow: table.showHeaderRow,
+          showBandedRows: table.showBandedRows,
+          showBandedColumns: table.showBandedColumns,
+          showFilterButtons: table.showFilterButtons,
+          created: table.created,
+          modified: new Date()
+        }));
+
+        logger.info('[TableStudio] 📝 Tables data to save:', {
+          count: tablesData.length,
+          data: tablesData
+        });
+
+        // Save to plugin storage
+        await this.context.storage.set('structured-tables', tablesData);
+
+        logger.info('[TableStudio] ✅ Tables saved to persistence successfully!', {
+          count: tablesData.length
+        });
+
+        // Verify it was saved by reading it back
+        const verification = await this.context.storage.get('structured-tables');
+        logger.info('[TableStudio] 🔍 Verification - Reading back from storage:', {
+          hasData: !!verification,
+          isArray: Array.isArray(verification),
+          count: Array.isArray(verification) ? verification.length : 0,
+          data: verification
+        });
+      } catch (error) {
+        logger.error('[TableStudio] ❌ Failed to save tables', error);
+      }
+    }
+
+    /**
+     * Load tables from persistence
+     */
+    private async loadTablesFromPersistence(): Promise<void> {
+      if (!this.tableManager || !this.context) {
+        logger.error('[TableStudio] ❌ Cannot load tables - TableManager or context missing');
+        return;
+      }
+
+      try {
+        logger.info('[TableStudio] 📂 Attempting to load tables from IndexedDB...');
+
+        const tablesData = await this.context.storage.get('structured-tables') as any[];
+
+        logger.info('[TableStudio] 📦 Storage get result:', {
+          hasData: !!tablesData,
+          isArray: Array.isArray(tablesData),
+          type: typeof tablesData,
+          data: tablesData
+        });
+
+        if (!tablesData || !Array.isArray(tablesData)) {
+          logger.info('[TableStudio] No tables found in persistence');
+          return;
+        }
+
+        if (tablesData.length === 0) {
+          logger.info('[TableStudio] Tables array is empty in persistence');
+          return;
+        }
+
+        logger.info('[TableStudio] 🔄 Loading tables from persistence', {
+          count: tablesData.length,
+          tableNames: tablesData.map((t: any) => t.name)
+        });
+
+        // First, restore all tables to TableManager
+        for (const tableData of tablesData) {
+          // Restore table to manager
+          const table = {
+            ...tableData,
+            created: new Date(tableData.created),
+            modified: new Date(tableData.modified)
+          };
+
+          // Register table in manager's internal Map
+          (this.tableManager as any).tables.set(table.id, table);
+
+          logger.info('[TableStudio] ✅ Table restored to TableManager', {
+            id: table.id,
+            name: table.name,
+            sheetId: table.sheetId,
+            range: table.range
+          });
+        }
+
+        // Verify tables are in TableManager
+        const allTables = this.tableManager.listTables();
+        logger.info('[TableStudio] 📊 Tables in TableManager after restoration', {
+          count: allTables.length,
+          tables: allTables.map((t: any) => ({ id: t.id, name: t.name, sheetId: t.sheetId }))
+        });
+
+        // Wait a bit for sheets to be ready
+        await new Promise(resolve => setTimeout(resolve, 100));
+
+        // Get ALL sheets and apply formatting to tables in each sheet
+        const workbook = this.context.kernel.workbookManager.getActiveWorkbook();
+        if (!workbook) {
+          logger.warn('[TableStudio] ⚠️ No active workbook found');
+          return;
+        }
+
+        logger.info('[TableStudio] 🎨 Applying formatting to restored tables...', {
+          workbookId: workbook.id,
+          sheetCount: workbook.sheets.length
+        });
+
+        for (const sheet of workbook.sheets) {
+          for (const tableData of tablesData) {
+            if (tableData.sheetId === sheet.id) {
+              const table = (this.tableManager as any).tables.get(tableData.id);
+              if (table) {
+                logger.info('[TableStudio] Formatting table in sheet', {
+                  tableId: table.id,
+                  tableName: table.name,
+                  sheetId: sheet.id,
+                  sheetName: sheet.name
+                });
+
+                this.tableManager.applyTableFormatting(table, sheet);
+                this.tableManager.addHeaderButtons(table, sheet);
+
+                if (table.showTotalRow) {
+                  await this.applyTotalsWithCalculation(table, sheet);
+                }
+
+                logger.info('[TableStudio] ✅ Table formatting applied', { tableId: table.id });
+              }
+            }
+          }
+        }
+
+        const grid = this.context.kernel.getGrid();
+        if (grid) {
+          logger.info('[TableStudio] 🖼️ Rendering grid with restored tables');
+          grid.render();
+        }
+
+        logger.info('[TableStudio] ✅ All tables loaded and formatted successfully!', {
+          totalTablesLoaded: allTables.length
+        });
+
+        // CRITICAL: Force refresh of panel after tables are loaded
+        setTimeout(() => {
+          logger.info('[TableStudio] 🔄 Triggering post-load panel refresh...');
+          this.refreshTableStudioPanel();
+        }, 200);
+
+      } catch (error) {
+        logger.error('[TableStudio] ❌ Failed to load tables from persistence', error);
+      }
+    }
+
+    /**
+     * ═══════════════════════════════════════════════════════════════════════
+     * CORREÇÃO CRÍTICA: TOTAIS COM CÁLCULO AUTOMÁTICO (NÃO TEXTO)
+     * ═══════════════════════════════════════════════════════════════════════
+     */
+    private async applyTotalsWithCalculation(table: any, sheet: any): Promise<void> {
+      if (!this.tableManager || !this.context) return;
+
+      try {
+        // Apply formulas using TableManager
+        this.tableManager.applyTotals(table, sheet);
+
+        // Force recalculation of all formulas in the total row
+        const { range } = table;
+        const totalRow = range.endRow;
+
+        logger.info('[TableStudio] Applying totals with auto-calculation', {
+          tableId: table.id,
+          totalRow
+        });
+
+        // Wait a bit for cells to be set
+        await new Promise(resolve => setTimeout(resolve, 50));
+
+        // CORREÇÃO: Usar context.kernel.calcEngine.recalculate(sheet) em vez de context.kernel.recalculate(sheet.id)
+        // O CalcEngine recebe o objeto Sheet, não o ID
+        await this.context.kernel.calcEngine.recalculate(sheet);
+
+        logger.info('[TableStudio] Total row formulas calculated successfully');
+      } catch (error) {
+        logger.error('[TableStudio] Failed to calculate totals', error);
+        this.context?.ui.showToast('⚠️ Erro ao calcular totais', 'warning');
+      }
     }
 
 
@@ -926,23 +1852,41 @@ import type {
     }
 
     /**
-     * Refresh the Table Tools panel
+     * Refresh the Table Studio panel
      */
-    private refreshTableToolsPanel(): void {
-      const panel = document.getElementById('table-tools-content')?.parentElement;
-      if (panel) {
-        this.renderTableToolsPanel(panel);
+    private refreshTableStudioPanel(): void {
+      logger.debug('[TableStudio] Refresh panel requested');
+
+      // Try to find panel by stored reference first
+      if (this.panelContainer) {
+        logger.debug('[TableStudio] Using stored panel container reference');
+        this.renderTableStudioPanel(this.panelContainer);
+        return;
       }
+
+      // Fallback: try to find by ID
+      const panel = document.getElementById('table-studio-content')?.parentElement;
+      if (panel) {
+        logger.debug('[TableStudio] Found panel by DOM ID');
+        this.panelContainer = panel;
+        this.renderTableStudioPanel(panel);
+        return;
+      }
+
+      logger.warn('[TableStudio] ⚠️ Cannot refresh panel - container not found');
     }
 
     /**
-     * Render comprehensive Table Tools panel
+     * Render comprehensive Table Studio panel with modern design
      */
-    private renderTableToolsPanel(container: HTMLElement): void {
+    private renderTableStudioPanel(container: HTMLElement): void{
+      logger.debug('[TableStudio] 🎨 Rendering panel...');
+
       if (!this.context || !this.tableManager) {
+        logger.error('[TableStudio] ❌ Cannot render - context or TableManager missing');
         container.innerHTML = `
           <div style="padding: 16px; color: var(--theme-text-secondary);">
-            <p>TableManager não está inicializado.</p>
+            <p>❌ TableManager não está inicializado.</p>
           </div>
         `;
         return;
@@ -950,26 +1894,59 @@ import type {
 
       const sheet = this.context.kernel.workbookManager.getActiveSheet();
       if (!sheet) {
+        logger.warn('[TableStudio] ⚠️ No active sheet');
         container.innerHTML = `
           <div style="padding: 16px; color: var(--theme-text-secondary);">
-            <p>Selecione uma planilha para ver as ferramentas de tabela.</p>
+            <p>⚠️ Selecione uma planilha para ver as ferramentas de tabela.</p>
           </div>
         `;
         return;
       }
 
       // Get all tables in the active sheet
+      const allTables = this.tableManager.listTables();
       const tables = this.tableManager.getTablesBySheet(sheet.id);
+
+      logger.info('[TableStudio] 📊 Rendering panel with current state', {
+        sheetId: sheet.id,
+        sheetName: sheet.name,
+        tablesInCurrentSheet: tables.length,
+        totalTablesInManager: allTables.length,
+        allTablesDetails: allTables.map((t: any) => ({
+          id: t.id,
+          name: t.name,
+          sheetId: t.sheetId
+        }))
+      });
 
       // Get table at active cell if any
       const grid = this.context.kernel.getGrid();
       let activeTable = null;
       if (grid) {
+        logger.debug('[TableStudio] Checking for active table at grid position', {
+          activeRow: grid.activeRow,
+          activeCol: grid.activeCol
+        });
         activeTable = this.findTableAtCell(sheet, grid.activeRow, grid.activeCol);
+
+        if (activeTable) {
+          logger.info('[TableStudio] ✅ Active table found for panel display', {
+            tableId: activeTable.id,
+            tableName: activeTable.name
+          });
+        } else {
+          logger.debug('[TableStudio] No active table at current cell');
+        }
       }
 
       const panelHTML = `
-        <div id="table-tools-content" style="padding: 16px; color: var(--theme-text-primary); font-size: 13px;">
+        <div id="table-studio-content" style="padding: 16px; color: var(--theme-text-primary); font-size: 13px;">
+          <!-- Header -->
+          <div style="margin-bottom: 24px; padding: 16px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 8px; color: white;">
+            <div style="font-size: 20px; font-weight: 700; margin-bottom: 4px;">✨ Table Studio</div>
+            <div style="font-size: 11px; opacity: 0.9;">Motor inteligente de análise de tabelas</div>
+          </div>
+
           <!-- Tables List -->
           <div style="margin-bottom: 20px;">
             <h4 style="margin: 0 0 12px 0; font-size: 14px; color: var(--theme-text-secondary); text-transform: uppercase; letter-spacing: 0.5px;">
@@ -1127,12 +2104,16 @@ import type {
 
       const deleteBtn = container.querySelector('#quick-delete-table');
       if (deleteBtn && activeTable) {
-        deleteBtn.addEventListener('click', () => {
+        deleteBtn.addEventListener('click', async () => {
           if (confirm(`Tem certeza que deseja excluir a tabela "${activeTable.name}"?`)) {
             try {
               this.tableManager!.deleteTable(activeTable.id);
+
+              // CORREÇÃO CRÍTICA: Salvar alterações na persistência
+              await this.saveTablesToPersistence();
+
               this.context!.ui.showToast('Tabela excluída com sucesso', 'success');
-              this.renderTableToolsPanel(container); // Refresh panel
+              this.renderTableStudioPanel(container); // Refresh panel
               const grid = this.context!.kernel.getGrid();
               if (grid) grid.render();
             } catch (error) {

@@ -275,8 +275,8 @@ export class UIManager {
             type="text"
             class="formula-input"
             id="formula-input"
-            placeholder="Digite um valor ou fórmula (ex: =SOMA(A1:A10))"
           />
+          <div id="formula-autocomplete-suggestions" class="autocomplete-suggestions"></div>
         </div>
         
         <!-- Main Content -->
@@ -605,23 +605,69 @@ export class UIManager {
 
     // Formula input
     const formulaInput = document.getElementById('formula-input') as HTMLInputElement;
+    const suggestionsContainer = document.getElementById('formula-autocomplete-suggestions');
+
+    formulaInput?.addEventListener('input', () => {
+      const value = formulaInput.value.trim();
+      if (value.startsWith('=')) {
+        this.showAutocompleteSuggestions(value.substring(1));
+      } else {
+        this.hideAutocompleteSuggestions();
+      }
+    });
+
     formulaInput?.addEventListener('keydown', (e) => {
       if (e.key === 'Enter') {
-        const value = formulaInput.value;
-        const selection = this.grid?.getSelection();
-        if (selection && this.grid) {
-          const sheet = this.grid.getSheet();
-          if (sheet) {
-            if (String(value).startsWith('=')) {
-              sheet.setCell(selection.start.row, selection.start.col, 0, { formula: String(value) });
-              kernel.recalculate(sheet.id);
-            } else {
-              sheet.setCell(selection.start.row, selection.start.col, value);
+        const activeSuggestion = suggestionsContainer?.querySelector('.autocomplete-item.active') as HTMLElement;
+        if (activeSuggestion) {
+          e.preventDefault(); // Prevent form submission
+          const functionName = activeSuggestion.dataset.function;
+          if (functionName) {
+            this.selectAutocompleteSuggestion(functionName);
+          }
+        } else {
+          const value = formulaInput.value;
+          const selection = this.grid?.getSelection();
+          if (selection && this.grid) {
+            const sheet = this.grid.getSheet();
+            if (sheet) {
+              if (String(value).startsWith('=')) {
+                sheet.setCell(selection.start.row, selection.start.col, 0, { formula: String(value) });
+                kernel.recalculate(sheet.id);
+              } else {
+                sheet.setCell(selection.start.row, selection.start.col, value);
+              }
+              this.grid.render();
             }
-            this.grid.render();
           }
         }
+      } else if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+        if (suggestionsContainer && suggestionsContainer.style.display === 'block') {
+          e.preventDefault();
+          const items = Array.from(suggestionsContainer.querySelectorAll('.autocomplete-item')) as HTMLElement[];
+          if (items.length === 0) return;
+
+          let currentIndex = items.findIndex(item => item.classList.contains('active'));
+          items[currentIndex]?.classList.remove('active');
+
+          if (e.key === 'ArrowDown') {
+            currentIndex = (currentIndex + 1) % items.length;
+          } else { // ArrowUp
+            currentIndex = (currentIndex - 1 + items.length) % items.length;
+          }
+          items[currentIndex].classList.add('active');
+          items[currentIndex].scrollIntoView({ block: 'nearest' });
+        }
+      } else if (e.key === 'Escape') {
+        this.hideAutocompleteSuggestions();
       }
+    });
+
+    formulaInput?.addEventListener('blur', () => {
+      // Delay hiding to allow click event on suggestion to fire
+      setTimeout(() => {
+        this.hideAutocompleteSuggestions();
+      }, 100);
     });
 
     // Header buttons
@@ -828,48 +874,15 @@ export class UIManager {
     const row = selection.start.row;
     const col = selection.start.col;
 
-    // Try to detect range above
-    let rangeStart = row - 1;
-    let rangeEnd = row - 1;
+    // Use detectDataRange to find a suitable range
+    const detectedRange = this.detectDataRange(sheet, row, col);
 
-    while (rangeStart >= 0) {
-      const cell = sheet.getCell(rangeStart, col);
-      if (!cell || (cell.type !== 'number' && !cell.formula)) break;
-      rangeEnd = rangeStart;
-      rangeStart--;
-    }
-
-    if (rangeEnd < row - 1) {
-      // Found numbers above
-      const colName = sheet.getColumnName(col);
-      const formula = `=SOMA(${colName}${rangeEnd + 1}:${colName}${row})`;
+    if (detectedRange) {
+      const formula = `=SOMA(${detectedRange})`;
       sheet.setCell(row, col, '', { formula, type: 'formula' });
       kernel.recalculate(sheet.id);
       this.grid?.render();
-      logger.info('[UIManager] AutoSum inserted', { formula });
-      return;
-    }
-
-    // Try to detect range to the left
-    rangeStart = col - 1;
-    rangeEnd = col - 1;
-
-    while (rangeStart >= 0) {
-      const cell = sheet.getCell(row, rangeStart);
-      if (!cell || (cell.type !== 'number' && !cell.formula)) break;
-      rangeEnd = rangeStart;
-      rangeStart--;
-    }
-
-    if (rangeEnd < col - 1) {
-      // Found numbers to the left
-      const startColName = sheet.getColumnName(rangeEnd);
-      const endColName = sheet.getColumnName(col - 1);
-      const formula = `=SOMA(${startColName}${row + 1}:${endColName}${row + 1})`;
-      sheet.setCell(row, col, '', { formula, type: 'formula' });
-      kernel.recalculate(sheet.id);
-      this.grid?.render();
-      logger.info('[UIManager] AutoSum inserted', { formula });
+      logger.info('[UIManager] AutoSum inserted', { formula, detectedRange });
       return;
     }
 
@@ -1343,22 +1356,15 @@ export class UIManager {
                   ${arg.optional ? '<span style="font-size: 10px; padding: 2px 6px; background: var(--theme-bg-tertiary); border-radius: 3px; color: var(--theme-text-tertiary);">opcional</span>' : '<span style="font-size: 10px; padding: 2px 6px; background: var(--theme-color-error); color: white; border-radius: 3px;">obrigatório</span>'}
                   ${arg.repeating ? '<span style="font-size: 10px; padding: 2px 6px; background: var(--theme-color-info); color: white; border-radius: 3px;">...</span>' : ''}
                 </label>
-                <div style="display: flex; gap: 4px; align-items: stretch;">
+                <div style="display: flex; gap: 4px; align-items: stretch; position: relative;">
                   <input
                     type="text"
                     class="form-control formula-arg-input"
                     data-arg-index="${index}"
                     placeholder="${this.getPlaceholder(arg)}"
-                    style="font-family: var(--font-mono); font-size: 13px; flex: 1;">
+                    style="font-family: var(--font-mono); font-size: 13px; flex: 1; padding-right: 30px;">
                   ${this.shouldShowCellSelector(arg.type) ? `
-                    <button class="btn btn-cell-selector" data-arg-index="${index}" title="Selecionar células" style="padding: var(--spacing-xs) var(--spacing-sm); min-width: auto; white-space: nowrap; font-size: 12px;">
-                      📍 Selecionar
-                    </button>
-                    ${arg.type.includes('range') || arg.type === 'number|range' ? `
-                      <button class="btn btn-smart-detect" data-arg-index="${index}" title="Detectar tabela/coluna" style="padding: var(--spacing-xs) var(--spacing-sm); min-width: auto; white-space: nowrap; font-size: 12px;">
-                        🔍 Auto
-                      </button>
-                    ` : ''}
+                    <span class="cell-selector-icon" data-arg-index="${index}" title="Clique para selecionar células ou arraste na grade" style="position: absolute; right: 8px; top: 50%; transform: translateY(-50%); cursor: pointer; color: var(--theme-text-tertiary); font-size: 14px;">📍</span>
                   ` : ''}
                 </div>
                 <small style="font-size: 11px; color: var(--theme-text-tertiary); margin-top: 4px; display: block;">${this.getArgHelp(arg)}</small>
@@ -1386,21 +1392,24 @@ export class UIManager {
         this.currentFormulaArgs[index] = (e.target as HTMLInputElement).value;
         this.updateFormulaPreview();
       });
-    });
 
-    // Add cell selector button listeners
-    container.querySelectorAll('.btn-cell-selector').forEach(btn => {
-      btn.addEventListener('click', (e) => {
-        const index = parseInt((e.target as HTMLElement).dataset.argIndex || '0');
-        this.startCellSelection(index);
+      // Add focus listener to trigger cell selection
+      input.addEventListener('focus', (e) => {
+        const targetInput = e.target as HTMLInputElement; // Cast to HTMLInputElement
+        const index = parseInt(targetInput.dataset.argIndex || '0');
+        // Only start selection if the input is empty or contains a cell/range reference
+        if (!targetInput.value || /^[A-Z]+\d+(:[A-Z]+\d+)?$/.test(targetInput.value)) {
+          this.startCellSelection(index, targetInput);
+        }
       });
     });
 
-    // Add smart detect button listeners
-    container.querySelectorAll('.btn-smart-detect').forEach(btn => {
-      btn.addEventListener('click', (e) => {
+    // Add click listener for the cell selector icon
+    container.querySelectorAll('.cell-selector-icon').forEach(icon => {
+      icon.addEventListener('click', (e) => {
         const index = parseInt((e.target as HTMLElement).dataset.argIndex || '0');
-        this.smartDetectRange(index);
+        const input = (e.target as HTMLElement).previousElementSibling as HTMLInputElement; // Get the associated input
+        this.startCellSelection(index, input);
       });
     });
   }
@@ -1410,13 +1419,15 @@ export class UIManager {
   }
 
   private cellSelectionMode = false;
+  private activeFormulaInput: HTMLInputElement | null = null;
   private cellSelectionArgIndex = -1;
   private cellSelectionStart: { row: number; col: number } | null = null;
 
-  private startCellSelection(argIndex: number): void {
+  private startCellSelection(argIndex: number, inputElement: HTMLInputElement): void {
     this.cellSelectionMode = true;
     this.cellSelectionArgIndex = argIndex;
     this.cellSelectionStart = null;
+    this.activeFormulaInput = inputElement; // Store the input element
 
     // Hide formula builder modal completely so it doesn't block the view
     const modal = document.getElementById('formula-builder-modal');
@@ -1534,9 +1545,8 @@ export class UIManager {
 
   private completeCellSelection(range: string): void {
     // Update the input field
-    const input = document.querySelector(`.formula-arg-input[data-arg-index="${this.cellSelectionArgIndex}"]`) as HTMLInputElement;
-    if (input) {
-      input.value = range;
+    if (this.activeFormulaInput) {
+      this.activeFormulaInput.value = range;
       this.currentFormulaArgs[this.cellSelectionArgIndex] = range;
       this.updateFormulaPreview();
     }
@@ -1548,6 +1558,7 @@ export class UIManager {
     this.cellSelectionMode = false;
     this.cellSelectionArgIndex = -1;
     this.cellSelectionStart = null;
+    this.activeFormulaInput = null; // Clear the active input
 
     // Restore formula builder modal
     const modal = document.getElementById('formula-builder-modal');
@@ -1568,35 +1579,7 @@ export class UIManager {
     }
   }
 
-  private smartDetectRange(argIndex: number): void {
-    const sheet = this.grid?.getSheet();
-    const selection = this.grid?.getSelection();
 
-    if (!sheet || !selection) {
-      alert('Selecione uma célula primeiro');
-      return;
-    }
-
-    const startRow = selection.start.row;
-    const startCol = selection.start.col;
-
-    // Try to detect a data range (table/column)
-    const detectedRange = this.detectDataRange(sheet, startRow, startCol);
-
-    if (detectedRange) {
-      const input = document.querySelector(`.formula-arg-input[data-arg-index="${argIndex}"]`) as HTMLInputElement;
-      if (input) {
-        input.value = detectedRange;
-        this.currentFormulaArgs[argIndex] = detectedRange;
-        this.updateFormulaPreview();
-
-        // Show toast
-        this.showToast(`Intervalo detectado: ${detectedRange}`, 'success');
-      }
-    } else {
-      alert('Não foi possível detectar uma tabela ou coluna de dados nesta célula');
-    }
-  }
 
   private isCellEmpty(cell: any): boolean {
     if (!cell) return true;
@@ -1825,30 +1808,7 @@ export class UIManager {
     return false;
   }
 
-  private showToast(message: string, type: 'success' | 'error' | 'info' = 'info'): void {
-    const toast = document.createElement('div');
-    toast.style.cssText = `
-      position: fixed;
-      bottom: 24px;
-      right: 24px;
-      padding: 12px 20px;
-      background: ${type === 'success' ? 'var(--theme-color-success)' : type === 'error' ? 'var(--theme-color-error)' : 'var(--theme-color-info)'};
-      color: white;
-      border-radius: var(--border-radius-lg);
-      box-shadow: var(--shadow-lg);
-      z-index: 10000;
-      animation: slideIn 0.3s ease-out;
-      font-size: 14px;
-      font-weight: 500;
-    `;
-    toast.textContent = message;
-    document.body.appendChild(toast);
 
-    setTimeout(() => {
-      toast.style.animation = 'slideOut 0.3s ease-out';
-      setTimeout(() => toast.remove(), 300);
-    }, 3000);
-  }
 
   private getTypeLabel(type: string): string {
     const labels: Record<string, string> = {
@@ -2003,6 +1963,53 @@ export class UIManager {
 
     // Default: regular text
     return `<span style="color: var(--theme-text-primary);">${arg}</span>`;
+  }
+
+  private showAutocompleteSuggestions(query: string): void {
+    const suggestionsContainer = document.getElementById('formula-autocomplete-suggestions');
+    if (!suggestionsContainer) return;
+
+    const allFunctions = kernel.calcEngine.getRegistry().list();
+    const filteredFunctions = allFunctions.filter(fn =>
+      fn.name.toLowerCase().startsWith(query.toLowerCase())
+    );
+
+    if (filteredFunctions.length > 0 && query.length > 0) {
+      suggestionsContainer.innerHTML = filteredFunctions.map(fn => `
+        <div class="autocomplete-item" data-function="${fn.name}" style="padding: 8px; cursor: pointer; background: var(--theme-bg-primary); border-bottom: 1px solid var(--theme-border-color);">
+          <strong>${fn.name}</strong> - ${fn.description}
+        </div>
+      `).join('');
+      suggestionsContainer.style.display = 'block';
+
+      suggestionsContainer.querySelectorAll('.autocomplete-item').forEach(item => {
+        item.addEventListener('click', () => {
+          const functionName = (item as HTMLElement).dataset.function;
+          if (functionName) {
+            this.selectAutocompleteSuggestion(functionName);
+          }
+        });
+      });
+    } else {
+      this.hideAutocompleteSuggestions();
+    }
+  }
+
+  private hideAutocompleteSuggestions(): void {
+    const suggestionsContainer = document.getElementById('formula-autocomplete-suggestions');
+    if (suggestionsContainer) {
+      suggestionsContainer.innerHTML = '';
+      suggestionsContainer.style.display = 'none';
+    }
+  }
+
+  private selectAutocompleteSuggestion(functionName: string): void {
+    const formulaInput = document.getElementById('formula-input') as HTMLInputElement;
+    if (formulaInput) {
+      formulaInput.value = `=${functionName}(`;
+      formulaInput.focus();
+      this.hideAutocompleteSuggestions();
+    }
   }
 
   private insertFormula(formula: string): void {

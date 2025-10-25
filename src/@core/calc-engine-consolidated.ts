@@ -70,9 +70,9 @@ export class FormulaParser {
       }
 
       // Cell references (A1, B2, AA10)
-      if (/[A-Z]/.test(char)) {
+      if (/[A-ZÀ-Ú]/.test(char)) {
         let ref = "";
-        while (i < formula.length && /[A-Z0-9:]/.test(formula[i])) {
+        while (i < formula.length && /[A-Z0-9À-Ú:]/.test(formula[i])) {
           ref += formula[i++];
         }
 

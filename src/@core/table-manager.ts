@@ -762,7 +762,7 @@ export class TableManager {
 
         // Add subtle styling to indicate interactivity
         if (cell.format) {
-          cell.format.underline = false; // Remove underline if present
+          cell.format.underline = true; // Add underline to signal clickability
         }
       }
     }

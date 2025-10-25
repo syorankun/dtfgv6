@@ -1336,6 +1336,23 @@ textarea.form-control {
   display: none !important;
 }
 
+.sidebar.collapsed,
+.panels.collapsed {
+  width: 0;
+  min-width: 0;
+  padding: 0;
+  border-right: none; /* Remove border when collapsed */
+  opacity: 0;
+  overflow: hidden;
+  transition: all 0.3s ease-in-out;
+}
+
+/* Ensure content is not visible when collapsed */
+.sidebar.collapsed > *,
+.panels.collapsed > * {
+  display: none;
+}
+
 .invisible {
   visibility: hidden !important;
 }

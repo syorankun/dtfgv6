@@ -314,18 +314,23 @@ export class DJDataForgeKernel {
       // 4. Load workbooks for active company
       const activeCompany = this.companyManager.getActiveCompany();
       if (activeCompany) {
+        logger.debug("[Kernel] Active company ID for workbook load:", activeCompany.id);
         const workbooksData = await this.storageManager.getAllWorkbooks(activeCompany.id);
+        logger.debug("[Kernel] Workbooks data from storage:", { count: workbooksData.length, ids: workbooksData.map((wb: any) => wb.id) });
         
         if (workbooksData.length > 0) {
           for (const wbData of workbooksData) {
             const wb = Workbook.deserialize(wbData);
             this.workbookManager['workbooks'].set(wb.id, wb);
           }
-        } else {
+        }
+        
+        // If no workbooks were loaded from storage, and none exist in the manager, create a default one.
+        if (this.workbookManager.listWorkbooks().length === 0) {
           this.createWorkbook('Meu Primeiro Workbook');
         }
         
-        logger.info("[Kernel] Workbooks loaded", { count: workbooksData.length });
+        logger.info("[Kernel] Workbooks loaded", { count: this.workbookManager.listWorkbooks().length });
       }
       
       // 5. Start session

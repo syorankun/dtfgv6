@@ -207,7 +207,7 @@ export class PersistenceManager {
     try {
       const serialized = workbook.serialize();
       await this.db.put("workbooks", serialized);
-      this.logger.debug("[Persistence] Workbook saved", { id: workbook.id });
+      this.logger.debug("[Persistence] Workbook saved", { id: workbook.id, companyId: workbook.companyId });
     } catch (error) {
       this.logger.error("[Persistence] Workbook save failed", error);
       throw error;
@@ -242,6 +242,7 @@ export class PersistenceManager {
     if (!this.db) throw new Error("DB not initialized");
 
     try {
+      this.logger.debug("[Persistence] Getting all workbooks for companyId:", companyId);
       if (companyId) {
         return await this.db.getAllFromIndex(
           "workbooks",
@@ -249,7 +250,9 @@ export class PersistenceManager {
           companyId
         );
       }
-      return await this.db.getAll("workbooks");
+      const allWorkbooks = await this.db.getAll("workbooks");
+      this.logger.debug("[Persistence] Retrieved all workbooks (no companyId filter):", { count: allWorkbooks.length, ids: allWorkbooks.map((wb: any) => wb.id) });
+      return allWorkbooks;
     } catch (error) {
       this.logger.error("[Persistence] Get all workbooks failed", error);
       return [];

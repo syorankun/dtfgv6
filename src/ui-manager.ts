@@ -342,6 +342,10 @@ export class UIManager {
       <input type="file" id="file-input" accept=".csv,.xlsx,.xls,.json" style="display: none;" />
     `;
 
+    // Ensure sidebar and panels are visible by default
+    document.querySelector('.sidebar')?.classList.remove('collapsed');
+    document.querySelector('.panels')?.classList.remove('collapsed');
+
     this.setupGrid();
     this.listenForUIChanges();
     this.setupEventListeners();

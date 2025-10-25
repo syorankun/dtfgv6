@@ -54,6 +54,7 @@ export interface ValidationRule {
 // ============================================================================
 
 export interface WorkbookOptions {
+  id?: string;
   name?: string;
   created?: Date;
   author?: string;

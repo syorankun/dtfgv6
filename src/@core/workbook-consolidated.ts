@@ -62,8 +62,8 @@ export class Sheet {
   rowCount: number = 1000;
   colCount: number = 26;
 
-  constructor(name: string = "Sheet1") {
-    this.id = nanoid();
+  constructor(name: string = "Sheet1", id?: string) {
+    this.id = id || nanoid();
     this.name = name;
     this.initDefaultColumns();
   }
@@ -342,7 +342,7 @@ export class Sheet {
   }
 
   static deserialize(data: any): Sheet {
-    const sheet = new Sheet(data.name);
+    const sheet = new Sheet(data.name, data.id);
     sheet.rowCount = data.rowCount;
     sheet.colCount = data.colCount;
 
@@ -386,7 +386,7 @@ export class Workbook {
   companyId?: string;
 
   constructor(options: WorkbookOptions = {}) {
-    this.id = nanoid();
+    this.id = options.id || nanoid();
     this.name = options.name || "Sem título";
     this.created = options.created || new Date();
     this.modified = new Date();
@@ -496,6 +496,7 @@ export class Workbook {
 
   static deserialize(data: any): Workbook {
     const wb = new Workbook({
+      id: data.id,
       name: data.name,
       created: new Date(data.created),
       author: data.author,

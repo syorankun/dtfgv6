@@ -319,11 +319,20 @@ export class DJDataForgeKernel {
         logger.debug("[Kernel] Workbooks data from storage:", { count: workbooksData.length, ids: workbooksData.map((wb: any) => wb.id) });
         
         if (workbooksData.length > 0) {
-          for (const wbData of workbooksData) {
-            const wb = Workbook.deserialize(wbData);
-            this.workbookManager['workbooks'].set(wb.id, wb);
-          }
-        }
+                  for (const wbData of workbooksData) {
+                    const wb = Workbook.deserialize(wbData);
+                    this.workbookManager['workbooks'].set(wb.id, wb);
+                  }
+          
+                  // Restore active workbook from last session
+                  const lastActiveWbId = await this.storageManager.getSetting('lastActiveWorkbook');
+                  if (lastActiveWbId && this.workbookManager.getWorkbook(lastActiveWbId)) {
+                    this.workbookManager.setActiveWorkbook(lastActiveWbId);
+                    logger.info('[Kernel] Restored active workbook', { id: lastActiveWbId });
+                  } else if (workbooksData.length > 0) {
+                    // Fallback to first workbook
+                    this.workbookManager.setActiveWorkbook(workbooksData[0].id);
+                  }        }
         
         // If no workbooks were loaded from storage, and none exist in the manager, create a default one.
         if (this.workbookManager.listWorkbooks().length === 0) {
@@ -331,6 +340,11 @@ export class DJDataForgeKernel {
         }
         
         logger.info("[Kernel] Workbooks loaded", { count: this.workbookManager.listWorkbooks().length });
+
+        // Notify plugins that workbooks are ready
+        this.eventBus.emit("workbook:loaded", { 
+          count: this.workbookManager.listWorkbooks().length 
+        });
       }
       
       // 5. Start session
@@ -550,12 +564,17 @@ export class DJDataForgeKernel {
   async saveAllWorkbooks(): Promise<void> {
     const workbooks = this.workbookManager.listWorkbooks();
     
-    for (const wb of workbooks) {
-      await this.storageManager.saveWorkbook(wb);
-    }
+        for (const wb of workbooks) {
+          await this.storageManager.saveWorkbook(wb);
+        }
     
-    logger.info("[Kernel] All workbooks saved", { count: workbooks.length });
-  }
+        // Save active workbook ID to restore session
+        const activeWbId = this.workbookManager.getActiveWorkbook()?.id;
+        if (activeWbId) {
+          await this.storageManager.saveSetting('lastActiveWorkbook', activeWbId);
+        }
+    
+        logger.info("[Kernel] All workbooks saved", { count: workbooks.length });  }
   
   // --------------------------------------------------------------------------
   // INTERNAL METHODS

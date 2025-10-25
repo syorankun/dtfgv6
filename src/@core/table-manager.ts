@@ -530,6 +530,29 @@ export class TableManager {
   }
 
   /**
+   * Register a table that has been loaded from persistence.
+   * This ensures the table is known to the manager without creating a new one.
+   */
+  registerTable(table: StructuredTable): void {
+    if (this.tables.has(table.id)) {
+      logger.warn('[TableManager] Table already registered, overwriting with loaded data.', { id: table.id });
+    }
+    
+    this.tables.set(table.id, table);
+
+    // Ensure tableNameCounter is up-to-date to avoid name collisions
+    const match = table.name.match(/^Tabela(\d+)$/);
+    if (match) {
+      const num = parseInt(match[1], 10);
+      if (num >= this.tableNameCounter) {
+        this.tableNameCounter = num + 1;
+      }
+    }
+
+    logger.info('[TableManager] Table registered from persistence', { id: table.id, name: table.name });
+  }
+
+  /**
    * Apply table formatting to sheet
    */
   applyTableFormatting(table: StructuredTable, sheet: Sheet): void {

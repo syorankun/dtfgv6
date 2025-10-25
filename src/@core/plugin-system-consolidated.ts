@@ -1707,7 +1707,7 @@ import type {
           };
 
           // Register table in manager's internal Map
-          (this.tableManager as any).tables.set(table.id, table);
+          this.tableManager.registerTable(table);
 
           logger.info('[TableStudio] ✅ Table restored to TableManager', {
             id: table.id,

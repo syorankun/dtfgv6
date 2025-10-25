@@ -427,9 +427,27 @@ import type {
           id: 'table-tools-panel',
           title: '🔧 Ferramentas de Tabela',
           render: (container: HTMLElement) => {
-            container.innerHTML = '<div id="table-tools-content"></div>';
+            this.renderTableToolsPanel(container);
           },
           position: 'right',
+        });
+
+        // Configure TableManager in grid
+        const grid = context.kernel.getGrid();
+        if (grid && this.tableManager) {
+          grid.setTableManager(this.tableManager);
+          logger.debug('[PivotPlugin] TableManager configured in grid');
+        }
+
+        // Listen for filter button clicks from grid
+        context.events.on('table:header-filter-click', (data: any) => {
+          logger.debug('[PivotPlugin] Filter button clicked from grid', data);
+          this.handleGridFilterButtonClick(data);
+        });
+
+        // Listen for selection changes to update panel
+        context.events.on('selection:changed', () => {
+          this.refreshTableToolsPanel();
         });
 
         context.ui.showToast('Tabelas Estruturadas v2.0 carregado!', 'success');
@@ -808,6 +826,14 @@ import type {
               () => {
                 // Filter callback
                 plugin.filterTableColumn(table, sheet, columnIndex);
+              },
+              () => {
+                // Clear sort callback
+                plugin.clearColumnSort(table, sheet, columnIndex);
+              },
+              () => {
+                // Clear filter callback
+                plugin.clearColumnFilter(table, sheet, columnIndex);
               }
             );
           }
@@ -828,6 +854,12 @@ import type {
 
       try {
         this.tableManager.sortTableByColumn(table, sheet, columnIndex, ascending);
+
+        // Update header state
+        this.tableManager.updateHeaderButtonState(table, sheet, columnIndex, {
+          sorted: ascending ? 'asc' : 'desc'
+        });
+
         const grid = this.context.kernel.getGrid();
         if (grid) grid.render();
 
@@ -837,6 +869,55 @@ import type {
       } catch (error) {
         logger.error('[PivotPlugin] Sort failed', error);
         this.context.ui.showToast(`Erro ao ordenar: ${error}`, 'error');
+      }
+    }
+
+    /**
+     * Clear sort from a column
+     */
+    private clearColumnSort(table: any, sheet: any, columnIndex: number): void {
+      if (!this.tableManager || !this.context) return;
+
+      try {
+        // Update state to clear sort
+        this.tableManager.updateHeaderButtonState(table, sheet, columnIndex, {
+          sorted: null
+        });
+
+        const grid = this.context.kernel.getGrid();
+        if (grid) grid.render();
+
+        const columnName = table.columns[columnIndex]?.name || `Coluna ${columnIndex + 1}`;
+        this.context.ui.showToast(`Ordenação removida de "${columnName}"`, 'info');
+      } catch (error) {
+        logger.error('[PivotPlugin] Clear sort failed', error);
+        this.context.ui.showToast(`Erro ao limpar ordenação: ${error}`, 'error');
+      }
+    }
+
+    /**
+     * Clear filter from a column
+     */
+    private clearColumnFilter(table: any, sheet: any, columnIndex: number): void {
+      if (!this.tableManager || !this.context) return;
+
+      try {
+        // Clear the filter
+        this.tableManager.filterTableByColumn(table, sheet, columnIndex, null);
+
+        // Update state
+        this.tableManager.updateHeaderButtonState(table, sheet, columnIndex, {
+          filtered: false
+        });
+
+        const grid = this.context.kernel.getGrid();
+        if (grid) grid.render();
+
+        const columnName = table.columns[columnIndex]?.name || `Coluna ${columnIndex + 1}`;
+        this.context.ui.showToast(`Filtro removido de "${columnName}"`, 'info');
+      } catch (error) {
+        logger.error('[PivotPlugin] Clear filter failed', error);
+        this.context.ui.showToast(`Erro ao limpar filtro: ${error}`, 'error');
       }
     }
 
@@ -1080,6 +1161,12 @@ import type {
         if (filterValue && this.tableManager) {
           try {
             this.tableManager.filterTableByColumn(table, sheet, columnIndex, filterValue);
+
+            // Update header state to show filter is active
+            this.tableManager.updateHeaderButtonState(table, sheet, columnIndex, {
+              filtered: true
+            });
+
             const grid = this.context?.kernel.getGrid();
             if (grid) grid.render();
             this.context?.ui.showToast(`Filtro aplicado: "${filterValue}"`, 'success');
@@ -1138,6 +1225,270 @@ import type {
         logger.error('[PivotPlugin] Clear filters failed', error);
         this.context.ui.showToast(`Erro ao limpar filtros: ${error}`, 'error');
       }
+    }
+
+    /**
+     * Handle filter button click from grid
+     */
+    private handleGridFilterButtonClick(data: { table: any, sheet: any, columnIndex: number, clientX: number, clientY: number }): void {
+      if (!this.tableManager || !this.context) return;
+
+      const { table, sheet, columnIndex, clientX, clientY } = data;
+
+      this.tableManager.showHeaderMenu(
+        table,
+        sheet,
+        columnIndex,
+        clientX,
+        clientY,
+        (ascending: boolean) => {
+          this.sortTableColumn(table, sheet, columnIndex, ascending);
+        },
+        () => {
+          this.filterTableColumn(table, sheet, columnIndex);
+        },
+        () => {
+          this.clearColumnSort(table, sheet, columnIndex);
+        },
+        () => {
+          this.clearColumnFilter(table, sheet, columnIndex);
+        }
+      );
+    }
+
+    /**
+     * Refresh the Table Tools panel
+     */
+    private refreshTableToolsPanel(): void {
+      const panel = document.getElementById('table-tools-content')?.parentElement;
+      if (panel) {
+        this.renderTableToolsPanel(panel);
+      }
+    }
+
+    /**
+     * Render comprehensive Table Tools panel
+     */
+    private renderTableToolsPanel(container: HTMLElement): void {
+      if (!this.context || !this.tableManager) {
+        container.innerHTML = `
+          <div style="padding: 16px; color: var(--theme-text-secondary);">
+            <p>TableManager não está inicializado.</p>
+          </div>
+        `;
+        return;
+      }
+
+      const sheet = this.context.kernel.workbookManager.getActiveSheet();
+      if (!sheet) {
+        container.innerHTML = `
+          <div style="padding: 16px; color: var(--theme-text-secondary);">
+            <p>Selecione uma planilha para ver as ferramentas de tabela.</p>
+          </div>
+        `;
+        return;
+      }
+
+      // Get all tables in the active sheet
+      const tables = this.tableManager.getTablesBySheet(sheet.id);
+
+      // Get table at active cell if any
+      const grid = this.context.kernel.getGrid();
+      let activeTable = null;
+      if (grid) {
+        activeTable = this.findTableAtCell(sheet, grid.activeRow, grid.activeCol);
+      }
+
+      const panelHTML = `
+        <div id="table-tools-content" style="padding: 16px; color: var(--theme-text-primary); font-size: 13px;">
+          <!-- Tables List -->
+          <div style="margin-bottom: 20px;">
+            <h4 style="margin: 0 0 12px 0; font-size: 14px; color: var(--theme-text-secondary); text-transform: uppercase; letter-spacing: 0.5px;">
+              📊 Tabelas na Planilha
+            </h4>
+            ${tables.length === 0 ? `
+              <div style="padding: 12px; background: var(--theme-bg-secondary); border-radius: 6px; color: var(--theme-text-secondary); text-align: center;">
+                Nenhuma tabela criada
+              </div>
+            ` : `
+              <div style="display: flex; flex-direction: column; gap: 8px;">
+                ${tables.map((table: any) => `
+                  <div style="
+                    padding: 12px;
+                    background: ${activeTable?.id === table.id ? 'var(--theme-color-primary)' : 'var(--theme-bg-secondary)'};
+                    color: ${activeTable?.id === table.id ? 'white' : 'var(--theme-text-primary)'};
+                    border-radius: 6px;
+                    cursor: pointer;
+                    transition: all 0.2s;
+                    border: 1px solid ${activeTable?.id === table.id ? 'var(--theme-color-primary)' : 'var(--theme-border-color)'};
+                  " class="table-item" data-table-id="${table.id}">
+                    <div style="font-weight: 600; margin-bottom: 4px;">${table.name}</div>
+                    <div style="font-size: 11px; opacity: 0.8;">
+                      ${table.columns.length} colunas • ${table.range.endRow - table.range.startRow + 1} linhas
+                    </div>
+                  </div>
+                `).join('')}
+              </div>
+            `}
+          </div>
+
+          <!-- Active Table Info -->
+          ${activeTable ? `
+            <div style="margin-bottom: 20px; padding: 16px; background: var(--theme-bg-secondary); border-radius: 8px; border-left: 4px solid var(--theme-color-primary);">
+              <h4 style="margin: 0 0 12px 0; font-size: 14px; color: var(--theme-text-primary);">
+                ✨ Tabela Selecionada
+              </h4>
+              <div style="margin-bottom: 12px;">
+                <strong>${activeTable.name}</strong>
+              </div>
+              <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; font-size: 12px; color: var(--theme-text-secondary);">
+                <div>
+                  <div style="font-weight: 600;">Colunas</div>
+                  <div>${activeTable.columns.length}</div>
+                </div>
+                <div>
+                  <div style="font-weight: 600;">Linhas</div>
+                  <div>${activeTable.range.endRow - activeTable.range.startRow + 1}</div>
+                </div>
+                <div>
+                  <div style="font-weight: 600;">Estilo</div>
+                  <div>${activeTable.style.name}</div>
+                </div>
+                <div>
+                  <div style="font-weight: 600;">Filtros</div>
+                  <div>${activeTable.showFilterButtons ? '✓ Ativos' : '✗ Inativos'}</div>
+                </div>
+              </div>
+
+              <!-- Column Details -->
+              <div style="margin-top: 16px;">
+                <div style="font-weight: 600; margin-bottom: 8px; font-size: 12px; color: var(--theme-text-secondary);">
+                  Colunas:
+                </div>
+                <div style="max-height: 200px; overflow-y: auto;">
+                  ${activeTable.columns.map((col: any) => {
+                    const state = (activeTable as any).columnStates?.get(col.index) || { sorted: null, filtered: false };
+                    return `
+                      <div style="
+                        padding: 8px;
+                        margin-bottom: 4px;
+                        background: var(--theme-bg-primary);
+                        border-radius: 4px;
+                        display: flex;
+                        justify-content: space-between;
+                        align-items: center;
+                        font-size: 11px;
+                      ">
+                        <div>
+                          <div style="font-weight: 600;">${col.name}</div>
+                          <div style="color: var(--theme-text-secondary); font-size: 10px;">${col.dataType}</div>
+                        </div>
+                        <div style="display: flex; gap: 4px; align-items: center;">
+                          ${state.sorted ? `<span title="Ordenado ${state.sorted === 'asc' ? 'crescente' : 'decrescente'}">${state.sorted === 'asc' ? '🔼' : '🔽'}</span>` : ''}
+                          ${state.filtered ? '<span title="Filtrado">🔍</span>' : ''}
+                        </div>
+                      </div>
+                    `;
+                  }).join('')}
+                </div>
+              </div>
+            </div>
+          ` : ''}
+
+          <!-- Quick Actions -->
+          <div style="margin-bottom: 20px;">
+            <h4 style="margin: 0 0 12px 0; font-size: 14px; color: var(--theme-text-secondary); text-transform: uppercase; letter-spacing: 0.5px;">
+              ⚡ Ações Rápidas
+            </h4>
+            <div style="display: flex; flex-direction: column; gap: 8px;">
+              <button id="quick-create-table" style="
+                padding: 10px 14px;
+                background: var(--theme-color-primary);
+                color: white;
+                border: none;
+                border-radius: 6px;
+                cursor: pointer;
+                font-weight: 600;
+                display: flex;
+                align-items: center;
+                gap: 8px;
+                transition: all 0.2s;
+              ">
+                <span>📊</span>
+                <span>Criar Nova Tabela</span>
+              </button>
+              ${activeTable ? `
+                <button id="quick-delete-table" style="
+                  padding: 10px 14px;
+                  background: #ef4444;
+                  color: white;
+                  border: none;
+                  border-radius: 6px;
+                  cursor: pointer;
+                  font-weight: 600;
+                  display: flex;
+                  align-items: center;
+                  gap: 8px;
+                  transition: all 0.2s;
+                ">
+                  <span>🗑️</span>
+                  <span>Excluir Tabela Atual</span>
+                </button>
+              ` : ''}
+            </div>
+          </div>
+
+          <!-- Tips -->
+          <div style="padding: 12px; background: var(--theme-bg-secondary); border-radius: 6px; font-size: 11px; color: var(--theme-text-secondary);">
+            <div style="font-weight: 600; margin-bottom: 6px;">💡 Dica:</div>
+            <div>Clique nos ícones ▼ nos cabeçalhos das tabelas para acessar opções de ordenação e filtro!</div>
+          </div>
+        </div>
+      `;
+
+      container.innerHTML = panelHTML;
+
+      // Setup event listeners
+      const createBtn = container.querySelector('#quick-create-table');
+      if (createBtn) {
+        createBtn.addEventListener('click', () => {
+          this.showCreateTableDialog();
+        });
+      }
+
+      const deleteBtn = container.querySelector('#quick-delete-table');
+      if (deleteBtn && activeTable) {
+        deleteBtn.addEventListener('click', () => {
+          if (confirm(`Tem certeza que deseja excluir a tabela "${activeTable.name}"?`)) {
+            try {
+              this.tableManager!.deleteTable(activeTable.id);
+              this.context!.ui.showToast('Tabela excluída com sucesso', 'success');
+              this.renderTableToolsPanel(container); // Refresh panel
+              const grid = this.context!.kernel.getGrid();
+              if (grid) grid.render();
+            } catch (error) {
+              logger.error('[PivotPlugin] Failed to delete table', error);
+              this.context!.ui.showToast('Erro ao excluir tabela', 'error');
+            }
+          }
+        });
+      }
+
+      // Add hover effects to table items
+      const tableItems = container.querySelectorAll('.table-item');
+      tableItems.forEach(item => {
+        item.addEventListener('mouseenter', () => {
+          if (!(item as HTMLElement).style.background.includes('var(--theme-color-primary)')) {
+            (item as HTMLElement).style.background = 'var(--theme-bg-hover)';
+          }
+        });
+        item.addEventListener('mouseleave', () => {
+          const tableId = item.getAttribute('data-table-id');
+          if (activeTable?.id !== tableId) {
+            (item as HTMLElement).style.background = 'var(--theme-bg-secondary)';
+          }
+        });
+      });
     }
   }
 

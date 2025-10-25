@@ -206,7 +206,9 @@ class CellRenderer {
     width: number,
     height: number,
     label: string,
-    _isColumn: boolean
+    _isColumn: boolean,
+    hasFilterButton: boolean = false,
+    filterState?: { sorted: 'asc' | 'desc' | null, filtered: boolean }
   ): void {
     const ctx = this.ctx;
 
@@ -224,7 +226,38 @@ class CellRenderer {
     ctx.font = "bold 12px -apple-system, sans-serif";
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
-    ctx.fillText(label, x + width / 2, y + height / 2);
+
+    // Calculate text position considering filter button if present
+    const textX = hasFilterButton ? x + width / 2 - 8 : x + width / 2;
+    ctx.fillText(label, textX, y + height / 2);
+
+    // Render filter/sort button if this is a table column
+    if (hasFilterButton) {
+      // Determine icon based on state
+      let icon = '▼'; // Default dropdown
+      if (filterState?.sorted === 'asc') {
+        icon = '🔼';
+      } else if (filterState?.sorted === 'desc') {
+        icon = '🔽';
+      } else if (filterState?.filtered) {
+        icon = '🔍';
+      }
+
+      // Draw button background (subtle)
+      const buttonX = x + width - 22;
+      const buttonY = y + (height - 18) / 2;
+      const buttonSize = 18;
+
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.05)';
+      ctx.fillRect(buttonX, buttonY, buttonSize, buttonSize);
+
+      // Draw icon
+      ctx.font = "11px sans-serif";
+      ctx.fillStyle = this.getThemeColor('--theme-text-primary');
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText(icon, buttonX + buttonSize / 2, buttonY + buttonSize / 2);
+    }
   }
 }
 
@@ -443,6 +476,10 @@ export class VirtualGrid {
 
   private appElement: HTMLElement;
 
+  // Table integration
+  private tableManager?: any;
+  private activeTableInfo?: { table: any, columnStates: Map<number, any> } | null;
+
   constructor(canvas: HTMLCanvasElement, kernel: any) {
     this.canvas = canvas;
     this.kernel = kernel;
@@ -624,6 +661,31 @@ export class VirtualGrid {
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
 
+    // Check if click was on a column header with filter button
+    if (y < this.headerHeight && y > 0 && x > this.headerWidth) {
+      const col = Math.floor((x - this.headerWidth + this.scrollX) / this.cellWidth);
+
+      // Check if this column is part of a table with filter buttons
+      if (this.activeTableInfo && this.sheet) {
+        const table = this.activeTableInfo.table;
+        if (table.hasHeaders && table.showFilterButtons &&
+            col >= table.range.startCol && col <= table.range.endCol) {
+
+          // Calculate button position
+          const colX = this.headerWidth + (col * this.cellWidth) - this.scrollX;
+          const buttonX = colX + this.cellWidth - 22;
+          const buttonSize = 18;
+
+          // Check if click was on the filter button
+          if (x >= buttonX && x <= buttonX + buttonSize) {
+            e.preventDefault();
+            this.handleFilterButtonClick(col, e.clientX, e.clientY);
+            return;
+          }
+        }
+      }
+    }
+
     const cellPos = this.getCellAt(x, y);
     if (cellPos) {
       // If editing a formula, add cell reference instead of changing selection
@@ -635,9 +697,29 @@ export class VirtualGrid {
       }
 
       this.selectionManager.startSelection(cellPos.row, cellPos.col);
+      this.updateActiveTableInfo(); // Update table info when selection changes
       this.onSelectionChange?.(this.selectionManager.getSelection());
       this.render();
     }
+  }
+
+  /**
+   * Handle click on filter button in column header
+   */
+  private handleFilterButtonClick(col: number, clientX: number, clientY: number): void {
+    if (!this.activeTableInfo || !this.sheet || !this.tableManager) return;
+
+    const table = this.activeTableInfo.table;
+    const columnIndex = col - table.range.startCol;
+
+    // Emit event for external handling (by PivotPlugin)
+    this.kernel.eventBus?.emit('table:header-filter-click', {
+      table,
+      sheet: this.sheet,
+      columnIndex,
+      clientX,
+      clientY
+    });
   }
 
   private handleMouseMove(e: MouseEvent): void {
@@ -885,7 +967,21 @@ export class VirtualGrid {
     for (let col = startCol; col < endCol; col++) {
       const x = this.headerWidth + (col * this.cellWidth) - this.scrollX;
       const label = this.sheet.getColumnName(col);
-      this.renderer.renderHeader(x, 0, this.cellWidth, this.headerHeight, label, true);
+
+      // Check if this column is part of a table header
+      let hasFilterButton = false;
+      let filterState = undefined;
+
+      if (this.activeTableInfo) {
+        const table = this.activeTableInfo.table;
+        if (table.hasHeaders && col >= table.range.startCol && col <= table.range.endCol) {
+          const columnIndex = col - table.range.startCol;
+          hasFilterButton = table.showFilterButtons;
+          filterState = this.activeTableInfo.columnStates.get(columnIndex) || { sorted: null, filtered: false };
+        }
+      }
+
+      this.renderer.renderHeader(x, 0, this.cellWidth, this.headerHeight, label, true, hasFilterButton, filterState);
     }
 
     // Render row headers
@@ -1495,11 +1591,48 @@ export class VirtualGrid {
     this.selectionManager.startSelection(0, 0);
     this.selectionManager.endSelection();
     this.updateScrollbarSizes();
+    this.updateActiveTableInfo();
     this.render();
   }
 
   getSheet(): Sheet | undefined {
     return this.sheet;
+  }
+
+  /**
+   * Set TableManager for table integration
+   */
+  setTableManager(tableManager: any): void {
+    this.tableManager = tableManager;
+    this.updateActiveTableInfo();
+  }
+
+  /**
+   * Update information about the active table based on current selection
+   */
+  private updateActiveTableInfo(): void {
+    if (!this.tableManager || !this.sheet) {
+      this.activeTableInfo = null;
+      return;
+    }
+
+    const activeCell = this.selectionManager.getActiveCell();
+    const tables = this.tableManager.getTablesBySheet(this.sheet.id);
+
+    // Find table containing the active cell
+    for (const table of tables) {
+      const { range } = table;
+      if (activeCell.row >= range.startRow && activeCell.row <= range.endRow &&
+          activeCell.col >= range.startCol && activeCell.col <= range.endCol) {
+        this.activeTableInfo = {
+          table,
+          columnStates: (table as any).columnStates || new Map()
+        };
+        return;
+      }
+    }
+
+    this.activeTableInfo = null;
   }
 
   refresh(): void {

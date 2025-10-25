@@ -321,14 +321,14 @@ export class TableManager {
 
   /**
    * Auto-detect data range from current selection or active cell
+   * Enhanced with smarter contiguous region detection
    */
   private detectDataRange(sheet: Sheet): Range {
-    // Find the contiguous data region
-    // For now, use simple detection - find first row/col and last row/col with data
-
+    // Find the contiguous data region using flood-fill algorithm
     let minRow = Infinity, minCol = Infinity;
     let maxRow = -1, maxCol = -1;
 
+    // First pass: find any data
     for (let r = 0; r < sheet.rowCount; r++) {
       for (let c = 0; c < sheet.colCount; c++) {
         const cell = sheet.getCell(r, c);
@@ -345,12 +345,89 @@ export class TableManager {
       throw new Error('Nenhum dado encontrado na planilha');
     }
 
+    // Second pass: detect contiguous table-like structure
+    // Check if first row looks like headers (text-heavy, no duplicates)
+    const isLikelyHeader = this.isRowLikelyHeader(sheet, minRow, minCol, maxCol);
+
+    // Trim trailing empty rows
+    while (maxRow > minRow && this.isRowEmpty(sheet, maxRow, minCol, maxCol)) {
+      maxRow--;
+    }
+
+    // Trim trailing empty columns
+    while (maxCol > minCol && this.isColumnEmpty(sheet, maxCol, minRow, maxRow)) {
+      maxCol--;
+    }
+
+    logger.info('[TableManager] Detected data range', {
+      range: { minRow, minCol, maxRow, maxCol },
+      hasHeaders: isLikelyHeader,
+      rows: maxRow - minRow + 1,
+      cols: maxCol - minCol + 1
+    });
+
     return {
       startRow: minRow,
       startCol: minCol,
       endRow: maxRow,
       endCol: maxCol
     };
+  }
+
+  /**
+   * Check if a row is likely a header row
+   */
+  private isRowLikelyHeader(sheet: Sheet, row: number, startCol: number, endCol: number): boolean {
+    let textCount = 0;
+    let nonEmptyCount = 0;
+    const values: any[] = [];
+
+    for (let col = startCol; col <= endCol; col++) {
+      const cell = sheet.getCell(row, col);
+      if (cell && cell.value !== null && cell.value !== undefined && cell.value !== '') {
+        nonEmptyCount++;
+        values.push(cell.value);
+        if (typeof cell.value === 'string') {
+          textCount++;
+        }
+      }
+    }
+
+    // Headers are typically:
+    // 1. Mostly text (>70%)
+    // 2. Unique values (no duplicates)
+    // 3. Short strings (<50 chars average)
+    const textRatio = nonEmptyCount > 0 ? textCount / nonEmptyCount : 0;
+    const uniqueValues = new Set(values);
+    const hasUniqueValues = uniqueValues.size === values.length;
+
+    return textRatio > 0.7 && hasUniqueValues;
+  }
+
+  /**
+   * Check if a row is completely empty
+   */
+  private isRowEmpty(sheet: Sheet, row: number, startCol: number, endCol: number): boolean {
+    for (let col = startCol; col <= endCol; col++) {
+      const cell = sheet.getCell(row, col);
+      if (cell && cell.value !== null && cell.value !== undefined && cell.value !== '') {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  /**
+   * Check if a column is completely empty
+   */
+  private isColumnEmpty(sheet: Sheet, col: number, startRow: number, endRow: number): boolean {
+    for (let row = startRow; row <= endRow; row++) {
+      const cell = sheet.getCell(row, col);
+      if (cell && cell.value !== null && cell.value !== undefined && cell.value !== '') {
+        return false;
+      }
+    }
+    return true;
   }
 
   /**
@@ -645,7 +722,7 @@ export class TableManager {
   }
 
   /**
-   * Add filter/sort buttons to table headers (Google Sheets style)
+   * Add filter/sort buttons to table headers with enhanced visual indicators
    */
   addHeaderButtons(table: StructuredTable, sheet: Sheet): void {
     if (!table.showFilterButtons || !table.showHeaderRow || !table.hasHeaders) {
@@ -655,23 +732,61 @@ export class TableManager {
     const { range } = table;
     const headerRow = range.startRow;
 
-    // Add a special marker to each header cell to indicate it has buttons
+    // Initialize filter/sort state tracking if not exists
+    if (!(table as any).columnStates) {
+      (table as any).columnStates = new Map();
+    }
+
+    // Add intuitive filter/sort indicators to each header cell
     for (let col = range.startCol; col <= range.endCol; col++) {
       const cell = sheet.getCell(headerRow, col);
       if (cell) {
-        // Add a visual indicator (▼ triangle) to the header value
-        const originalValue = cell.value ? String(cell.value) : '';
-        if (!originalValue.includes(' ▼')) {
-          cell.value = originalValue + ' ▼';
+        const columnIndex = col - range.startCol;
+        const state = (table as any).columnStates.get(columnIndex) || { sorted: null, filtered: false };
+
+        // Build header text with visual indicators
+        const originalValue = cell.value ? String(cell.value).replace(/ [▼▲🔽🔼🔍✓]$/g, '').trim() : '';
+
+        let indicator = '';
+        if (state.sorted === 'asc') {
+          indicator = ' 🔼'; // Ascending sort indicator
+        } else if (state.sorted === 'desc') {
+          indicator = ' 🔽'; // Descending sort indicator
+        } else if (state.filtered) {
+          indicator = ' 🔍'; // Filter active indicator
+        } else {
+          indicator = ' ▼'; // Default dropdown indicator
+        }
+
+        cell.value = originalValue + indicator;
+
+        // Add subtle styling to indicate interactivity
+        if (cell.format) {
+          cell.format.underline = false; // Remove underline if present
         }
       }
     }
 
-    logger.info('[TableManager] Header buttons added', { tableId: table.id });
+    logger.info('[TableManager] Header buttons added with visual indicators', { tableId: table.id });
   }
 
   /**
-   * Handle header click for filter/sort menu (Google Sheets style)
+   * Update header button state after sort/filter operations
+   */
+  updateHeaderButtonState(table: StructuredTable, sheet: Sheet, columnIndex: number, state: { sorted?: 'asc' | 'desc' | null, filtered?: boolean }): void {
+    if (!(table as any).columnStates) {
+      (table as any).columnStates = new Map();
+    }
+
+    const currentState = (table as any).columnStates.get(columnIndex) || { sorted: null, filtered: false };
+    (table as any).columnStates.set(columnIndex, { ...currentState, ...state });
+
+    // Refresh header buttons to show updated state
+    this.addHeaderButtons(table, sheet);
+  }
+
+  /**
+   * Handle header click for filter/sort menu (Enhanced modern style)
    */
   showHeaderMenu(
     table: StructuredTable,
@@ -680,7 +795,9 @@ export class TableManager {
     x: number,
     y: number,
     onSort: (ascending: boolean) => void,
-    onFilter: () => void
+    onFilter: () => void,
+    onClearSort?: () => void,
+    onClearFilter?: () => void
   ): void {
     // Remove existing menu if any
     const existingMenu = document.getElementById('table-header-menu');
@@ -688,7 +805,24 @@ export class TableManager {
       existingMenu.remove();
     }
 
-    const columnName = table.columns[columnIndex]?.name || `Coluna ${columnIndex + 1}`;
+    const column = table.columns[columnIndex];
+    const columnName = column?.name || `Coluna ${columnIndex + 1}`;
+    const dataType = column?.dataType || 'text';
+
+    // Get current state
+    const state = (table as any).columnStates?.get(columnIndex) || { sorted: null, filtered: false };
+
+    // Determine sort labels based on data type
+    let sortAscLabel = 'Ordenar A → Z';
+    let sortDescLabel = 'Ordenar Z → A';
+
+    if (dataType === 'number' || dataType === 'currency' || dataType === 'percentage') {
+      sortAscLabel = 'Ordenar: Menor → Maior';
+      sortDescLabel = 'Ordenar: Maior → Menor';
+    } else if (dataType === 'date' || dataType === 'datetime') {
+      sortAscLabel = 'Ordenar: Antigo → Recente';
+      sortDescLabel = 'Ordenar: Recente → Antigo';
+    }
 
     const menuHTML = `
       <div id="table-header-menu" style="
@@ -697,46 +831,98 @@ export class TableManager {
         top: ${y}px;
         background: var(--theme-bg-primary);
         border: 1px solid var(--theme-border-color);
-        border-radius: 4px;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        border-radius: 8px;
+        box-shadow: 0 8px 24px rgba(0,0,0,0.2);
         z-index: 10000;
-        min-width: 200px;
-        padding: 4px 0;
+        min-width: 240px;
+        padding: 8px 0;
         color: var(--theme-text-primary);
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
       ">
-        <div style="padding: 8px 12px; font-weight: bold; border-bottom: 1px solid var(--theme-border-color);">
-          ${columnName}
+        <div style="padding: 12px 16px; font-weight: 600; border-bottom: 1px solid var(--theme-border-color); font-size: 13px; color: var(--theme-text-secondary);">
+          📊 ${columnName}
         </div>
-        <div class="menu-item" data-action="sort-asc" style="
-          padding: 8px 12px;
-          cursor: pointer;
-          display: flex;
-          align-items: center;
-          gap: 8px;
-        ">
-          <span>⬆️</span>
-          <span>Ordenar de A a Z</span>
+
+        <!-- Sort Options -->
+        <div class="menu-section" style="padding: 4px 0;">
+          <div class="menu-item" data-action="sort-asc" style="
+            padding: 10px 16px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-size: 13px;
+            transition: background 0.15s ease;
+            ${state.sorted === 'asc' ? 'background: var(--theme-bg-hover); font-weight: 600;' : ''}
+          ">
+            <span style="font-size: 16px;">🔼</span>
+            <span>${sortAscLabel}</span>
+            ${state.sorted === 'asc' ? '<span style="margin-left: auto; color: var(--theme-color-primary);">✓</span>' : ''}
+          </div>
+          <div class="menu-item" data-action="sort-desc" style="
+            padding: 10px 16px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-size: 13px;
+            transition: background 0.15s ease;
+            ${state.sorted === 'desc' ? 'background: var(--theme-bg-hover); font-weight: 600;' : ''}
+          ">
+            <span style="font-size: 16px;">🔽</span>
+            <span>${sortDescLabel}</span>
+            ${state.sorted === 'desc' ? '<span style="margin-left: auto; color: var(--theme-color-primary);">✓</span>' : ''}
+          </div>
+          ${state.sorted ? `
+          <div class="menu-item" data-action="clear-sort" style="
+            padding: 10px 16px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-size: 13px;
+            transition: background 0.15s ease;
+            color: var(--theme-text-secondary);
+          ">
+            <span style="font-size: 16px;">↩️</span>
+            <span>Limpar Ordenação</span>
+          </div>
+          ` : ''}
         </div>
-        <div class="menu-item" data-action="sort-desc" style="
-          padding: 8px 12px;
-          cursor: pointer;
-          display: flex;
-          align-items: center;
-          gap: 8px;
-        ">
-          <span>⬇️</span>
-          <span>Ordenar de Z a A</span>
-        </div>
+
         <div style="border-top: 1px solid var(--theme-border-color); margin: 4px 0;"></div>
-        <div class="menu-item" data-action="filter" style="
-          padding: 8px 12px;
-          cursor: pointer;
-          display: flex;
-          align-items: center;
-          gap: 8px;
-        ">
-          <span>🔍</span>
-          <span>Filtrar...</span>
+
+        <!-- Filter Options -->
+        <div class="menu-section" style="padding: 4px 0;">
+          <div class="menu-item" data-action="filter" style="
+            padding: 10px 16px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-size: 13px;
+            transition: background 0.15s ease;
+            ${state.filtered ? 'font-weight: 600;' : ''}
+          ">
+            <span style="font-size: 16px;">🔍</span>
+            <span>Filtrar Valores...</span>
+            ${state.filtered ? '<span style="margin-left: auto; color: var(--theme-color-primary);">●</span>' : ''}
+          </div>
+          ${state.filtered ? `
+          <div class="menu-item" data-action="clear-filter" style="
+            padding: 10px 16px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-size: 13px;
+            transition: background 0.15s ease;
+            color: var(--theme-text-secondary);
+          ">
+            <span style="font-size: 16px;">✖️</span>
+            <span>Limpar Filtro</span>
+          </div>
+          ` : ''}
         </div>
       </div>
     `;
@@ -746,14 +932,21 @@ export class TableManager {
     const menu = document.getElementById('table-header-menu');
     if (!menu) return;
 
-    // Add hover effects
+    // Add hover effects and click handlers
     const menuItems = menu.querySelectorAll('.menu-item');
     menuItems.forEach(item => {
       item.addEventListener('mouseenter', () => {
-        (item as HTMLElement).style.backgroundColor = 'var(--theme-bg-hover)';
+        if (!(item as HTMLElement).style.background.includes('var(--theme-bg-hover)')) {
+          (item as HTMLElement).style.backgroundColor = 'rgba(0, 0, 0, 0.05)';
+        }
       });
       item.addEventListener('mouseleave', () => {
-        (item as HTMLElement).style.backgroundColor = 'transparent';
+        const action = item.getAttribute('data-action');
+        const hasActiveState = (action === 'sort-asc' && state.sorted === 'asc') ||
+                               (action === 'sort-desc' && state.sorted === 'desc');
+        if (!hasActiveState) {
+          (item as HTMLElement).style.backgroundColor = 'transparent';
+        }
       });
 
       item.addEventListener('click', () => {
@@ -768,6 +961,12 @@ export class TableManager {
             break;
           case 'filter':
             onFilter();
+            break;
+          case 'clear-sort':
+            if (onClearSort) onClearSort();
+            break;
+          case 'clear-filter':
+            if (onClearFilter) onClearFilter();
             break;
         }
 

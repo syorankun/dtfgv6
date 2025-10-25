@@ -233,6 +233,10 @@ export class UIManager {
                   <span class="ribbon-icon">📂</span>
                   <span class="ribbon-label">Barra Lateral</span>
                 </button>
+                <button id="btn-toggle-right-panel" class="ribbon-btn">
+                  <span class="ribbon-icon">📊</span>
+                  <span class="ribbon-label">Painéis Direita</span>
+                </button>
                 <button id="btn-toggle-formula-bar" class="ribbon-btn">
                   <span class="ribbon-icon">ƒx</span>
                   <span class="ribbon-label">Barra Fórmulas</span>
@@ -245,7 +249,7 @@ export class UIManager {
             </div>
 
             <div class="ribbon-group">
-              <div class="ribbon-group-title">Painéis</div>
+              <div class="ribbon-group-title">Painéis Individuais</div>
               <div class="ribbon-buttons">
                 <button id="btn-toggle-console-panel" class="ribbon-btn">
                   <span class="ribbon-icon">📝</span>
@@ -350,8 +354,10 @@ export class UIManager {
       <input type="file" id="file-input" accept=".csv,.xlsx,.xls,.json" style="display: none;" />
     `;
 
-    // Ensure sidebar is visible by default
+    // Ensure sidebar is visible by default, right panels container visible but individual panels hidden
     document.querySelector('.sidebar')?.classList.remove('collapsed');
+    document.querySelector('.panels')?.classList.remove('collapsed');
+    // Individual panels (console and info) remain hidden by default (class="hidden" in HTML)
 
     this.setupGrid();
     this.listenForUIChanges();
@@ -577,12 +583,18 @@ export class UIManager {
       sidebar?.classList.toggle('collapsed');
     });
 
+    document.getElementById('btn-toggle-right-panel')?.addEventListener('click', () => {
+      const panels = document.querySelector('.panels');
+      panels?.classList.toggle('collapsed');
+      logger.info('[UIManager] Right panels toggled', { visible: !panels?.classList.contains('collapsed') });
+    });
+
     document.getElementById('btn-toggle-formula-bar')?.addEventListener('click', () => {
       const formulaBar = document.querySelector('.formula-bar');
       formulaBar?.classList.toggle('hidden');
     });
 
-    // Panel toggle buttons
+    // Panel toggle buttons (individual)
     document.getElementById('btn-toggle-console-panel')?.addEventListener('click', () => {
       const consolePanel = document.getElementById('panel-console');
       const button = document.getElementById('btn-toggle-console-panel');

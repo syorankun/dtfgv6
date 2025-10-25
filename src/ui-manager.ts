@@ -187,15 +187,15 @@ export class UIManager {
             <div class="ribbon-group">
               <div class="ribbon-group-title">Ferramentas de Dados</div>
               <div class="ribbon-buttons">
-                <button class="ribbon-btn">
+                <button id="btn-filter-data" class="ribbon-btn">
                   <span class="ribbon-icon">🔍</span>
                   <span class="ribbon-label">Filtrar</span>
                 </button>
-                <button class="ribbon-btn">
+                <button id="btn-sort-data" class="ribbon-btn">
                   <span class="ribbon-icon">↕️</span>
                   <span class="ribbon-label">Ordenar</span>
                 </button>
-                <button class="ribbon-btn">
+                <button id="btn-data-validation" class="ribbon-btn">
                   <span class="ribbon-icon">🔗</span>
                   <span class="ribbon-label">Validação</span>
                 </button>
@@ -480,14 +480,60 @@ export class UIManager {
       fileInput?.click();
     });
 
-    document.getElementById('btn-export')?.addEventListener('click', () => {
+    document.getElementById('btn-export')?.addEventListener('click', async () => {
       const wb = kernel.workbookManager.getActiveWorkbook();
       if (!wb) {
         alert('Nenhum workbook ativo');
         return;
       }
-      // TODO: Implement export functionality
 
+      const format = prompt('Formato de exportação (csv, xlsx, json):', 'csv');
+      if (!format || !['csv', 'xlsx', 'json'].includes(format.toLowerCase())) {
+        return;
+      }
+
+      try {
+        const { FileWriter } = await import('./@core/io-transform-consolidated');
+        const sheet = wb.getActiveSheet();
+
+        if (!sheet) {
+          alert('Nenhuma sheet ativa');
+          return;
+        }
+
+        let blob: Blob;
+        let fileName: string;
+
+        switch (format.toLowerCase()) {
+          case 'csv':
+            blob = FileWriter.exportCSV(sheet);
+            fileName = `${wb.name}_${sheet.name}.csv`;
+            break;
+          case 'xlsx':
+            blob = FileWriter.exportXLSX(wb);
+            fileName = `${wb.name}.xlsx`;
+            break;
+          case 'json':
+            blob = FileWriter.exportJSON(sheet);
+            fileName = `${wb.name}_${sheet.name}.json`;
+            break;
+          default:
+            return;
+        }
+
+        // Download file
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = fileName;
+        a.click();
+        URL.revokeObjectURL(url);
+
+        logger.info('[UIManager] File exported', { fileName, format });
+      } catch (error) {
+        logger.error('[UIManager] Export failed', error);
+        alert(`Erro ao exportar: ${error}`);
+      }
     });
 
     // View toggle buttons
@@ -578,10 +624,391 @@ export class UIManager {
     });
 
     document.getElementById('btn-settings')?.addEventListener('click', () => {
-      alert('Configurações em construção!');
+      this.showSettingsModal();
+    });
+
+    // Formatting buttons
+    document.getElementById('btn-bold')?.addEventListener('click', () => {
+      this.applyFormatting({ bold: true });
+    });
+
+    document.getElementById('btn-italic')?.addEventListener('click', () => {
+      this.applyFormatting({ italic: true });
+    });
+
+    document.getElementById('btn-color')?.addEventListener('click', () => {
+      const color = prompt('Digite a cor (ex: #ff0000, red, rgb(255,0,0)):');
+      if (color) {
+        this.applyFormatting({ textColor: color });
+      }
+    });
+
+    document.getElementById('btn-align-left')?.addEventListener('click', () => {
+      this.applyFormatting({ alignment: 'left' });
+    });
+
+    document.getElementById('btn-align-center')?.addEventListener('click', () => {
+      this.applyFormatting({ alignment: 'center' });
+    });
+
+    document.getElementById('btn-align-right')?.addEventListener('click', () => {
+      this.applyFormatting({ alignment: 'right' });
+    });
+
+    // File input change listener
+    const fileInput = document.getElementById('file-input') as HTMLInputElement;
+    fileInput?.addEventListener('change', async (e) => {
+      await this.handleFileImport(e);
+    });
+
+    // Autosum button
+    document.getElementById('btn-autosum')?.addEventListener('click', () => {
+      this.insertAutoSum();
+    });
+
+    // Function helper buttons
+    document.getElementById('btn-math-functions')?.addEventListener('click', () => {
+      this.showFunctionHelper('math');
+    });
+
+    document.getElementById('btn-stats-functions')?.addEventListener('click', () => {
+      this.showFunctionHelper('stats');
+    });
+
+    document.getElementById('btn-financial-functions')?.addEventListener('click', () => {
+      this.showFunctionHelper('financial');
+    });
+
+    // Zoom buttons
+    document.getElementById('btn-zoom-in')?.addEventListener('click', () => {
+      this.adjustZoom(1.1);
+    });
+
+    document.getElementById('btn-zoom-out')?.addEventListener('click', () => {
+      this.adjustZoom(0.9);
+    });
+
+    document.getElementById('btn-zoom-reset')?.addEventListener('click', () => {
+      this.resetZoom();
+    });
+
+    // Toggle gridlines
+    document.getElementById('btn-toggle-gridlines')?.addEventListener('click', () => {
+      this.toggleGridlines();
+    });
+
+    // Data tools buttons
+    document.getElementById('btn-filter-data')?.addEventListener('click', () => {
+      alert('Filtrar dados: funcionalidade em desenvolvimento\n\nEm breve você poderá filtrar dados por coluna.');
+    });
+
+    document.getElementById('btn-sort-data')?.addEventListener('click', () => {
+      alert('Ordenar dados: funcionalidade em desenvolvimento\n\nEm breve você poderá ordenar dados por coluna.');
+    });
+
+    document.getElementById('btn-data-validation')?.addEventListener('click', () => {
+      alert('Validação de dados: funcionalidade em desenvolvimento\n\nEm breve você poderá definir regras de validação para células.');
     });
 
     logger.info('[UIManager] Event listeners configured');
+  }
+
+  private applyFormatting(format: Partial<import('./@core/types').CellFormat>): void {
+    const selection = this.grid?.getSelection();
+    const sheet = this.grid?.getSheet();
+
+    if (!selection || !sheet) {
+      alert('Selecione uma célula primeiro');
+      return;
+    }
+
+    // Apply formatting to all cells in selection
+    for (let row = selection.start.row; row <= selection.end.row; row++) {
+      for (let col = selection.start.col; col <= selection.end.col; col++) {
+        const cell = sheet.getCell(row, col) || { value: '', type: 'auto' as const };
+        const currentFormat = cell.format || {};
+
+        // Merge formats
+        const newFormat = { ...currentFormat, ...format };
+
+        sheet.setCell(row, col, cell.value, { ...cell, format: newFormat });
+      }
+    }
+
+    this.grid?.render();
+    logger.info('[UIManager] Formatting applied', format);
+  }
+
+  private async handleFileImport(e: Event): Promise<void> {
+    const input = e.target as HTMLInputElement;
+    const file = input.files?.[0];
+
+    if (!file) return;
+
+    try {
+      const { FileReader: DataForgeFileReader } = await import('./@core/io-transform-consolidated');
+
+      const data = await DataForgeFileReader.readAuto(file);
+
+      // Create new workbook with imported data
+      const wb = kernel.workbookManager.createWorkbook(file.name.replace(/\.[^/.]+$/, ''));
+      const sheet = wb.getActiveSheet();
+
+      if (sheet && data && data.length > 0) {
+        // Populate sheet with data
+        data.forEach((row: any[], rowIdx: number) => {
+          row.forEach((value: any, colIdx: number) => {
+            sheet.setCell(rowIdx, colIdx, value);
+          });
+        });
+
+        kernel.workbookManager.setActiveWorkbook(wb.id);
+        this.refreshWorkbookList();
+        this.refreshSheetList();
+        this.refreshGrid();
+
+        logger.info('[UIManager] File imported successfully', { fileName: file.name, rows: data.length });
+      }
+    } catch (error) {
+      logger.error('[UIManager] Import failed', error);
+      alert(`Erro ao importar arquivo: ${error}`);
+    }
+
+    // Reset input
+    input.value = '';
+  }
+
+  private insertAutoSum(): void {
+    const selection = this.grid?.getSelection();
+    const sheet = this.grid?.getSheet();
+
+    if (!selection || !sheet) {
+      alert('Selecione uma célula primeiro');
+      return;
+    }
+
+    const row = selection.start.row;
+    const col = selection.start.col;
+
+    // Try to detect range above
+    let rangeStart = row - 1;
+    let rangeEnd = row - 1;
+
+    while (rangeStart >= 0) {
+      const cell = sheet.getCell(rangeStart, col);
+      if (!cell || (cell.type !== 'number' && !cell.formula)) break;
+      rangeEnd = rangeStart;
+      rangeStart--;
+    }
+
+    if (rangeEnd < row - 1) {
+      // Found numbers above
+      const colName = sheet.getColumnName(col);
+      const formula = `=SOMA(${colName}${rangeEnd + 1}:${colName}${row})`;
+      sheet.setCell(row, col, 0, { formula });
+      kernel.recalculate(sheet.id);
+      this.grid?.render();
+      logger.info('[UIManager] AutoSum inserted', { formula });
+      return;
+    }
+
+    // Try to detect range to the left
+    rangeStart = col - 1;
+    rangeEnd = col - 1;
+
+    while (rangeStart >= 0) {
+      const cell = sheet.getCell(row, rangeStart);
+      if (!cell || (cell.type !== 'number' && !cell.formula)) break;
+      rangeEnd = rangeStart;
+      rangeStart--;
+    }
+
+    if (rangeEnd < col - 1) {
+      // Found numbers to the left
+      const startColName = sheet.getColumnName(rangeEnd);
+      const endColName = sheet.getColumnName(col - 1);
+      const formula = `=SOMA(${startColName}${row + 1}:${endColName}${row + 1})`;
+      sheet.setCell(row, col, 0, { formula });
+      kernel.recalculate(sheet.id);
+      this.grid?.render();
+      logger.info('[UIManager] AutoSum inserted', { formula });
+      return;
+    }
+
+    alert('Não foi possível detectar um range de números para somar');
+  }
+
+  private showFunctionHelper(category: string): void {
+    const functions: Record<string, string[]> = {
+      math: ['SOMA', 'MÉDIA', 'MÁXIMO', 'MÍNIMO', 'ARREDONDAR', 'ABS', 'RAIZ', 'POTÊNCIA'],
+      stats: ['CONT.NÚM', 'CONT.VALORES', 'MÉDIA', 'MÁXIMO', 'MÍNIMO'],
+      financial: ['PROCV', 'SE', 'E', 'OU']
+    };
+
+    const funcList = functions[category] || [];
+    const funcNames = funcList.join(', ');
+
+    alert(`Funções disponíveis (${category}):\n\n${funcNames}\n\nDigite na célula: =NOME_FUNÇÃO(argumentos)`);
+  }
+
+  private zoomLevel = 1.0;
+
+  private adjustZoom(factor: number): void {
+    this.zoomLevel *= factor;
+    this.zoomLevel = Math.max(0.5, Math.min(2.0, this.zoomLevel));
+
+    const gridWrapper = document.querySelector('.grid-wrapper') as HTMLElement;
+    if (gridWrapper) {
+      gridWrapper.style.transform = `scale(${this.zoomLevel})`;
+      gridWrapper.style.transformOrigin = 'top left';
+    }
+
+    logger.info('[UIManager] Zoom adjusted', { level: this.zoomLevel });
+  }
+
+  private resetZoom(): void {
+    this.zoomLevel = 1.0;
+    const gridWrapper = document.querySelector('.grid-wrapper') as HTMLElement;
+    if (gridWrapper) {
+      gridWrapper.style.transform = 'scale(1)';
+    }
+    logger.info('[UIManager] Zoom reset');
+  }
+
+  private gridlinesVisible = true;
+
+  private toggleGridlines(): void {
+    this.gridlinesVisible = !this.gridlinesVisible;
+    // This would need to be implemented in VirtualGrid
+    // For now, just log
+    logger.info('[UIManager] Gridlines toggled', { visible: this.gridlinesVisible });
+    alert('Toggle gridlines: funcionalidade em desenvolvimento');
+  }
+
+  private showSettingsModal(): void {
+    const modalId = 'settings-modal';
+    // Remover modal existente para evitar duplicatas
+    document.getElementById(modalId)?.remove();
+
+    const currentTheme = localStorage.getItem('theme') || 'light';
+
+    const modalHTML = `
+      <div id="${modalId}" class="modal-overlay" style="background: var(--theme-overlay-background, rgba(0,0,0,0.5));">
+        <div class="modal" id="settings-wizard-modal" style="background: var(--theme-bg-primary); box-shadow: var(--shadow-lg);">
+          <div class="modal-header" id="settings-modal-header" style="border-bottom: 1px solid var(--theme-border-color);">
+            <h2 style="color: var(--theme-text-primary);">⚙️ Configurações</h2>
+            <button class="close-button" id="settings-modal-close">&times;</button>
+          </div>
+          <div class="modal-content">
+            <div class="form-group">
+              <label for="theme-select">Tema:</label>
+              <select id="theme-select" class="form-control" style="background: var(--theme-bg-primary); color: var(--theme-text-primary);">
+                <option value="light" ${currentTheme === 'light' ? 'selected' : ''}>Claro</option>
+                <option value="dark" ${currentTheme === 'dark' ? 'selected' : ''}>Escuro</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label for="language-select">Idioma:</label>
+              <select id="language-select" class="form-control" style="background: var(--theme-bg-primary); color: var(--theme-text-primary);">
+                <option value="pt-BR" selected>Português (Brasil)</option>
+                <option value="en-US">English (US)</option>
+              </select>
+            </div>
+            <!-- Adicionar mais opções de configuração aqui -->
+          </div>
+          <div class="modal-actions">
+            <button class="btn" id="settings-modal-cancel">Cancelar</button>
+            <button class="btn btn-primary" id="settings-modal-save">Salvar</button>
+          </div>
+        </div>
+      </div>
+    `;
+
+    document.body.insertAdjacentHTML('beforeend', modalHTML);
+
+    const settingsModal = document.getElementById(modalId);
+    const settingsWizardModal = document.getElementById('settings-wizard-modal');
+    const settingsModalHeader = document.getElementById('settings-modal-header');
+
+    if (settingsModal && settingsWizardModal && settingsModalHeader) {
+      // Fechar modal
+      document.getElementById('settings-modal-close')?.addEventListener('click', () => settingsModal.remove());
+      document.getElementById('settings-modal-cancel')?.addEventListener('click', () => settingsModal.remove());
+
+      // Salvar configurações
+      document.getElementById('settings-modal-save')?.addEventListener('click', () => {
+        const themeSelect = document.getElementById('theme-select') as HTMLSelectElement;
+        const selectedTheme = themeSelect.value;
+
+        // Aplicar e salvar tema
+        if (selectedTheme === 'dark') {
+          this.app.classList.add('dark');
+          localStorage.setItem('theme', 'dark');
+        } else {
+          this.app.classList.remove('dark');
+          localStorage.setItem('theme', 'light');
+        }
+        this.grid?.render(); // Re-renderiza a grid após a mudança de tema
+
+        // Salvar outras configurações (ex: idioma)
+        const languageSelect = document.getElementById('language-select') as HTMLSelectElement;
+        // TODO: Implementar sistema de configurações globais
+        // kernel.settings.set('language', languageSelect.value);
+        localStorage.setItem('language', languageSelect.value);
+
+        settingsModal.remove();
+        logger.info('[UIManager] Configurações salvas.');
+      });
+
+      // Tornar modal arrastável
+      this.makeModalDraggable(settingsWizardModal, settingsModalHeader);
+    }
+  }
+
+  private makeModalDraggable(modalElement: HTMLElement, dragHandle: HTMLElement): void {
+    let isDragging = false;
+    let currentX: number;
+    let currentY: number;
+    let initialX: number;
+    let initialY: number;
+    let xOffset = 0;
+    let yOffset = 0;
+
+    dragHandle.addEventListener('mousedown', dragStart);
+    document.addEventListener('mouseup', dragEnd);
+    document.addEventListener('mousemove', drag);
+
+    function dragStart(e: MouseEvent) {
+      initialX = e.clientX - xOffset;
+      initialY = e.clientY - yOffset;
+
+      if (e.target === dragHandle) {
+        isDragging = true;
+      }
+    }
+
+    function dragEnd(_e: MouseEvent) {
+      initialX = currentX;
+      initialY = currentY;
+      isDragging = false;
+    }
+
+    function drag(e: MouseEvent) {
+      if (isDragging) {
+        e.preventDefault();
+        currentX = e.clientX - initialX;
+        currentY = e.clientY - initialY;
+
+        xOffset = currentX;
+        yOffset = currentY;
+
+        setTranslate(currentX, currentY, modalElement);
+      }
+    }
+
+    function setTranslate(xPos: number, yPos: number, el: HTMLElement) {
+      el.style.transform = `translate3d(${xPos}px, ${yPos}px, 0)`;
+    }
   }
 
   public refreshWorkbookList(): void {

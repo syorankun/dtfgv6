@@ -596,20 +596,34 @@ export class FormulaRegistry {
   private flattenNumbers(args: any[]): number[] {
     const result: number[] = [];
 
-    for (const arg of args) {
-      if (Array.isArray(arg)) {
-        result.push(...this.flattenNumbers(arg));
-      } else if (typeof arg === "object" && arg !== null && "value" in arg) {
+    const flatten = (item: any): void => {
+      if (Array.isArray(item)) {
+        // Recursively flatten arrays (handles Cell[][] from ranges)
+        item.forEach(flatten);
+      } else if (typeof item === "object" && item !== null && "value" in item) {
         // Handle Cell objects from getRange
-        const val = arg.value;
+        const val = item.value;
         if (typeof val === "number" && !isNaN(val)) {
           result.push(val);
+        } else if (typeof val === "string") {
+          // Try to parse string as number
+          const parsed = parseFloat(val);
+          if (!isNaN(parsed)) {
+            result.push(parsed);
+          }
         }
-      } else if (typeof arg === "number" && !isNaN(arg)) {
-        result.push(arg);
+      } else if (typeof item === "number" && !isNaN(item)) {
+        result.push(item);
+      } else if (typeof item === "string") {
+        // Try to parse string as number
+        const parsed = parseFloat(item);
+        if (!isNaN(parsed)) {
+          result.push(parsed);
+        }
       }
-    }
+    };
 
+    args.forEach(flatten);
     return result;
   }
 }
@@ -677,6 +691,8 @@ export class CalcEngine {
   private parser: FormulaParser;
   private registry: FormulaRegistry;
   private cache: Map<string, any> = new Map();
+  private dependencyCache: Map<string, Set<string>> = new Map(); // cellRef -> Set of cells it depends on
+  private reverseDependencyCache: Map<string, Set<string>> = new Map(); // cellRef -> Set of cells that depend on it
 
   constructor() {
     this.parser = new FormulaParser();
@@ -685,6 +701,34 @@ export class CalcEngine {
 
   async init(): Promise<void> {
     // Future: load custom functions from storage
+  }
+
+  /**
+   * Invalidate cache for a cell and all cells that depend on it
+   */
+  invalidateCell(cellRef: string): void {
+    // Clear the cell's own cache
+    this.cache.delete(cellRef);
+
+    // Get all cells that depend on this cell
+    const dependents = this.reverseDependencyCache.get(cellRef);
+    if (dependents) {
+      // Recursively invalidate all dependents
+      dependents.forEach(dependent => {
+        if (this.cache.has(dependent)) {
+          this.invalidateCell(dependent);
+        }
+      });
+    }
+  }
+
+  /**
+   * Clear all caches
+   */
+  clearAllCaches(): void {
+    this.cache.clear();
+    this.dependencyCache.clear();
+    this.reverseDependencyCache.clear();
   }
 
   /**
@@ -747,9 +791,25 @@ export class CalcEngine {
     if (!cell?.formula) return;
 
     try {
+      // Track dependencies for this cell
+      const dependencies = new Set<string>();
+
       const tokens = this.parser.tokenize(cell.formula);
       const ast = this.parser.parse(tokens);
-      const result = await this.evalAST(ast, sheet);
+      const result = await this.evalASTWithTracking(ast, sheet, dependencies);
+
+      console.log(`[CalcEngine] Cell ${cellRef} formula "${cell.formula}" => result:`, result, typeof result);
+
+      // Store dependency info
+      this.dependencyCache.set(cellRef, dependencies);
+
+      // Update reverse dependencies (which cells depend on this cell's dependencies)
+      dependencies.forEach(depRef => {
+        if (!this.reverseDependencyCache.has(depRef)) {
+          this.reverseDependencyCache.set(depRef, new Set());
+        }
+        this.reverseDependencyCache.get(depRef)!.add(cellRef);
+      });
 
       // Update cell value
       sheet.setCell(coord.row, coord.col, result, {
@@ -759,10 +819,61 @@ export class CalcEngine {
 
       this.cache.set(cellRef, result);
     } catch (error: any) {
+      console.error(`[CalcEngine] Error in cell ${cellRef}:`, error);
       sheet.setCell(coord.row, coord.col, `#ERROR!`, {
         formula: cell.formula,
         type: "error",
       });
+    }
+  }
+
+  private async evalASTWithTracking(node: ASTNode, sheet: Sheet, dependencies: Set<string>): Promise<any> {
+    switch (node.type) {
+      case "Literal":
+        return node.value;
+
+      case "CellRef":
+        const cellRefValue = node.value!;
+        dependencies.add(cellRefValue);
+        const coord = this.cellRefToCoord(cellRefValue);
+        return sheet.getCellValue(coord.row, coord.col);
+
+      case "RangeRef":
+        // Track all cells in the range as dependencies
+        const start = this.cellRefToCoord(node.startCell!);
+        const end = this.cellRefToCoord(node.endCell!);
+
+        for (let r = start.row; r <= end.row; r++) {
+          for (let c = start.col; c <= end.col; c++) {
+            dependencies.add(this.coordToCellRef(r, c));
+          }
+        }
+
+        return sheet.getRange(start.row, start.col, end.row, end.col);
+
+      case "BinaryOp":
+        const left = await this.evalASTWithTracking(node.left!, sheet, dependencies);
+        const right = await this.evalASTWithTracking(node.right!, sheet, dependencies);
+        return this.evalBinaryOp(node.operator!, left, right);
+
+      case "UnaryOp":
+        const operand = await this.evalASTWithTracking(node.operand!, sheet, dependencies);
+        return this.evalUnaryOp(node.operator!, operand);
+
+      case "FunctionCall":
+        const fnSpec = this.registry.get(node.name!);
+        if (!fnSpec) {
+          throw new Error(`Unknown function: ${node.name}`);
+        }
+
+        const args = await Promise.all(
+          (node.args || []).map(arg => this.evalASTWithTracking(arg, sheet, dependencies))
+        );
+
+        return fnSpec.impl(...args);
+
+      default:
+        throw new Error(`Unknown AST node type: ${node.type}`);
     }
   }
 
@@ -875,6 +986,69 @@ export class CalcEngine {
 
   getRegistry(): FormulaRegistry {
     return this.registry;
+  }
+
+  /**
+   * Adjust a formula when copying from one cell to another
+   * Handles relative and absolute references ($A$1, $A1, A$1, A1)
+   */
+  adjustFormula(formula: string, fromRow: number, fromCol: number, toRow: number, toCol: number): string {
+    const rowOffset = toRow - fromRow;
+    const colOffset = toCol - fromCol;
+
+    if (rowOffset === 0 && colOffset === 0) {
+      return formula;
+    }
+
+    // Remove the leading '=' if present
+    const cleanFormula = formula.startsWith('=') ? formula.substring(1) : formula;
+
+    // Replace cell references with adjusted ones
+    const adjusted = cleanFormula.replace(
+      /(\$?)([A-Z]+)(\$?)(\d+)/g,
+      (_match, colAbs, col, rowAbs, row) => {
+        // Convert column letters to number
+        const colNum = this.columnNameToNumber(col);
+        const rowNum = parseInt(row, 10) - 1; // Convert to 0-indexed
+
+        // Adjust based on absolute/relative markers
+        const newCol = colAbs === '$' ? colNum : colNum + colOffset;
+        const newRow = rowAbs === '$' ? rowNum : rowNum + rowOffset;
+
+        // Ensure we don't go negative
+        const finalCol = Math.max(0, newCol);
+        const finalRow = Math.max(0, newRow);
+
+        // Convert back to column name
+        const newColName = this.numberToColumnName(finalCol);
+        const newRowName = finalRow + 1; // Convert back to 1-indexed
+
+        return `${colAbs}${newColName}${rowAbs}${newRowName}`;
+      }
+    );
+
+    return '=' + adjusted;
+  }
+
+  private columnNameToNumber(name: string): number {
+    let result = 0;
+    for (let i = 0; i < name.length; i++) {
+      result = result * 26 + (name.charCodeAt(i) - 'A'.charCodeAt(0) + 1);
+    }
+    return result - 1; // Convert to 0-indexed
+  }
+
+  private numberToColumnName(num: number): string {
+    let result = '';
+    let n = num + 1; // Convert to 1-indexed
+
+    while (n > 0) {
+      const remainder = (n - 1) % 26;
+      result = String.fromCharCode('A'.charCodeAt(0) + remainder) + result;
+      n = Math.floor((n - 1) / 26);
+    }
+
+    return result;
   }
 
   private cellRefToCoord(ref: string): { row: number; col: number } {

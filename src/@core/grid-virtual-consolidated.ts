@@ -231,7 +231,13 @@ class CellRenderer {
 // ============================================================================
 
 class ClipboardManager {
-  private data: any[][] | null = null;
+  private data: Cell[][] | null = null;
+  private sourceRange: {
+    startRow: number;
+    startCol: number;
+    endRow: number;
+    endCol: number;
+  } | null = null;
 
   copy(
     sheet: Sheet,
@@ -243,12 +249,14 @@ class ClipboardManager {
     }
   ): void {
     this.data = [];
+    this.sourceRange = { ...range };
 
     for (let r = range.startRow; r <= range.endRow; r++) {
-      const row: any[] = [];
+      const row: Cell[] = [];
       for (let c = range.startCol; c <= range.endCol; c++) {
         const cell = sheet.getCell(r, c);
-        row.push(cell?.value ?? "");
+        // Copy the entire cell object, not just the value
+        row.push(cell ? { ...cell } : { value: null, type: 'auto' as const });
       }
       this.data.push(row);
     }
@@ -256,19 +264,123 @@ class ClipboardManager {
     logger.debug("[Clipboard] Copied", {
       rows: this.data.length,
       cols: this.data[0]?.length,
+      formulas: this.countFormulas(),
     });
   }
 
-  paste(sheet: Sheet, startRow: number, startCol: number): void {
-    if (!this.data) return;
+  paste(sheet: Sheet, startRow: number, startCol: number, calcEngine?: any): void {
+    if (!this.data || !this.sourceRange) return;
 
     for (let r = 0; r < this.data.length; r++) {
       for (let c = 0; c < this.data[r].length; c++) {
-        sheet.setCell(startRow + r, startCol + c, this.data[r][c]);
+        const sourceCell = this.data[r][c];
+        const targetRow = startRow + r;
+        const targetCol = startCol + c;
+
+        // If cell has a formula, adjust it for the new position
+        if (sourceCell.formula && calcEngine) {
+          const fromRow = this.sourceRange.startRow + r;
+          const fromCol = this.sourceRange.startCol + c;
+
+          const adjustedFormula = calcEngine.adjustFormula(
+            sourceCell.formula,
+            fromRow,
+            fromCol,
+            targetRow,
+            targetCol
+          );
+
+          sheet.setCell(targetRow, targetCol, '', {
+            formula: adjustedFormula,
+            type: 'formula',
+            format: sourceCell.format
+          });
+        } else {
+          // Regular cell - just copy the value and format
+          sheet.setCell(targetRow, targetCol, sourceCell.value, {
+            type: sourceCell.type,
+            format: sourceCell.format
+          });
+        }
       }
     }
 
-    logger.debug("[Clipboard] Pasted", { at: `${startRow},${startCol}` });
+    logger.debug("[Clipboard] Pasted with formula adjustment", { at: `${startRow},${startCol}` });
+  }
+
+  fillDown(sheet: Sheet, range: { startRow: number; startCol: number; endRow: number; endCol: number }, calcEngine?: any): void {
+    for (let c = range.startCol; c <= range.endCol; c++) {
+      const sourceCell = sheet.getCell(range.startRow, c);
+      if (!sourceCell) continue;
+
+      for (let r = range.startRow + 1; r <= range.endRow; r++) {
+        if (sourceCell.formula && calcEngine) {
+          const adjustedFormula = calcEngine.adjustFormula(
+            sourceCell.formula,
+            range.startRow,
+            c,
+            r,
+            c
+          );
+
+          sheet.setCell(r, c, '', {
+            formula: adjustedFormula,
+            type: 'formula',
+            format: sourceCell.format
+          });
+        } else {
+          sheet.setCell(r, c, sourceCell.value, {
+            type: sourceCell.type,
+            format: sourceCell.format
+          });
+        }
+      }
+    }
+
+    logger.debug("[Clipboard] Filled down", { range });
+  }
+
+  fillRight(sheet: Sheet, range: { startRow: number; startCol: number; endRow: number; endCol: number }, calcEngine?: any): void {
+    for (let r = range.startRow; r <= range.endRow; r++) {
+      const sourceCell = sheet.getCell(r, range.startCol);
+      if (!sourceCell) continue;
+
+      for (let c = range.startCol + 1; c <= range.endCol; c++) {
+        if (sourceCell.formula && calcEngine) {
+          const adjustedFormula = calcEngine.adjustFormula(
+            sourceCell.formula,
+            r,
+            range.startCol,
+            r,
+            c
+          );
+
+          sheet.setCell(r, c, '', {
+            formula: adjustedFormula,
+            type: 'formula',
+            format: sourceCell.format
+          });
+        } else {
+          sheet.setCell(r, c, sourceCell.value, {
+            type: sourceCell.type,
+            format: sourceCell.format
+          });
+        }
+      }
+    }
+
+    logger.debug("[Clipboard] Filled right", { range });
+  }
+
+  private countFormulas(): number {
+    if (!this.data) return 0;
+    let count = 0;
+    for (const row of this.data) {
+      for (const cell of row) {
+        if (cell.formula) count++;
+      }
+    }
+    return count;
   }
 
   hasData(): boolean {
@@ -696,6 +808,18 @@ export class VirtualGrid {
         if (e.ctrlKey || e.metaKey) {
           e.preventDefault();
           this.pasteSelection();
+        }
+        break;
+      case 'd':
+        if (e.ctrlKey || e.metaKey) {
+          e.preventDefault();
+          this.fillDown();
+        }
+        break;
+      case 'r':
+        if (e.ctrlKey || e.metaKey) {
+          e.preventDefault();
+          this.fillRight();
         }
         break;
       case 'F2':
@@ -1289,14 +1413,43 @@ export class VirtualGrid {
 
     const range = this.selectionManager.getRange();
     this.clipboardManager.copy(this.sheet, range);
+    logger.info('[Grid] Copied selection', range);
   }
 
   private pasteSelection(): void {
     if (!this.sheet) return;
 
     const activeCell = this.selectionManager.getActiveCell();
-    this.clipboardManager.paste(this.sheet, activeCell.row, activeCell.col);
+    this.clipboardManager.paste(this.sheet, activeCell.row, activeCell.col, this.kernel.calcEngine);
+
+    // Recalculate after paste
+    this.kernel.recalculate(this.sheet.id);
     this.render();
+    logger.info('[Grid] Pasted at', activeCell);
+  }
+
+  private fillDown(): void {
+    if (!this.sheet) return;
+
+    const range = this.selectionManager.getRange();
+    this.clipboardManager.fillDown(this.sheet, range, this.kernel.calcEngine);
+
+    // Recalculate after fill
+    this.kernel.recalculate(this.sheet.id);
+    this.render();
+    logger.info('[Grid] Filled down', range);
+  }
+
+  private fillRight(): void {
+    if (!this.sheet) return;
+
+    const range = this.selectionManager.getRange();
+    this.clipboardManager.fillRight(this.sheet, range, this.kernel.calcEngine);
+
+    // Recalculate after fill
+    this.kernel.recalculate(this.sheet.id);
+    this.render();
+    logger.info('[Grid] Filled right', range);
   }
 
   private deleteSelection(): void {
@@ -1318,7 +1471,7 @@ export class VirtualGrid {
   // UTILITIES
   // --------------------------------------------------------------------------
 
-  private getCellAt(x: number, y: number): { row: number; col: number } | null {
+  public getCellAt(x: number, y: number): { row: number; col: number } | null {
     if (x < this.headerWidth || y < this.headerHeight) {
       return null;
     }

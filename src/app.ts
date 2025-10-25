@@ -40,6 +40,12 @@ class DJDataForgeApp {
       // Load plugins
       await this.loadBuiltInPlugins();
 
+      // Load saved custom plugins
+      await this.uiManager.loadSavedPlugins();
+
+      // Refresh plugin count in UI
+      this.uiManager.refreshPluginCount();
+
       this.uiManager.hideLoading();
       this.setupErrorHandler();
       logger.info('[App] Application ready - ALL PHASES COMPLETE!');

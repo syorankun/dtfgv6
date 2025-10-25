@@ -456,8 +456,10 @@ export class UIManager {
     const isDarkMode = localStorage.getItem('theme') === 'dark';
     if (isDarkMode) {
       this.app.classList.add('dark');
+      document.body.classList.add('dark');
     } else {
       this.app.classList.remove('dark');
+      document.body.classList.remove('dark');
     }
   }
 
@@ -676,7 +678,8 @@ export class UIManager {
 
     // Header buttons
     document.getElementById('btn-toggle-dark-mode')?.addEventListener('click', () => {
-      this.app.classList.toggle('dark'); // Alterado para this.app
+      this.app.classList.toggle('dark');
+      document.body.classList.toggle('dark');
       const isDarkMode = this.app.classList.contains('dark');
       if (isDarkMode) {
         localStorage.setItem('theme', 'dark');

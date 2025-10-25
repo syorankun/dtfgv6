@@ -90,28 +90,42 @@ import type {
     }
     
     showToast(message: string, type: "info" | "success" | "warning" | "error"): void {
+      const toastId = `toast-${Date.now()}`;
       const toast = document.createElement('div');
+      toast.id = toastId;
       toast.className = `toast toast-${type}`;
-      toast.textContent = message;
-      toast.style.cssText = `
-        position: fixed;
-        top: 20px;
-        right: 20px;
-        padding: 12px 20px;
-        background: ${type === 'error' ? '#ef4444' : type === 'success' ? '#10b981' : type === 'warning' ? '#f59e0b' : '#3b82f6'};
-        color: white;
-        border-radius: 6px;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-        z-index: 10000;
-        animation: slideIn 0.3s ease-out;
-      `;
+      
+      const icon = document.createElement('span');
+      icon.className = 'toast-icon';
+      if (type === 'success') icon.textContent = '✅';
+      if (type === 'error') icon.textContent = '❌';
+      if (type === 'info') icon.textContent = 'ℹ️';
+      if (type === 'warning') icon.textContent = '⚠️';
+      
+      const messageSpan = document.createElement('span');
+      messageSpan.textContent = message;
+      
+      const closeButton = document.createElement('button');
+      closeButton.textContent = '×';
+      closeButton.className = 'toast-close';
+      closeButton.onclick = () => {
+        toast.classList.add('slideOut');
+        setTimeout(() => toast.remove(), 300);
+      };
+      
+      toast.appendChild(icon);
+      toast.appendChild(messageSpan);
+      toast.appendChild(closeButton);
       
       document.body.appendChild(toast);
       
       setTimeout(() => {
-        toast.style.animation = 'slideOut 0.3s ease-out';
-        setTimeout(() => toast.remove(), 300);
-      }, 3000);
+        const el = document.getElementById(toastId);
+        if (el) {
+          el.classList.add('slideOut');
+          setTimeout(() => el.remove(), 300);
+        }
+      }, 5000);
     }
     
     cleanup(): void {

@@ -504,6 +504,8 @@ export class ImageWidgetRenderer {
   }
 }
 
+import { kernel } from './kernel';
+
 // ============================================================================
 // TABLE WIDGET RENDERER (Melhorado)
 // ============================================================================
@@ -561,6 +563,18 @@ export class TableWidgetRenderer {
     htmlTable.style.borderCollapse = 'collapse';
     htmlTable.style.fontSize = '13px';
 
+    const tableSheet = kernel.workbookManager.getSheet(table.sheetId);
+
+    if (!tableSheet) {
+        const errorRow = document.createElement('tr');
+        const errorCell = document.createElement('td');
+        errorCell.colSpan = table.columns.length || 1;
+        errorCell.innerHTML = `<div style="color: #ef4444; padding: 20px; text-align: center;">Erro: A planilha de origem da tabela (ID: ${table.sheetId}) não foi encontrada.</div>`;
+        errorRow.appendChild(errorCell);
+        htmlTable.appendChild(errorRow);
+        return htmlTable;
+    }
+
     // Headers
     if (table.hasHeaders && table.showHeaderRow) {
       const thead = document.createElement('thead');
@@ -610,7 +624,7 @@ export class TableWidgetRenderer {
       }
 
       for (let c = table.range.startCol; c <= table.range.endCol; c++) {
-        const cell = this.sheet.getCell(r, c);
+        const cell = tableSheet.getCell(r, c);
         const td = document.createElement('td');
         td.textContent = cell?.value != null ? String(cell.value) : '';
         td.style.padding = '10px 12px';
@@ -640,7 +654,7 @@ export class TableWidgetRenderer {
 
       const totalRow = document.createElement('tr');
       for (let c = table.range.startCol; c <= table.range.endCol; c++) {
-        const cell = this.sheet.getCell(table.range.endRow, c);
+        const cell = tableSheet.getCell(table.range.endRow, c);
         const td = document.createElement('td');
         td.textContent = cell?.value != null ? String(cell.value) : '';
         td.style.padding = '12px';

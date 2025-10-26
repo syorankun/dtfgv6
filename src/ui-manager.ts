@@ -3356,10 +3356,16 @@ class MeuPlugin {
    */
   private showTableConfigModal(sheetId: string): void {
     const tableManager = TableManager.getInstance();
-    const tables = tableManager.getTablesBySheet(sheetId);
+    const tables = tableManager.listTables();
+    const workbook = kernel.workbookManager.getActiveWorkbook();
+
+    if (!workbook) {
+        alert('Nenhum workbook ativo. Não é possível encontrar as planilhas.');
+        return;
+    }
 
     if (tables.length === 0) {
-      alert('Nenhuma tabela encontrada nesta sheet. Crie uma tabela primeiro na aba Dados.');
+      alert('Nenhuma tabela encontrada neste workbook. Crie uma tabela primeiro na aba Dados.');
       return;
     }
 
@@ -3375,7 +3381,11 @@ class MeuPlugin {
           <div class="form-group">
             <label>Selecione a Tabela</label>
             <select id="table-select" class="form-control">
-              ${tables.map(t => `<option value="${t.id}">${t.name}</option>`).join('')}
+              ${tables.map(t => {
+                const sheet = workbook.getSheet(t.sheetId);
+                const sheetName = sheet ? sheet.name : 'Planilha desconhecida';
+                return `<option value="${t.id}">${sheetName} - ${t.name}</option>`;
+              }).join('')}
             </select>
           </div>
         </div>

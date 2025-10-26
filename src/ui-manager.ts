@@ -330,6 +330,29 @@ export class UIManager {
             </div>
 
           </aside>
+
+          <!-- Dashboard Sidebar -->
+          <aside class="dashboard-sidebar hidden">
+            <h3>Dashboard</h3>
+            <div id="dashboard-widget-buttons" class="dashboard-toolbar-buttons">
+              <button id="btn-add-kpi-widget" class="dashboard-widget-btn" title="Adicionar KPI">
+                <span class="widget-icon">📊</span>
+                <span class="widget-label">KPI</span>
+              </button>
+              <button id="btn-add-table-widget" class="dashboard-widget-btn" title="Adicionar Tabela">
+                <span class="widget-icon">📋</span>
+                <span class="widget-label">Tabela</span>
+              </button>
+              <button id="btn-add-text-widget" class="dashboard-widget-btn" title="Adicionar Texto">
+                <span class="widget-icon">📝</span>
+                <span class="widget-label">Texto</span>
+              </button>
+              <button id="btn-add-image-widget" class="dashboard-widget-btn" title="Adicionar Imagem">
+                <span class="widget-icon">🖼️</span>
+                <span class="widget-label">Imagem</span>
+              </button>
+            </div>
+          </aside>
           
           <!-- Grid Area -->
           <main class="grid-container">

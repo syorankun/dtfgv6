@@ -331,54 +331,8 @@ export class UIManager {
 
           </aside>
 
-          <!-- Dashboard Sidebar -->
-          <aside class="dashboard-sidebar hidden">
-            <h3>Dashboard</h3>
-            <div id="dashboard-widget-buttons" class="dashboard-toolbar-buttons">
-              <button id="btn-add-kpi-widget" class="dashboard-widget-btn" title="Adicionar KPI">
-                <span class="widget-icon">📊</span>
-                <span class="widget-label">KPI</span>
-              </button>
-              <button id="btn-add-table-widget" class="dashboard-widget-btn" title="Adicionar Tabela">
-                <span class="widget-icon">📋</span>
-                <span class="widget-label">Tabela</span>
-              </button>
-              <button id="btn-add-text-widget" class="dashboard-widget-btn" title="Adicionar Texto">
-                <span class="widget-icon">📝</span>
-                <span class="widget-label">Texto</span>
-              </button>
-              <button id="btn-add-image-widget" class="dashboard-widget-btn" title="Adicionar Imagem">
-                <span class="widget-icon">🖼️</span>
-                <span class="widget-label">Imagem</span>
-              </button>
-            </div>
-          </aside>
-          
           <!-- Grid Area -->
           <main class="grid-container">
-            <!-- Dashboard Toolbar (hidden by default) -->
-            <div id="dashboard-toolbar" class="dashboard-toolbar hidden">
-              <div class="dashboard-toolbar-title">🎨 Adicionar Widget</div>
-              <div class="dashboard-toolbar-buttons">
-                <button id="btn-add-kpi-widget" class="dashboard-widget-btn" title="Adicionar KPI">
-                  <span class="widget-icon">📊</span>
-                  <span class="widget-label">KPI</span>
-                </button>
-                <button id="btn-add-table-widget" class="dashboard-widget-btn" title="Adicionar Tabela">
-                  <span class="widget-icon">📋</span>
-                  <span class="widget-label">Tabela</span>
-                </button>
-                <button id="btn-add-text-widget" class="dashboard-widget-btn" title="Adicionar Texto">
-                  <span class="widget-icon">📝</span>
-                  <span class="widget-label">Texto</span>
-                </button>
-                <button id="btn-add-image-widget" class="dashboard-widget-btn" title="Adicionar Imagem">
-                  <span class="widget-icon">🖼️</span>
-                  <span class="widget-label">Imagem</span>
-                </button>
-              </div>
-            </div>
-
             <!-- Grid Wrapper -->
             <div class="grid-wrapper" id="grid-wrapper">
               <canvas id="grid-canvas" class="grid-canvas" tabindex="0"></canvas>
@@ -397,16 +351,41 @@ export class UIManager {
           
           <!-- Panels (right side) -->
           <aside class="panels">
-            <div id="plugin-panels"></div>
+            <div id="spreadsheet-panels">
+                <div id="plugin-panels"></div>
 
-            <div class="panel panel-console hidden" id="panel-console">
-              <h4>📝 Console</h4>
-              <div id="console-logs" class="console-logs"></div>
+                <div class="panel panel-console hidden" id="panel-console">
+                  <h4>📝 Console</h4>
+                  <div id="console-logs" class="console-logs"></div>
+                </div>
+
+                <div class="panel panel-info hidden" id="panel-info">
+                  <h4>ℹ️ Info da Célula</h4>
+                  <div id="cell-info" class="cell-info" style="font-size: 12px; line-height: 1.6;"></div>
+                </div>
             </div>
-
-            <div class="panel panel-info hidden" id="panel-info">
-              <h4>ℹ️ Info da Célula</h4>
-              <div id="cell-info" class="cell-info" style="font-size: 12px; line-height: 1.6;"></div>
+            <div id="dashboard-panels" class="hidden">
+                <div class="panel">
+                    <h4>🎨 Adicionar Widget</h4>
+                    <div class="dashboard-toolbar-buttons">
+                        <button id="btn-add-kpi-widget" class="dashboard-widget-btn" title="Adicionar KPI">
+                            <span class="widget-icon">📊</span>
+                            <span class="widget-label">KPI</span>
+                        </button>
+                        <button id="btn-add-table-widget" class="dashboard-widget-btn" title="Adicionar Tabela">
+                            <span class="widget-icon">📋</span>
+                            <span class="widget-label">Tabela</span>
+                        </button>
+                        <button id="btn-add-text-widget" class="dashboard-widget-btn" title="Adicionar Texto">
+                            <span class="widget-icon">📝</span>
+                            <span class="widget-label">Texto</span>
+                        </button>
+                        <button id="btn-add-image-widget" class="dashboard-widget-btn" title="Adicionar Imagem">
+                            <span class="widget-icon">🖼️</span>
+                            <span class="widget-label">Imagem</span>
+                        </button>
+                    </div>
+                </div>
             </div>
           </aside>
         </div>
@@ -3183,14 +3162,16 @@ class MeuPlugin {
 
     const gridWrapper = document.getElementById('grid-wrapper');
     const dashboardContainer = document.getElementById('dashboard-container');
-    const dashboardToolbar = document.getElementById('dashboard-toolbar');
     const toggleBtn = document.getElementById('btn-toggle-dashboard');
+    const spreadsheetPanels = document.getElementById('spreadsheet-panels');
+    const dashboardPanels = document.getElementById('dashboard-panels');
 
     if (this.isDashboardMode) {
       // Enter dashboard mode
       gridWrapper?.classList.add('hidden');
       dashboardContainer?.classList.remove('hidden');
-      dashboardToolbar?.classList.remove('hidden');
+      spreadsheetPanels?.classList.add('hidden');
+      dashboardPanels?.classList.remove('hidden');
       toggleBtn?.classList.add('active');
 
       // Update button label
@@ -3205,7 +3186,8 @@ class MeuPlugin {
       // Exit dashboard mode
       gridWrapper?.classList.remove('hidden');
       dashboardContainer?.classList.add('hidden');
-      dashboardToolbar?.classList.add('hidden');
+      spreadsheetPanels?.classList.remove('hidden');
+      dashboardPanels?.classList.add('hidden');
       toggleBtn?.classList.remove('active');
 
       // Update button label

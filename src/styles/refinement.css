@@ -119,3 +119,9 @@
   background-color: var(--theme-bg-hover);
   color: var(--theme-text-primary);
 }
+
+.dashboard-toolbar-buttons {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}

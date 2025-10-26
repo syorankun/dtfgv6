@@ -438,4 +438,5 @@ export interface TableCreationOptions {
   styleName?: string;
   tableName?: string;
   analyzeDataTypes?: boolean;
+  startPosition?: { row: number; col: number }; // Starting position for range detection
 }

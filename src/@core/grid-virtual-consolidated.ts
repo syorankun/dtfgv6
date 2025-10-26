@@ -674,6 +674,20 @@ export class VirtualGrid {
   // EVENT HANDLERS
   // --------------------------------------------------------------------------
 
+  /**
+   * Emit selection changed event to plugins
+   */
+  private emitSelectionChanged(): void {
+    if (this.kernel?.pluginHost?.eventBus) {
+      const selection = this.selectionManager.getSelection();
+      this.kernel.pluginHost.eventBus.emit('selection:changed', {
+        row: selection.start.row,
+        col: selection.start.col,
+        selection: selection
+      });
+    }
+  }
+
   private handleMouseDown(e: MouseEvent): void {
     const rect = this.canvas.getBoundingClientRect();
     const x = e.clientX - rect.left;
@@ -716,6 +730,7 @@ export class VirtualGrid {
       this.selectionManager.startSelection(cellPos.row, cellPos.col);
       this.updateActiveTableInfo(); // Update table info when selection changes
       this.onSelectionChange?.(this.selectionManager.getSelection());
+      this.emitSelectionChanged(); // Notify plugins
       this.render();
     }
   }
@@ -755,6 +770,7 @@ export class VirtualGrid {
 
         this.selectionManager.extendSelection(cellPos.row, cellPos.col);
         this.onSelectionChange?.(this.selectionManager.getSelection());
+        this.emitSelectionChanged(); // Notify plugins
         this.render();
       }
     }
@@ -792,6 +808,7 @@ export class VirtualGrid {
           this.selectionManager.moveSelection(-1, 0);
         }
         this.onSelectionChange?.(this.selectionManager.getSelection());
+        this.emitSelectionChanged(); // Notify plugins
         this.ensureCellVisible(this.selectionManager.getSelection().start.row, currentCol);
         this.render();
         break;
@@ -807,6 +824,7 @@ export class VirtualGrid {
           this.selectionManager.moveSelection(1, 0);
         }
         this.onSelectionChange?.(this.selectionManager.getSelection());
+        this.emitSelectionChanged(); // Notify plugins
         this.ensureCellVisible(this.selectionManager.getSelection().start.row, currentCol);
         this.render();
         break;
@@ -820,6 +838,7 @@ export class VirtualGrid {
           this.selectionManager.moveSelection(0, -1);
         }
         this.onSelectionChange?.(this.selectionManager.getSelection());
+        this.emitSelectionChanged(); // Notify plugins
         this.ensureCellVisible(currentRow, this.selectionManager.getSelection().start.col);
         this.render();
         break;
@@ -835,6 +854,7 @@ export class VirtualGrid {
           this.selectionManager.moveSelection(0, 1);
         }
         this.onSelectionChange?.(this.selectionManager.getSelection());
+        this.emitSelectionChanged(); // Notify plugins
         this.ensureCellVisible(currentRow, this.selectionManager.getSelection().start.col);
         this.render();
         break;
@@ -845,6 +865,7 @@ export class VirtualGrid {
         const newRowUp = Math.max(0, currentRow - pageUpRows);
         this.selectionManager.setSelection(newRowUp, currentCol, newRowUp, currentCol);
         this.onSelectionChange?.(this.selectionManager.getSelection());
+        this.emitSelectionChanged(); // Notify plugins
         this.ensureCellVisible(newRowUp, currentCol);
         this.render();
         break;
@@ -856,6 +877,7 @@ export class VirtualGrid {
         const newRowDown = Math.min(maxRow, currentRow + pageDownRows);
         this.selectionManager.setSelection(newRowDown, currentCol, newRowDown, currentCol);
         this.onSelectionChange?.(this.selectionManager.getSelection());
+        this.emitSelectionChanged(); // Notify plugins
         this.ensureCellVisible(newRowDown, currentCol);
         this.render();
         break;
@@ -873,6 +895,7 @@ export class VirtualGrid {
           this.scrollX = 0;
         }
         this.onSelectionChange?.(this.selectionManager.getSelection());
+        this.emitSelectionChanged(); // Notify plugins
         this.render();
         break;
 
@@ -891,6 +914,7 @@ export class VirtualGrid {
           this.ensureCellVisible(currentRow, lastCol);
         }
         this.onSelectionChange?.(this.selectionManager.getSelection());
+        this.emitSelectionChanged(); // Notify plugins
         this.render();
         break;
 
@@ -1200,6 +1224,7 @@ export class VirtualGrid {
         this.stopEditing(row, col, true);
         this.selectionManager.moveSelection(1, 0);
         this.onSelectionChange?.(this.selectionManager.getSelection());
+        this.emitSelectionChanged(); // Notify plugins
         this.render();
       } else if (e.key === 'Escape') {
         e.preventDefault();
@@ -1209,6 +1234,7 @@ export class VirtualGrid {
         this.stopEditing(row, col, true);
         this.selectionManager.moveSelection(0, 1);
         this.onSelectionChange?.(this.selectionManager.getSelection());
+        this.emitSelectionChanged(); // Notify plugins
         this.render();
       }
     });

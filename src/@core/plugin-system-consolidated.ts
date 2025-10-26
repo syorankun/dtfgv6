@@ -667,7 +667,8 @@ import type {
 
       try {
         // Get options from form
-        const tableName = (document.getElementById('table-name-input') as HTMLInputElement)?.value || undefined;
+        const tableNameInput = (document.getElementById('table-name-input') as HTMLInputElement)?.value.trim() || '';
+        const tableName = tableNameInput.length > 0 ? tableNameInput : undefined; // Only use if not empty
         const hasHeaders = (document.getElementById('has-headers-checkbox') as HTMLInputElement)?.checked ?? true;
         const analyzeTypes = (document.getElementById('analyze-types-checkbox') as HTMLInputElement)?.checked ?? true;
         const styleName = (document.getElementById('table-style-select') as HTMLSelectElement)?.value || 'modern-blue';
@@ -1932,7 +1933,12 @@ import type {
         allTablesDetails: allTables.map((t: any) => ({
           id: t.id,
           name: t.name,
-          sheetId: t.sheetId
+          sheetId: t.sheetId,
+          matchesCurrentSheet: t.sheetId === sheet.id
+        })),
+        tablesInThisSheet: tables.map((t: any) => ({
+          id: t.id,
+          name: t.name
         }))
       });
 

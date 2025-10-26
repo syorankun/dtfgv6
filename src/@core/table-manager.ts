@@ -265,7 +265,11 @@ export class TableManager {
     if (options.range) {
       range = options.range;
     } else if (options.autoDetectRange) {
-      range = this.detectDataRange(sheet);
+      // If startPosition is provided, detect range from that position (for multiple tables)
+      // Otherwise, detect all data in sheet (legacy behavior)
+      range = options.startPosition
+        ? this.detectDataRangeFromPosition(sheet, options.startPosition.row, options.startPosition.col)
+        : this.detectDataRange(sheet);
     } else {
       throw new Error('Range ou autoDetectRange deve ser fornecido');
     }
@@ -281,8 +285,31 @@ export class TableManager {
     // Create columns
     const columns = this.createColumnsFromRange(sheet, range, hasHeaders, options.analyzeDataTypes ?? true);
 
-    // Generate table name
-    const tableName = options.tableName || this.generateTableName();
+    // Generate table name with uniqueness check
+    let tableName: string;
+    if (options.tableName) {
+      // User provided a name - check if it's unique
+      const existingNames = Array.from(this.tables.values()).map(t => t.name);
+      if (existingNames.includes(options.tableName)) {
+        // Name already exists - append number to make it unique
+        let counter = 2;
+        let uniqueName = `${options.tableName}${counter}`;
+        while (existingNames.includes(uniqueName)) {
+          counter++;
+          uniqueName = `${options.tableName}${counter}`;
+        }
+        tableName = uniqueName;
+        logger.warn('[TableManager] Table name already exists, using unique name', {
+          requested: options.tableName,
+          used: tableName
+        });
+      } else {
+        tableName = options.tableName;
+      }
+    } else {
+      // Auto-generate unique name
+      tableName = this.generateTableName();
+    }
 
     // Get style
     const style = options.styleName && TABLE_STYLES[options.styleName]
@@ -322,46 +349,129 @@ export class TableManager {
   /**
    * Auto-detect data range from current selection or active cell
    * Enhanced with smarter contiguous region detection
+   * NOW: Detects only contiguous blocks NOT already covered by existing tables
    */
   private detectDataRange(sheet: Sheet): Range {
-    // Find the contiguous data region using flood-fill algorithm
-    let minRow = Infinity, minCol = Infinity;
-    let maxRow = -1, maxCol = -1;
+    // Get existing tables in this sheet to avoid them
+    const existingTables = this.getTablesBySheet(sheet.id);
 
-    // First pass: find any data
+    logger.info('[TableManager] Detecting data range, existing tables:', {
+      count: existingTables.length,
+      ranges: existingTables.map(t => t.range)
+    });
+
+    // Find the first cell with data that is NOT in an existing table
+    let firstRow = -1, firstCol = -1;
+
+    outerLoop:
     for (let r = 0; r < sheet.rowCount; r++) {
       for (let c = 0; c < sheet.colCount; c++) {
         const cell = sheet.getCell(r, c);
         if (cell && cell.value !== null && cell.value !== undefined && cell.value !== '') {
-          minRow = Math.min(minRow, r);
-          minCol = Math.min(minCol, c);
-          maxRow = Math.max(maxRow, r);
-          maxCol = Math.max(maxCol, c);
+          // Check if this cell is already in an existing table
+          const inExistingTable = existingTables.some(table => {
+            return r >= table.range.startRow && r <= table.range.endRow &&
+                   c >= table.range.startCol && c <= table.range.endCol;
+          });
+
+          if (!inExistingTable) {
+            firstRow = r;
+            firstCol = c;
+            logger.info('[TableManager] Found first data cell not in existing table', {
+              row: r,
+              col: c
+            });
+            break outerLoop;
+          }
         }
       }
     }
 
-    if (minRow === Infinity) {
-      throw new Error('Nenhum dado encontrado na planilha');
+    if (firstRow === -1) {
+      throw new Error('Nenhum dado novo encontrado (todos os dados já estão em tabelas)');
     }
 
-    // Second pass: detect contiguous table-like structure
-    // Check if first row looks like headers (text-heavy, no duplicates)
-    const isLikelyHeader = this.isRowLikelyHeader(sheet, minRow, minCol, maxCol);
+    // Now use detectDataRangeFromPosition to get contiguous region
+    return this.detectDataRangeFromPosition(sheet, firstRow, firstCol);
+  }
 
-    // Trim trailing empty rows
-    while (maxRow > minRow && this.isRowEmpty(sheet, maxRow, minCol, maxCol)) {
-      maxRow--;
+  /**
+   * Detect contiguous data range starting from a specific position
+   * (for creating multiple separate tables in the same sheet)
+   */
+  private detectDataRangeFromPosition(sheet: Sheet, startRow: number, startCol: number): Range {
+    logger.info('[TableManager] Detecting range from position', { startRow, startCol });
+
+    // Find the first non-empty cell from the start position
+    let firstRow = startRow;
+    let firstCol = startCol;
+    let found = false;
+
+    // Search for first data cell (expanding from start position)
+    for (let r = startRow; r < Math.min(startRow + 100, sheet.rowCount) && !found; r++) {
+      for (let c = startCol; c < Math.min(startCol + 50, sheet.colCount) && !found; c++) {
+        const cell = sheet.getCell(r, c);
+        if (cell && cell.value !== null && cell.value !== undefined && cell.value !== '') {
+          firstRow = r;
+          firstCol = c;
+          found = true;
+        }
+      }
     }
 
-    // Trim trailing empty columns
-    while (maxCol > minCol && this.isColumnEmpty(sheet, maxCol, minRow, maxRow)) {
-      maxCol--;
+    if (!found) {
+      throw new Error('Nenhum dado encontrado a partir da posição especificada');
     }
 
-    logger.info('[TableManager] Detected data range', {
+    // Now expand to find contiguous region using flood-fill
+    let minRow = firstRow, minCol = firstCol;
+    let maxRow = firstRow, maxCol = firstCol;
+
+    // Expand right to find columns
+    let c = firstCol;
+    while (c < sheet.colCount) {
+      const cell = sheet.getCell(firstRow, c);
+      if (cell && cell.value !== null && cell.value !== undefined && cell.value !== '') {
+        maxCol = c;
+        c++;
+      } else {
+        break;
+      }
+    }
+
+    // Expand left from first column
+    c = firstCol - 1;
+    while (c >= 0) {
+      const cell = sheet.getCell(firstRow, c);
+      if (cell && cell.value !== null && cell.value !== undefined && cell.value !== '') {
+        minCol = c;
+        c--;
+      } else {
+        break;
+      }
+    }
+
+    // Expand down to find rows (checking if all columns in row have some data)
+    let r = firstRow;
+    while (r < sheet.rowCount) {
+      let hasData = false;
+      for (c = minCol; c <= maxCol; c++) {
+        const cell = sheet.getCell(r, c);
+        if (cell && cell.value !== null && cell.value !== undefined && cell.value !== '') {
+          hasData = true;
+          break;
+        }
+      }
+      if (hasData) {
+        maxRow = r;
+        r++;
+      } else {
+        break;
+      }
+    }
+
+    logger.info('[TableManager] Detected range from position', {
       range: { minRow, minCol, maxRow, maxCol },
-      hasHeaders: isLikelyHeader,
       rows: maxRow - minRow + 1,
       cols: maxCol - minCol + 1
     });

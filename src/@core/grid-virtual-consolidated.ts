@@ -498,6 +498,24 @@ export class VirtualGrid {
   }
 
   // --------------------------------------------------------------------------
+  // PUBLIC ACCESSORS FOR ACTIVE CELL
+  // --------------------------------------------------------------------------
+
+  /**
+   * Get the active row (for plugin integration)
+   */
+  get activeRow(): number {
+    return this.selectionManager.getActiveCell().row;
+  }
+
+  /**
+   * Get the active column (for plugin integration)
+   */
+  get activeCol(): number {
+    return this.selectionManager.getActiveCell().col;
+  }
+
+  // --------------------------------------------------------------------------
   // SETUP
   // --------------------------------------------------------------------------
 

@@ -1104,9 +1104,26 @@ import type {
       }
 
       const grid = this.context.kernel.getGrid();
+
+      logger.info('[TableStudio] 🎨 showStylesGallery called', {
+        hasGrid: !!grid,
+        activeRow: grid?.activeRow,
+        activeCol: grid?.activeCol,
+        sheetId: sheet.id,
+        sheetName: sheet.name
+      });
+
       const activeTable = grid ? this.findTableAtCell(sheet, grid.activeRow, grid.activeCol) : null;
 
+      logger.info('[TableStudio] 🔍 Active table search result', {
+        found: !!activeTable,
+        tableName: activeTable?.name,
+        tableId: activeTable?.id,
+        tableRange: activeTable?.range
+      });
+
       if (!activeTable) {
+        logger.warn('[TableStudio] ⚠️ No active table found - showing warning to user');
         this.context.ui.showToast('Selecione uma célula dentro de uma tabela para aplicar estilos', 'warning');
         return;
       }

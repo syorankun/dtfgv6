@@ -122,7 +122,7 @@ export const logger = new Logger({ level: "info", toConsole: true });
 // ============================================================================
 
 const DB_NAME = "DJ_DataForge_v6";
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 
 export class PersistenceManager {
   private db?: IDBPDatabase;

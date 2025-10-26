@@ -8,6 +8,7 @@
 import type { WidgetConfig, DashboardLayout } from './types';
 import type { Sheet } from './workbook-consolidated';
 import { logger } from './storage-utils-consolidated';
+import { widgetRegistry } from './widget-registry';
 import {
   KPIWidgetRenderer,
   TextWidgetRenderer,
@@ -114,25 +115,14 @@ class WidgetRenderer {
    */
   private renderContent(container: HTMLDivElement): void {
     try {
-      switch (this.config.type) {
-        case 'table':
-          new TableWidgetRenderer(this.config, this.sheet, container).render();
-          break;
+      const RendererClass = widgetRegistry.get(this.config.type);
 
-        case 'text':
-          new TextWidgetRenderer(this.config, container).render();
-          break;
-
-        case 'kpi':
-          new KPIWidgetRenderer(this.config, this.sheet, container).render();
-          break;
-
-        case 'image':
-          new ImageWidgetRenderer(this.config, container).render();
-          break;
-
-        case 'chart':
-        case 'pivot':
+      if (RendererClass) {
+        new RendererClass(this.config, this.sheet, container).render();
+      } else {
+        // Handle unknown or in-development widgets
+        const isKnownButNotReady = ['chart', 'pivot'].includes(this.config.type);
+        if (isKnownButNotReady) {
           container.innerHTML = `
             <div style="
               display: flex;
@@ -147,14 +137,13 @@ class WidgetRenderer {
               <div>Widget tipo "${this.config.type}" em desenvolvimento</div>
             </div>
           `;
-          break;
-
-        default:
+        } else {
           container.innerHTML = `
             <div style="color: #ef4444; text-align: center; padding: 20px;">
               ⚠️ Tipo de widget desconhecido: "${this.config.type}"
             </div>
           `;
+        }
       }
     } catch (error) {
       logger.error('[WidgetRenderer] Error rendering widget', error);
@@ -261,7 +250,17 @@ export class DashboardRenderer {
 
     this.setupContainer();
     this.setupEventListeners();
+    this._registerWidgets();
     this.renderAllWidgets();
+  }
+
+  private _registerWidgets(): void {
+    // Register all available widget types.
+    // This is done once when the dashboard is initialized.
+    widgetRegistry.register('table', TableWidgetRenderer);
+    widgetRegistry.register('kpi', KPIWidgetRenderer);
+    widgetRegistry.register('text', TextWidgetRenderer);
+    widgetRegistry.register('image', ImageWidgetRenderer);
   }
 
   private setupContainer(): void {

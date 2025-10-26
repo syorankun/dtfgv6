@@ -322,6 +322,7 @@ export class UIManager {
               <div id="workbook-list" class="workbook-list">
                 ${this.renderWorkbookList(workbooks)}
               </div>
+              <div id="add-workbook-container"></div>
             </div>
 
             <div class="sidebar-section">
@@ -332,7 +333,9 @@ export class UIManager {
               <div id="sheet-list" class="sheet-list">
                 ${this.renderSheetList()}
               </div>
+              <div id="add-sheet-container"></div>
             </div>
+
           </aside>
           
           <!-- Grid Area -->
@@ -526,6 +529,66 @@ export class UIManager {
     return sheets.map(sheet => `<div class="sheet-item ${sheet.id === wb.activeSheetId ? 'active' : ''}" data-sheet-id="${sheet.id}"><span class="sheet-name">${sheet.name}</span><span class="sheet-size">${sheet.rowCount}x${sheet.colCount}</span></div>`).join('');
   }
 
+  public showAddItemUI(type: 'workbook' | 'sheet', containerId: string): void {
+    this.hideAddItemUI(); // Remove any existing form
+
+    const container = document.getElementById(containerId);
+    if (!container) return;
+
+    const placeholder = type === 'workbook' ? 'Nome do novo workbook' : 'Nome da nova sheet';
+    const buttonLabel = 'Criar';
+
+    const formHtml = `
+      <div class="add-item-container">
+        <form id="add-item-form" class="add-item-form">
+          <input type="text" id="add-item-input" class="add-item-input" placeholder="${placeholder}" required />
+          <button type="submit" class="add-item-btn">${buttonLabel}</button>
+        </form>
+      </div>
+    `;
+
+    container.innerHTML = formHtml;
+
+    const form = document.getElementById('add-item-form');
+    form?.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const input = document.getElementById('add-item-input') as HTMLInputElement;
+      const name = input.value.trim();
+      if (name) {
+        if (type === 'workbook') {
+          kernel.createWorkbook(name);
+          this.refreshWorkbookList();
+        } else {
+          const wb = kernel.workbookManager.getActiveWorkbook();
+          if (wb) {
+            wb.addSheet(name);
+            this.refreshSheetList();
+            this.refreshGrid();
+            logger.info('[UIManager] Sheet created', { name });
+          } else {
+            alert('Selecione um workbook primeiro');
+          }
+        }
+        this.hideAddItemUI();
+      }
+    });
+
+    const input = document.getElementById('add-item-input');
+    input?.focus();
+  }
+
+  public hideAddItemUI(): void {
+    const workbookContainer = document.getElementById('add-workbook-container');
+    if (workbookContainer) {
+      workbookContainer.innerHTML = '';
+    }
+    const sheetContainer = document.getElementById('add-sheet-container');
+    if (sheetContainer) {
+      sheetContainer.innerHTML = '';
+    }
+  }
+
+
   public showLoading(): void {
     this.app.innerHTML = '<div class="loading-screen"><div class="loading-spinner"></div><h2>🔧 DJ DataForge v6</h2><p>Carregando todas as funcionalidades...</p><div style="margin-top: 20px; font-size: 12px; color: #64748b;"><div>✅ Kernel & Storage</div><div>✅ Calc Engine (20+ fórmulas)</div><div>✅ Virtual Grid</div><div>✅ Plugin System</div><div>✅ Multi-Company</div></div></div>';
   }
@@ -579,15 +642,6 @@ export class UIManager {
     });
 
     // File operations
-    document.getElementById('btn-new-workbook')?.addEventListener('click', () => {
-      const name = prompt('Nome do novo workbook:');
-      if (name) {
-        kernel.workbookManager.createWorkbook(name);
-        this.refreshWorkbookList();
-        kernel.eventBus.emit('workbook:created', { name });
-      }
-    });
-
     document.getElementById('btn-import')?.addEventListener('click', () => {
       const fileInput = document.getElementById('file-input') as HTMLInputElement;
       fileInput?.click();
@@ -956,12 +1010,7 @@ export class UIManager {
 
     // Sidebar management buttons
     document.getElementById('btn-add-workbook')?.addEventListener('click', () => {
-      const name = prompt('Nome do novo workbook:');
-      if (name) {
-        kernel.workbookManager.createWorkbook(name);
-        this.refreshWorkbookList();
-        kernel.eventBus.emit('workbook:created', { name });
-      }
+      this.showAddItemUI('workbook', 'add-workbook-container');
     });
 
     document.getElementById('btn-add-sheet')?.addEventListener('click', () => {
@@ -970,14 +1019,7 @@ export class UIManager {
         alert('Selecione um workbook primeiro');
         return;
       }
-
-      const name = prompt('Nome da nova sheet:', `Sheet${wb.sheets.size + 1}`);
-      if (name) {
-        wb.addSheet(name);
-        this.refreshSheetList();
-        this.refreshGrid();
-        logger.info('[UIManager] Sheet created', { name });
-      }
+      this.showAddItemUI('sheet', 'add-sheet-container');
     });
 
     logger.info('[UIManager] Event listeners configured');

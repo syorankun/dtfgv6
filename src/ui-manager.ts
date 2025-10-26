@@ -231,16 +231,6 @@ export class UIManager {
           <!-- View Tab Content -->
           <div class="ribbon-content hidden" data-content="view">
             <div class="ribbon-group">
-              <div class="ribbon-group-title">Modo de Visualização</div>
-              <div class="ribbon-buttons">
-                <button id="btn-toggle-dashboard" class="ribbon-btn ribbon-btn-primary">
-                  <span class="ribbon-icon">📊</span>
-                  <span class="ribbon-label">Dashboard</span>
-                </button>
-              </div>
-            </div>
-
-            <div class="ribbon-group">
               <div class="ribbon-group-title">Mostrar/Ocultar</div>
               <div class="ribbon-buttons">
                 <button id="btn-toggle-sidebar" class="ribbon-btn">
@@ -328,7 +318,10 @@ export class UIManager {
             <div class="sidebar-section">
               <div class="sidebar-header">
                 <h3>Sheets</h3>
-                <button id="btn-add-sheet" class="btn-icon-small" title="Nova Sheet">+</button>
+                <div>
+                  <button id="btn-add-sheet" class="btn-icon-small" title="Nova Sheet">+</button>
+                  <button id="btn-add-dashboard" class="btn-icon-small" title="Novo Dashboard">📊</button>
+                </div>
               </div>
               <div id="sheet-list" class="sheet-list">
                 ${this.renderSheetList()}
@@ -526,16 +519,20 @@ export class UIManager {
     if (!wb) return '<p class="empty-state">Selecione um workbook</p>';
     
     const sheets = wb.listSheets();
-    return sheets.map(sheet => `<div class="sheet-item ${sheet.id === wb.activeSheetId ? 'active' : ''}" data-sheet-id="${sheet.id}"><span class="sheet-name">${sheet.name}</span><span class="sheet-size">${sheet.rowCount}x${sheet.colCount}</span></div>`).join('');
+    return sheets.map(sheet => {
+      const isDashboard = kernel.dashboardManager.getLayout(sheet.id);
+      const icon = isDashboard ? '📊' : '';
+      return `<div class="sheet-item ${sheet.id === wb.activeSheetId ? 'active' : ''}" data-sheet-id="${sheet.id}"><span class="sheet-name">${icon} ${sheet.name}</span><span class="sheet-size">${sheet.rowCount}x${sheet.colCount}</span></div>`
+    }).join('');
   }
 
-  public showAddItemUI(type: 'workbook' | 'sheet', containerId: string): void {
+  public showAddItemUI(type: 'workbook' | 'sheet' | 'dashboard', containerId: string): void {
     this.hideAddItemUI(); // Remove any existing form
 
     const container = document.getElementById(containerId);
     if (!container) return;
 
-    const placeholder = type === 'workbook' ? 'Nome do novo workbook' : 'Nome da nova sheet';
+    const placeholder = type === 'workbook' ? 'Nome do novo workbook' : (type === 'sheet' ? 'Nome da nova sheet' : 'Nome do novo dashboard');
     const buttonLabel = 'Criar';
 
     const formHtml = `
@@ -558,7 +555,7 @@ export class UIManager {
         if (type === 'workbook') {
           kernel.createWorkbook(name);
           this.refreshWorkbookList();
-        } else {
+        } else if (type === 'sheet') {
           const wb = kernel.workbookManager.getActiveWorkbook();
           if (wb) {
             wb.addSheet(name);
@@ -568,6 +565,21 @@ export class UIManager {
           } else {
             alert('Selecione um workbook primeiro');
           }
+        } else { // dashboard
+            const wb = kernel.workbookManager.getActiveWorkbook();
+            if (wb) {
+                const sheet = wb.addSheet(name);
+                wb.setActiveSheet(sheet.id);
+                kernel.dashboardManager.getOrCreateLayout(sheet.id);
+                this.refreshSheetList();
+                this.refreshGrid();
+                if (!this.isDashboardMode) {
+                    this.toggleDashboardMode();
+                }
+                logger.info('[UIManager] Dashboard sheet created', { name });
+            } else {
+                alert('Selecione um workbook primeiro');
+            }
         }
         this.hideAddItemUI();
       }
@@ -791,6 +803,13 @@ export class UIManager {
           wb.setActiveSheet(sheetId);
           this.refreshSheetList();
           this.refreshGrid();
+
+          const isDashboard = kernel.dashboardManager.getLayout(sheetId);
+          if (isDashboard && !this.isDashboardMode) {
+            this.toggleDashboardMode();
+          } else if (!isDashboard && this.isDashboardMode) {
+            this.toggleDashboardMode();
+          }
         }
       }
     });
@@ -1020,6 +1039,15 @@ export class UIManager {
         return;
       }
       this.showAddItemUI('sheet', 'add-sheet-container');
+    });
+
+    document.getElementById('btn-add-dashboard')?.addEventListener('click', () => {
+        const wb = kernel.workbookManager.getActiveWorkbook();
+        if (!wb) {
+        alert('Selecione um workbook primeiro');
+        return;
+        }
+        this.showAddItemUI('dashboard', 'add-sheet-container');
     });
 
     logger.info('[UIManager] Event listeners configured');

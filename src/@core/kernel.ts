@@ -16,6 +16,7 @@ import { WorkbookManager, Workbook } from './workbook-consolidated';
 import { CalcEngine } from './calc-engine-consolidated';
 import { PersistenceManager, logger, Perf } from './storage-utils-consolidated';
 import { PluginHost } from './plugin-system-consolidated';
+import { DashboardManager } from './dashboard-manager';
 import type { KernelState, KernelContext, CompanyContext, Session } from './types';
 
 // ============================================================================
@@ -271,6 +272,7 @@ export class DJDataForgeKernel {
   sessionManager: SessionManager;
   eventBus: EventBus;
   pluginHost: PluginHost;
+  dashboardManager: DashboardManager;
   
   // Auto-save
   private autoSaveTimer?: number;
@@ -284,6 +286,7 @@ export class DJDataForgeKernel {
     this.sessionManager = new SessionManager();
     this.eventBus = new EventBus();
     this.pluginHost = new PluginHost(this, this.storageManager);
+    this.dashboardManager = DashboardManager.getInstance();
 
     logger.info(`[Kernel] DJ DataForge v${this.version} initialized`);
   }
@@ -342,9 +345,21 @@ export class DJDataForgeKernel {
         logger.info("[Kernel] Workbooks loaded", { count: this.workbookManager.listWorkbooks().length });
 
         // Notify plugins that workbooks are ready
-        this.eventBus.emit("workbook:loaded", { 
-          count: this.workbookManager.listWorkbooks().length 
+        this.eventBus.emit("workbook:loaded", {
+          count: this.workbookManager.listWorkbooks().length
         });
+      }
+
+      // 4.5. Load dashboards from storage
+      try {
+        const dashboardsData = await this.storageManager.getAllDashboards();
+        if (dashboardsData.length > 0) {
+          const serializedData = { layouts: dashboardsData };
+          this.dashboardManager.deserialize(serializedData);
+          logger.info("[Kernel] Dashboards loaded", { count: dashboardsData.length });
+        }
+      } catch (error) {
+        logger.error("[Kernel] Failed to load dashboards", error);
       }
       
       // 5. Start session
@@ -563,18 +578,35 @@ export class DJDataForgeKernel {
    */
   async saveAllWorkbooks(): Promise<void> {
     const workbooks = this.workbookManager.listWorkbooks();
-    
+
         for (const wb of workbooks) {
           await this.storageManager.saveWorkbook(wb);
         }
-    
+
         // Save active workbook ID to restore session
         const activeWbId = this.workbookManager.getActiveWorkbook()?.id;
         if (activeWbId) {
           await this.storageManager.saveSetting('lastActiveWorkbook', activeWbId);
         }
-    
+
         logger.info("[Kernel] All workbooks saved", { count: workbooks.length });  }
+
+  /**
+   * Save all dashboards
+   */
+  async saveAllDashboards(): Promise<void> {
+    try {
+      const dashboardData = this.dashboardManager.serialize();
+      if (dashboardData?.layouts) {
+        for (const layout of dashboardData.layouts) {
+          await this.storageManager.saveDashboard(layout);
+        }
+        logger.debug("[Kernel] All dashboards saved", { count: dashboardData.layouts.length });
+      }
+    } catch (error) {
+      logger.error("[Kernel] Failed to save dashboards", error);
+    }
+  }
   
   // --------------------------------------------------------------------------
   // INTERNAL METHODS
@@ -584,6 +616,7 @@ export class DJDataForgeKernel {
     this.autoSaveTimer = window.setInterval(async () => {
       try {
         await this.saveAllWorkbooks();
+        await this.saveAllDashboards();
         await this.saveSnapshot();
         this.eventBus.emit("kernel:autosave-done");
         logger.debug("[Kernel] Auto-save complete");
@@ -599,9 +632,10 @@ export class DJDataForgeKernel {
       timestamp: new Date().toISOString(),
       companies: this.companyManager.serialize(),
       workbooks: this.workbookManager.serialize(),
+      dashboards: this.dashboardManager.serialize(),
       session: this.sessionManager.getSession(),
     };
-    
+
     await this.storageManager.saveSnapshot(snapshot);
   }
   

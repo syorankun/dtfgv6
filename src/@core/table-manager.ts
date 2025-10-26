@@ -486,7 +486,9 @@ export class TableManager {
 
   /**
    * Check if a row is likely a header row
+   * @internal - Reserved for future use
    */
+  // @ts-ignore - Utility method reserved for future use
   private isRowLikelyHeader(sheet: Sheet, row: number, startCol: number, endCol: number): boolean {
     let textCount = 0;
     let nonEmptyCount = 0;
@@ -516,7 +518,9 @@ export class TableManager {
 
   /**
    * Check if a row is completely empty
+   * @internal - Reserved for future use
    */
+  // @ts-ignore - Utility method reserved for future use
   private isRowEmpty(sheet: Sheet, row: number, startCol: number, endCol: number): boolean {
     for (let col = startCol; col <= endCol; col++) {
       const cell = sheet.getCell(row, col);
@@ -529,7 +533,9 @@ export class TableManager {
 
   /**
    * Check if a column is completely empty
+   * @internal - Reserved for future use
    */
+  // @ts-ignore - Utility method reserved for future use
   private isColumnEmpty(sheet: Sheet, col: number, startRow: number, endRow: number): boolean {
     for (let row = startRow; row <= endRow; row++) {
       const cell = sheet.getCell(row, col);

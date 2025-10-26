@@ -1,10 +1,14 @@
 import { kernel } from './@core/kernel';
 import { VirtualGrid } from './@core/grid-virtual-consolidated';
 import { logger } from './@core/storage-utils-consolidated';
+import { DashboardRenderer } from './@core/dashboard-renderer';
+import { TableManager } from './@core/table-manager';
 
 export class UIManager {
   private app: HTMLElement;
   private grid?: VirtualGrid;
+  private dashboardRenderer?: DashboardRenderer;
+  private isDashboardMode = false;
 
   constructor(app: HTMLElement) {
     this.app = app;
@@ -227,6 +231,16 @@ export class UIManager {
           <!-- View Tab Content -->
           <div class="ribbon-content hidden" data-content="view">
             <div class="ribbon-group">
+              <div class="ribbon-group-title">Modo de Visualização</div>
+              <div class="ribbon-buttons">
+                <button id="btn-toggle-dashboard" class="ribbon-btn ribbon-btn-primary">
+                  <span class="ribbon-icon">📊</span>
+                  <span class="ribbon-label">Dashboard</span>
+                </button>
+              </div>
+            </div>
+
+            <div class="ribbon-group">
               <div class="ribbon-group-title">Mostrar/Ocultar</div>
               <div class="ribbon-buttons">
                 <button id="btn-toggle-sidebar" class="ribbon-btn">
@@ -300,20 +314,54 @@ export class UIManager {
         <div class="app-content">
           <!-- Sidebar -->
           <aside class="sidebar">
-            <h3>Workbooks</h3>
-            <div id="workbook-list" class="workbook-list">
-              ${this.renderWorkbookList(workbooks)}
+            <div class="sidebar-section">
+              <div class="sidebar-header">
+                <h3>Workbooks</h3>
+                <button id="btn-add-workbook" class="btn-icon-small" title="Novo Workbook">+</button>
+              </div>
+              <div id="workbook-list" class="workbook-list">
+                ${this.renderWorkbookList(workbooks)}
+              </div>
             </div>
-            
-            <h3 style="margin-top: 24px;">Sheets</h3>
-            <div id="sheet-list" class="sheet-list">
-              ${this.renderSheetList()}
+
+            <div class="sidebar-section">
+              <div class="sidebar-header">
+                <h3>Sheets</h3>
+                <button id="btn-add-sheet" class="btn-icon-small" title="Nova Sheet">+</button>
+              </div>
+              <div id="sheet-list" class="sheet-list">
+                ${this.renderSheetList()}
+              </div>
             </div>
           </aside>
           
           <!-- Grid Area -->
           <main class="grid-container">
-            <div class="grid-wrapper">
+            <!-- Dashboard Toolbar (hidden by default) -->
+            <div id="dashboard-toolbar" class="dashboard-toolbar hidden">
+              <div class="dashboard-toolbar-title">🎨 Adicionar Widget</div>
+              <div class="dashboard-toolbar-buttons">
+                <button id="btn-add-kpi-widget" class="dashboard-widget-btn" title="Adicionar KPI">
+                  <span class="widget-icon">📊</span>
+                  <span class="widget-label">KPI</span>
+                </button>
+                <button id="btn-add-table-widget" class="dashboard-widget-btn" title="Adicionar Tabela">
+                  <span class="widget-icon">📋</span>
+                  <span class="widget-label">Tabela</span>
+                </button>
+                <button id="btn-add-text-widget" class="dashboard-widget-btn" title="Adicionar Texto">
+                  <span class="widget-icon">📝</span>
+                  <span class="widget-label">Texto</span>
+                </button>
+                <button id="btn-add-image-widget" class="dashboard-widget-btn" title="Adicionar Imagem">
+                  <span class="widget-icon">🖼️</span>
+                  <span class="widget-label">Imagem</span>
+                </button>
+              </div>
+            </div>
+
+            <!-- Grid Wrapper -->
+            <div class="grid-wrapper" id="grid-wrapper">
               <canvas id="grid-canvas" class="grid-canvas" tabindex="0"></canvas>
               <div class="grid-scrollbar-vertical" id="grid-scrollbar-vertical">
                 <div class="grid-scrollbar-content" id="grid-scrollbar-v-content"></div>
@@ -323,6 +371,9 @@ export class UIManager {
               </div>
               <div class="grid-scrollbar-corner"></div>
             </div>
+
+            <!-- Dashboard Container (hidden by default) -->
+            <div id="dashboard-container" class="dashboard-container hidden"></div>
           </main>
           
           <!-- Panels (right side) -->
@@ -880,6 +931,53 @@ export class UIManager {
 
     document.getElementById('btn-data-validation')?.addEventListener('click', () => {
       alert('Validação de dados: funcionalidade em desenvolvimento\n\nEm breve você poderá definir regras de validação para células.');
+    });
+
+    // Dashboard buttons
+    document.getElementById('btn-toggle-dashboard')?.addEventListener('click', () => {
+      this.toggleDashboardMode();
+    });
+
+    document.getElementById('btn-add-kpi-widget')?.addEventListener('click', () => {
+      this.addWidget('kpi');
+    });
+
+    document.getElementById('btn-add-table-widget')?.addEventListener('click', () => {
+      this.addWidget('table');
+    });
+
+    document.getElementById('btn-add-text-widget')?.addEventListener('click', () => {
+      this.addWidget('text');
+    });
+
+    document.getElementById('btn-add-image-widget')?.addEventListener('click', () => {
+      this.addWidget('image');
+    });
+
+    // Sidebar management buttons
+    document.getElementById('btn-add-workbook')?.addEventListener('click', () => {
+      const name = prompt('Nome do novo workbook:');
+      if (name) {
+        kernel.workbookManager.createWorkbook(name);
+        this.refreshWorkbookList();
+        kernel.eventBus.emit('workbook:created', { name });
+      }
+    });
+
+    document.getElementById('btn-add-sheet')?.addEventListener('click', () => {
+      const wb = kernel.workbookManager.getActiveWorkbook();
+      if (!wb) {
+        alert('Selecione um workbook primeiro');
+        return;
+      }
+
+      const name = prompt('Nome da nova sheet:', `Sheet${wb.sheets.size + 1}`);
+      if (name) {
+        wb.addSheet(name);
+        this.refreshSheetList();
+        this.refreshGrid();
+        logger.info('[UIManager] Sheet created', { name });
+      }
     });
 
     logger.info('[UIManager] Event listeners configured');
@@ -2972,5 +3070,408 @@ class MeuPlugin {
     if (element) {
       element.textContent = `Plugins: ${count}`;
     }
+  }
+
+  // ============================================================================
+  // DASHBOARD METHODS
+  // ============================================================================
+
+  /**
+   * Toggle between Grid and Dashboard mode
+   */
+  public toggleDashboardMode(): void {
+    const sheet = kernel.workbookManager.getActiveSheet();
+    if (!sheet) {
+      alert('Nenhuma sheet ativa');
+      return;
+    }
+
+    this.isDashboardMode = !this.isDashboardMode;
+
+    const gridWrapper = document.getElementById('grid-wrapper');
+    const dashboardContainer = document.getElementById('dashboard-container');
+    const dashboardToolbar = document.getElementById('dashboard-toolbar');
+    const toggleBtn = document.getElementById('btn-toggle-dashboard');
+
+    if (this.isDashboardMode) {
+      // Enter dashboard mode
+      gridWrapper?.classList.add('hidden');
+      dashboardContainer?.classList.remove('hidden');
+      dashboardToolbar?.classList.remove('hidden');
+      toggleBtn?.classList.add('active');
+
+      // Update button label
+      const btnLabel = toggleBtn?.querySelector('.ribbon-label');
+      if (btnLabel) btnLabel.textContent = 'Grade';
+
+      // Initialize dashboard
+      this.initDashboard(sheet.id);
+
+      logger.info('[UIManager] Dashboard mode activated');
+    } else {
+      // Exit dashboard mode
+      gridWrapper?.classList.remove('hidden');
+      dashboardContainer?.classList.add('hidden');
+      dashboardToolbar?.classList.add('hidden');
+      toggleBtn?.classList.remove('active');
+
+      // Update button label
+      const btnLabel = toggleBtn?.querySelector('.ribbon-label');
+      if (btnLabel) btnLabel.textContent = 'Dashboard';
+
+      // Clean up dashboard
+      if (this.dashboardRenderer) {
+        this.dashboardRenderer.destroy();
+        this.dashboardRenderer = undefined;
+      }
+
+      logger.info('[UIManager] Grid mode activated');
+    }
+  }
+
+  /**
+   * Initialize dashboard for a sheet
+   */
+  private initDashboard(sheetId: string): void {
+    const container = document.getElementById('dashboard-container');
+    const sheet = kernel.workbookManager.getActiveSheet();
+
+    if (!container || !sheet) {
+      logger.error('[UIManager] Cannot initialize dashboard - missing container or sheet');
+      return;
+    }
+
+    // Get or create layout
+    const layout = kernel.dashboardManager.getOrCreateLayout(sheetId);
+
+    // Create dashboard renderer
+    this.dashboardRenderer = new DashboardRenderer(
+      container,
+      sheet,
+      layout
+    );
+
+    // Set up change handler to auto-save
+    this.dashboardRenderer.setChangeHandler(async () => {
+      await kernel.saveAllDashboards();
+      logger.debug('[UIManager] Dashboard changes saved');
+    });
+
+    logger.info('[UIManager] Dashboard initialized', { sheetId, widgetCount: layout.widgets.length });
+  }
+
+  /**
+   * Add a widget to the current dashboard
+   */
+  public addWidget(type: 'kpi' | 'table' | 'text' | 'image'): void {
+    const sheet = kernel.workbookManager.getActiveSheet();
+    if (!sheet) {
+      alert('Nenhuma sheet ativa');
+      return;
+    }
+
+    if (!this.isDashboardMode) {
+      alert('Ative o modo Dashboard primeiro');
+      return;
+    }
+
+    // Show configuration modal based on widget type
+    switch (type) {
+      case 'kpi':
+        this.showKPIConfigModal(sheet.id);
+        break;
+      case 'table':
+        this.showTableConfigModal(sheet.id);
+        break;
+      case 'text':
+        this.showTextConfigModal(sheet.id);
+        break;
+      case 'image':
+        this.showImageConfigModal(sheet.id);
+        break;
+    }
+  }
+
+  /**
+   * Show KPI configuration modal (simplified)
+   */
+  private showKPIConfigModal(sheetId: string): void {
+    const modal = document.createElement('div');
+    modal.className = 'modal-overlay';
+    modal.innerHTML = `
+      <div class="modal-content" style="max-width: 500px;">
+        <div class="modal-header">
+          <h2>📊 Novo Widget KPI</h2>
+          <button class="modal-close">&times;</button>
+        </div>
+        <div class="modal-body">
+          <div class="form-group">
+            <label>Título do Widget</label>
+            <input type="text" id="kpi-title" class="form-control" value="KPI 1" />
+          </div>
+          <div class="form-group">
+            <label>Ícone (emoji)</label>
+            <input type="text" id="kpi-icon" class="form-control" value="📈" placeholder="📊" />
+          </div>
+          <div class="form-group">
+            <label>Fonte de Dados</label>
+            <select id="kpi-source" class="form-control">
+              <option value="cell">Célula</option>
+              <option value="formula">Fórmula</option>
+            </select>
+          </div>
+          <div class="form-group" id="kpi-cell-group">
+            <label>Referência da Célula (ex: A1)</label>
+            <input type="text" id="kpi-cellref" class="form-control" placeholder="A1" />
+          </div>
+          <div class="form-group">
+            <label>Formato</label>
+            <select id="kpi-format" class="form-control">
+              <option value="number">Número</option>
+              <option value="currency">Moeda</option>
+              <option value="percentage">Percentual</option>
+            </select>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-secondary modal-cancel">Cancelar</button>
+          <button class="btn btn-primary modal-confirm">Adicionar</button>
+        </div>
+      </div>
+    `;
+
+    document.body.appendChild(modal);
+
+    // Event listeners
+    modal.querySelector('.modal-close')?.addEventListener('click', () => modal.remove());
+    modal.querySelector('.modal-cancel')?.addEventListener('click', () => modal.remove());
+
+    modal.querySelector('.modal-confirm')?.addEventListener('click', () => {
+      const title = (document.getElementById('kpi-title') as HTMLInputElement).value;
+      const icon = (document.getElementById('kpi-icon') as HTMLInputElement).value;
+      const source = (document.getElementById('kpi-source') as HTMLSelectElement).value;
+      const cellRef = (document.getElementById('kpi-cellref') as HTMLInputElement).value;
+      const format = (document.getElementById('kpi-format') as HTMLSelectElement).value;
+
+      const widget = kernel.dashboardManager.addWidget(sheetId, 'kpi', {
+        title,
+        kpiConfig: {
+          valueSource: source as any,
+          cellRef: source === 'cell' ? cellRef : undefined,
+          format: format as any,
+          icon,
+          iconColor: '#10b981',
+          fontSize: 48,
+          decimals: 2
+        }
+      });
+
+      // Refresh dashboard
+      if (this.dashboardRenderer) {
+        this.dashboardRenderer.refresh();
+      }
+
+      modal.remove();
+      logger.info('[UIManager] KPI widget added', { widgetId: widget.id });
+    });
+  }
+
+  /**
+   * Show Table configuration modal (simplified)
+   */
+  private showTableConfigModal(sheetId: string): void {
+    const tableManager = TableManager.getInstance();
+    const tables = tableManager.getTablesBySheet(sheetId);
+
+    if (tables.length === 0) {
+      alert('Nenhuma tabela encontrada nesta sheet. Crie uma tabela primeiro na aba Dados.');
+      return;
+    }
+
+    const modal = document.createElement('div');
+    modal.className = 'modal-overlay';
+    modal.innerHTML = `
+      <div class="modal-content" style="max-width: 500px;">
+        <div class="modal-header">
+          <h2>📋 Novo Widget de Tabela</h2>
+          <button class="modal-close">&times;</button>
+        </div>
+        <div class="modal-body">
+          <div class="form-group">
+            <label>Selecione a Tabela</label>
+            <select id="table-select" class="form-control">
+              ${tables.map(t => `<option value="${t.id}">${t.name}</option>`).join('')}
+            </select>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-secondary modal-cancel">Cancelar</button>
+          <button class="btn btn-primary modal-confirm">Adicionar</button>
+        </div>
+      </div>
+    `;
+
+    document.body.appendChild(modal);
+
+    modal.querySelector('.modal-close')?.addEventListener('click', () => modal.remove());
+    modal.querySelector('.modal-cancel')?.addEventListener('click', () => modal.remove());
+
+    modal.querySelector('.modal-confirm')?.addEventListener('click', () => {
+      const tableId = (document.getElementById('table-select') as HTMLSelectElement).value;
+      const table = tableManager.getTable(tableId);
+
+      if (table) {
+        const widget = kernel.dashboardManager.addWidget(sheetId, 'table', {
+          title: table.name,
+          tableId: table.id
+        });
+
+        if (this.dashboardRenderer) {
+          this.dashboardRenderer.refresh();
+        }
+
+        modal.remove();
+        logger.info('[UIManager] Table widget added', { widgetId: widget.id });
+      }
+    });
+  }
+
+  /**
+   * Show Text configuration modal (simplified)
+   */
+  private showTextConfigModal(sheetId: string): void {
+    const modal = document.createElement('div');
+    modal.className = 'modal-overlay';
+    modal.innerHTML = `
+      <div class="modal-content" style="max-width: 500px;">
+        <div class="modal-header">
+          <h2>📝 Novo Widget de Texto</h2>
+          <button class="modal-close">&times;</button>
+        </div>
+        <div class="modal-body">
+          <div class="form-group">
+            <label>Conteúdo</label>
+            <textarea id="text-content" class="form-control" rows="4" placeholder="Digite seu texto aqui...">Texto do Dashboard</textarea>
+          </div>
+          <div class="form-group">
+            <label>Tamanho da Fonte</label>
+            <select id="text-size" class="form-control">
+              <option value="small">Pequeno</option>
+              <option value="medium" selected>Médio</option>
+              <option value="large">Grande</option>
+              <option value="xlarge">Extra Grande</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Alinhamento</label>
+            <select id="text-align" class="form-control">
+              <option value="left">Esquerda</option>
+              <option value="center" selected>Centro</option>
+              <option value="right">Direita</option>
+            </select>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-secondary modal-cancel">Cancelar</button>
+          <button class="btn btn-primary modal-confirm">Adicionar</button>
+        </div>
+      </div>
+    `;
+
+    document.body.appendChild(modal);
+
+    modal.querySelector('.modal-close')?.addEventListener('click', () => modal.remove());
+    modal.querySelector('.modal-cancel')?.addEventListener('click', () => modal.remove());
+
+    modal.querySelector('.modal-confirm')?.addEventListener('click', () => {
+      const content = (document.getElementById('text-content') as HTMLTextAreaElement).value;
+      const fontSize = (document.getElementById('text-size') as HTMLSelectElement).value;
+      const alignment = (document.getElementById('text-align') as HTMLSelectElement).value;
+
+      const widget = kernel.dashboardManager.addWidget(sheetId, 'text', {
+        title: 'Texto',
+        showTitle: false,
+        textConfig: {
+          content,
+          fontSize: fontSize as any,
+          alignment: alignment as any,
+          textColor: '#1f2937'
+        }
+      });
+
+      if (this.dashboardRenderer) {
+        this.dashboardRenderer.refresh();
+      }
+
+      modal.remove();
+      logger.info('[UIManager] Text widget added', { widgetId: widget.id });
+    });
+  }
+
+  /**
+   * Show Image configuration modal (simplified)
+   */
+  private showImageConfigModal(sheetId: string): void {
+    const modal = document.createElement('div');
+    modal.className = 'modal-overlay';
+    modal.innerHTML = `
+      <div class="modal-content" style="max-width: 500px;">
+        <div class="modal-header">
+          <h2>🖼️ Novo Widget de Imagem</h2>
+          <button class="modal-close">&times;</button>
+        </div>
+        <div class="modal-body">
+          <div class="form-group">
+            <label>URL da Imagem</label>
+            <input type="text" id="image-url" class="form-control" placeholder="https://example.com/image.png" />
+          </div>
+          <div class="form-group">
+            <label>Ajuste</label>
+            <select id="image-fit" class="form-control">
+              <option value="contain" selected>Conter</option>
+              <option value="cover">Cobrir</option>
+              <option value="fill">Preencher</option>
+              <option value="none">Nenhum</option>
+            </select>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-secondary modal-cancel">Cancelar</button>
+          <button class="btn btn-primary modal-confirm">Adicionar</button>
+        </div>
+      </div>
+    `;
+
+    document.body.appendChild(modal);
+
+    modal.querySelector('.modal-close')?.addEventListener('click', () => modal.remove());
+    modal.querySelector('.modal-cancel')?.addEventListener('click', () => modal.remove());
+
+    modal.querySelector('.modal-confirm')?.addEventListener('click', () => {
+      const url = (document.getElementById('image-url') as HTMLInputElement).value;
+      const fit = (document.getElementById('image-fit') as HTMLSelectElement).value;
+
+      if (!url) {
+        alert('Digite uma URL válida');
+        return;
+      }
+
+      const widget = kernel.dashboardManager.addWidget(sheetId, 'image', {
+        title: 'Imagem',
+        showTitle: false,
+        imageConfig: {
+          source: url,
+          fit: fit as any,
+          opacity: 1
+        }
+      });
+
+      if (this.dashboardRenderer) {
+        this.dashboardRenderer.refresh();
+      }
+
+      modal.remove();
+      logger.info('[UIManager] Image widget added', { widgetId: widget.id });
+    });
   }
 }

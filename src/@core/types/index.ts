@@ -440,3 +440,142 @@ export interface TableCreationOptions {
   analyzeDataTypes?: boolean;
   startPosition?: { row: number; col: number }; // Starting position for range detection
 }
+
+// ============================================================================
+// DASHBOARD TYPES (Phase 1)
+// ============================================================================
+
+export type DashboardMode = 'grid' | 'dashboard';
+
+export type WidgetType = 'kpi' | 'table' | 'text' | 'image' | 'chart' | 'pivot';
+
+export interface WidgetPosition {
+  x: number;      // Position in pixels from left
+  y: number;      // Position in pixels from top
+  width: number;  // Width in pixels
+  height: number; // Height in pixels
+}
+
+export interface WidgetConfig {
+  id: string;
+  type: WidgetType;
+  position: WidgetPosition;
+  title: string;
+
+  // Type-specific configuration
+  tableId?: string;      // For table widgets - reference to StructuredTable
+  chartConfig?: any;     // For chart widgets (future)
+  pivotConfig?: any;     // For pivot widgets (future)
+
+  // KPI widget configuration
+  kpiConfig?: KPIConfig;
+
+  // Text widget configuration
+  textConfig?: TextConfig;
+
+  // Image widget configuration
+  imageConfig?: ImageConfig;
+
+  // Visual settings
+  showTitle?: boolean;
+  backgroundColor?: string;
+  borderColor?: string;
+  borderWidth?: number;
+
+  // Metadata
+  created: Date;
+  modified: Date;
+}
+
+// ============================================================================
+// KPI WIDGET TYPES
+// ============================================================================
+
+export type KPIValueSource = 'cell' | 'formula' | 'aggregation';
+export type KPIAggregation = 'sum' | 'average' | 'min' | 'max' | 'count';
+export type KPIFormat = 'number' | 'currency' | 'percentage';
+export type KPIComparisonType = 'none' | 'target' | 'previous';
+
+export interface KPIConfig {
+  // Data source
+  valueSource: KPIValueSource;
+  cellRef?: string;           // If source is 'cell' (e.g., "A1")
+  formula?: string;           // If source is 'formula' (e.g., "=SOMA(A1:A10)")
+  tableId?: string;           // If source is 'aggregation'
+  columnIndex?: number;       // If source is 'aggregation'
+  aggregation?: KPIAggregation;
+
+  // Formatting
+  format: KPIFormat;
+  decimals?: number;
+  prefix?: string;            // e.g., "R$", "$"
+  suffix?: string;            // e.g., "%", "un"
+
+  // Visual
+  icon?: string;              // Emoji or icon character
+  iconColor?: string;
+  valueColor?: string;
+  fontSize?: number;          // Value font size in px
+
+  // Conditional formatting
+  conditionalColors?: KPIConditionalColor[];
+
+  // Comparison (optional)
+  comparison?: KPIComparisonType;
+  targetValue?: number;       // For 'target' comparison
+  previousValue?: number;     // For 'previous' comparison (stored, not configured)
+}
+
+export interface KPIConditionalColor {
+  condition: 'greater' | 'less' | 'equal' | 'between';
+  value: number;
+  value2?: number;            // For 'between'
+  color: string;
+}
+
+// ============================================================================
+// TEXT WIDGET TYPES
+// ============================================================================
+
+export type TextAlignment = 'left' | 'center' | 'right' | 'justify';
+export type TextFontSize = 'small' | 'medium' | 'large' | 'xlarge';
+
+export interface TextConfig {
+  content: string;            // HTML content
+  fontSize?: TextFontSize;
+  alignment?: TextAlignment;
+  textColor?: string;
+  bold?: boolean;
+  italic?: boolean;
+  underline?: boolean;
+
+  // Background
+  backgroundColor?: string;
+  padding?: number;           // Padding in px
+}
+
+// ============================================================================
+// IMAGE WIDGET TYPES
+// ============================================================================
+
+export type ImageFit = 'contain' | 'cover' | 'fill' | 'none';
+
+export interface ImageConfig {
+  source: string;             // URL or base64
+  alt?: string;               // Alt text
+  fit?: ImageFit;             // How image fits in widget
+  opacity?: number;           // 0-1
+  borderRadius?: number;      // Border radius in px
+}
+
+export interface DashboardLayout {
+  id: string;
+  sheetId: string;           // Dashboard belongs to a sheet
+  mode: DashboardMode;       // Current mode
+  widgets: WidgetConfig[];   // List of widgets
+  gridVisible?: boolean;     // Show grid lines in dashboard mode
+  snapToGrid?: boolean;      // Snap widgets to grid when moving
+  gridSize?: number;         // Grid size in pixels (default 20)
+  created: Date;
+  modified: Date;
+}

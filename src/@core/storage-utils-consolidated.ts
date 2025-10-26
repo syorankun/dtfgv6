@@ -171,6 +171,16 @@ export class PersistenceManager {
           if (!db.objectStoreNames.contains("settings")) {
             db.createObjectStore("settings", { keyPath: "key" });
           }
+
+          // Dashboards store
+          if (!db.objectStoreNames.contains("dashboards")) {
+            const dashboardStore = db.createObjectStore("dashboards", {
+              keyPath: "id",
+            });
+            dashboardStore.createIndex("sheetId", "sheetId", {
+              unique: false,
+            });
+          }
         },
       });
 
@@ -458,6 +468,69 @@ export class PersistenceManager {
 
   async savePluginRefs(refs: any[]): Promise<void> {
     await this.saveSetting("plugin_refs", refs);
+  }
+
+  // --------------------------------------------------------------------------
+  // DASHBOARD OPERATIONS
+  // --------------------------------------------------------------------------
+
+  async saveDashboard(dashboard: any): Promise<void> {
+    if (!this.db) throw new Error("DB not initialized");
+
+    try {
+      await this.db.put("dashboards", dashboard);
+      this.logger.debug("[Persistence] Dashboard saved", { id: dashboard.id, sheetId: dashboard.sheetId });
+    } catch (error) {
+      this.logger.error("[Persistence] Dashboard save failed", error);
+      throw error;
+    }
+  }
+
+  async getDashboard(id: string): Promise<any | null> {
+    if (!this.db) throw new Error("DB not initialized");
+
+    try {
+      const data = await this.db.get("dashboards", id);
+      return data || null;
+    } catch (error) {
+      this.logger.error("[Persistence] Dashboard get failed", error);
+      return null;
+    }
+  }
+
+  async getDashboardBySheetId(sheetId: string): Promise<any | null> {
+    if (!this.db) throw new Error("DB not initialized");
+
+    try {
+      const dashboards = await this.db.getAllFromIndex("dashboards", "sheetId", sheetId);
+      return dashboards.length > 0 ? dashboards[0] : null;
+    } catch (error) {
+      this.logger.error("[Persistence] Dashboard get by sheetId failed", error);
+      return null;
+    }
+  }
+
+  async getAllDashboards(): Promise<any[]> {
+    if (!this.db) throw new Error("DB not initialized");
+
+    try {
+      return await this.db.getAll("dashboards");
+    } catch (error) {
+      this.logger.error("[Persistence] Get all dashboards failed", error);
+      return [];
+    }
+  }
+
+  async deleteDashboard(id: string): Promise<void> {
+    if (!this.db) throw new Error("DB not initialized");
+
+    try {
+      await this.db.delete("dashboards", id);
+      this.logger.debug("[Persistence] Dashboard deleted", { id });
+    } catch (error) {
+      this.logger.error("[Persistence] Dashboard delete failed", error);
+      throw error;
+    }
   }
 }
 

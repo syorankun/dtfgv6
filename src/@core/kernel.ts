@@ -560,6 +560,34 @@ export class DJDataForgeKernel {
     
     return deleted;
   }
+
+  createSheet(name: string): any {
+    const wb = this.workbookManager.getActiveWorkbook();
+    if (!wb) {
+      logger.error("[Kernel] No active workbook to add sheet to");
+      return null;
+    }
+
+    const sheet = wb.addSheet(name);
+    this.eventBus.emit("sheet:created", { sheetId: sheet.id, workbookId: wb.id });
+    logger.info("[Kernel] Sheet created", { sheetId: sheet.id, workbookId: wb.id });
+    return sheet;
+  }
+
+  deleteSheet(workbookId: string, sheetId: string): boolean {
+    const wb = this.workbookManager.getWorkbook(workbookId);
+    if (!wb) {
+      logger.error("[Kernel] Workbook not found for sheet deletion", { workbookId });
+      return false;
+    }
+
+    const deleted = wb.deleteSheet(sheetId);
+    if (deleted) {
+      this.eventBus.emit("sheet:deleted", { sheetId, workbookId });
+      logger.info("[Kernel] Sheet deleted", { sheetId, workbookId });
+    }
+    return deleted;
+  }
   
   /**
    * Save workbook to storage

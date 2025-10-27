@@ -462,6 +462,31 @@ export class UIManager {
       this.addMenuItem(config);
     });
 
+    // ADICIONE ESTAS LINHAS:
+    kernel.eventBus.on('workbook:created', () => {
+        logger.debug('[UIManager] Received workbook:created event, refreshing list');
+        this.refreshWorkbookList();
+    });
+
+    kernel.eventBus.on('workbook:deleted', () => {
+        logger.debug('[UIManager] Received workbook:deleted event, refreshing list');
+        this.refreshWorkbookList();
+        this.refreshSheetList(); // Também atualiza a lista de sheets
+        this.refreshGrid();      // E a grid
+    });
+
+    // Você precisará criar e emitir estes eventos no kernel/workbook
+    kernel.eventBus.on('sheet:created', () => {
+        logger.debug('[UIManager] Received sheet:created event, refreshing list');
+        this.refreshSheetList();
+    });
+
+    kernel.eventBus.on('sheet:deleted', () => {
+        logger.debug('[UIManager] Received sheet:deleted event, refreshing list');
+        this.refreshSheetList();
+        this.refreshGrid();
+    });
+
     logger.info('[UIManager] UI change listeners set up successfully');
   }
 
@@ -590,25 +615,23 @@ export class UIManager {
         } else if (type === 'sheet') {
           const wb = kernel.workbookManager.getActiveWorkbook();
           if (wb) {
-            wb.addSheet(name);
-            this.refreshSheetList();
-            this.refreshGrid();
-            logger.info('[UIManager] Sheet created', { name });
+            kernel.createSheet(name);
+            logger.info('[UIManager] Sheet creation requested', { name });
           } else {
             alert('Selecione um workbook primeiro');
           }
         } else { // dashboard
             const wb = kernel.workbookManager.getActiveWorkbook();
             if (wb) {
-                const sheet = wb.addSheet(name);
-                wb.setActiveSheet(sheet.id);
-                kernel.dashboardManager.getOrCreateLayout(sheet.id);
-                this.refreshSheetList();
-                this.refreshGrid();
-                if (!this.isDashboardMode) {
-                    this.toggleDashboardMode();
+                const sheet = kernel.createSheet(name);
+                if (sheet) {
+                    wb.setActiveSheet(sheet.id);
+                    kernel.dashboardManager.getOrCreateLayout(sheet.id);
+                    if (!this.isDashboardMode) {
+                        this.toggleDashboardMode();
+                    }
+                    logger.info('[UIManager] Dashboard sheet created', { name });
                 }
-                logger.info('[UIManager] Dashboard sheet created', { name });
             } else {
                 alert('Selecione um workbook primeiro');
             }
@@ -3990,18 +4013,14 @@ class MeuPlugin {
       return;
     }
 
-    // Delete the sheet
-    const deleted = wb.deleteSheet(sheetId);
+    // Delete the sheet through the kernel
+    const deleted = kernel.deleteSheet(wb.id, sheetId);
 
     if (deleted) {
       // Delete dashboard layout if exists
       kernel.dashboardManager.deleteLayout(sheetId);
 
-      // Refresh UI
-      this.refreshSheetList();
-      this.refreshGrid();
-
-      logger.info('[UIManager] Sheet deleted', { sheetId, sheetName: sheet.name });
+      logger.info('[UIManager] Sheet deletion requested', { sheetId, sheetName: sheet.name });
     } else {
       alert('Erro ao apagar planilha.');
     }

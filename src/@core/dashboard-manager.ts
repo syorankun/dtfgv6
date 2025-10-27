@@ -55,6 +55,7 @@ export class DashboardManager {
         id: nanoid(),
         sheetId,
         mode: 'grid', // Start in grid mode
+        viewMode: 'edit', // Start in edit mode
         widgets: [],
         gridVisible: true,
         snapToGrid: true,
@@ -65,6 +66,11 @@ export class DashboardManager {
 
       this.layouts.set(sheetId, layout);
       logger.info('[DashboardManager] Created new layout', { sheetId, layoutId: layout.id });
+    }
+
+    // Ensure viewMode exists (for backwards compatibility)
+    if (!layout.viewMode) {
+      layout.viewMode = 'edit';
     }
 
     return layout;
@@ -353,6 +359,41 @@ export class DashboardManager {
     const newMode: DashboardMode = layout.mode === 'grid' ? 'dashboard' : 'grid';
     this.setMode(sheetId, newMode);
     return newMode;
+  }
+
+  /**
+   * Set view mode for dashboard (edit or view)
+   */
+  setViewMode(sheetId: string, viewMode: 'edit' | 'view'): void {
+    const layout = this.getOrCreateLayout(sheetId);
+    layout.viewMode = viewMode;
+    layout.modified = new Date();
+
+    logger.info('[DashboardManager] View mode changed', { sheetId, viewMode });
+
+    // Emit event
+    this.eventBus?.emit('dashboard:viewModeChanged', {
+      sheetId,
+      viewMode
+    });
+  }
+
+  /**
+   * Get current view mode for dashboard
+   */
+  getViewMode(sheetId: string): 'edit' | 'view' {
+    const layout = this.layouts.get(sheetId);
+    return layout?.viewMode || 'edit';
+  }
+
+  /**
+   * Toggle view mode (edit <-> view)
+   */
+  toggleViewMode(sheetId: string): 'edit' | 'view' {
+    const layout = this.getOrCreateLayout(sheetId);
+    const newViewMode: 'edit' | 'view' = layout.viewMode === 'edit' ? 'view' : 'edit';
+    this.setViewMode(sheetId, newViewMode);
+    return newViewMode;
   }
 
   /**

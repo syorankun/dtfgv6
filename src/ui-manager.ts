@@ -366,6 +366,24 @@ export class UIManager {
             </div>
             <div id="dashboard-panels" class="hidden">
                 <div class="panel">
+                    <h4>👁️ Visualização</h4>
+                    <button id="btn-toggle-view-mode" class="btn btn-primary" style="width: 100%; margin-bottom: 8px;">
+                        <span id="view-mode-icon">✏️</span>
+                        <span id="view-mode-label">Modo Edição</span>
+                    </button>
+                    <p id="view-mode-hint" style="font-size: 11px; color: var(--theme-text-secondary); margin: 0 0 12px 0;">
+                        Clique para alternar entre edição e visualização
+                    </p>
+                    <div id="export-buttons" class="hidden" style="display: flex; flex-direction: column; gap: 6px;">
+                        <button id="btn-export-pdf" class="btn" style="width: 100%; font-size: 12px;">
+                            📄 Exportar PDF
+                        </button>
+                        <button id="btn-export-excel" class="btn" style="width: 100%; font-size: 12px;">
+                            📊 Exportar Excel
+                        </button>
+                    </div>
+                </div>
+                <div class="panel" id="panel-add-widgets">
                     <h4>🎨 Adicionar Widget</h4>
                     <div class="dashboard-toolbar-buttons">
                         <button id="btn-add-kpi-widget" class="dashboard-widget-btn" title="Adicionar KPI">
@@ -1017,6 +1035,18 @@ export class UIManager {
     // Dashboard buttons
     document.getElementById('btn-toggle-dashboard')?.addEventListener('click', () => {
       this.toggleDashboardMode();
+    });
+
+    document.getElementById('btn-toggle-view-mode')?.addEventListener('click', () => {
+      this.toggleDashboardViewMode();
+    });
+
+    document.getElementById('btn-export-pdf')?.addEventListener('click', () => {
+      this.exportDashboardPDF();
+    });
+
+    document.getElementById('btn-export-excel')?.addEventListener('click', () => {
+      this.exportDashboardExcel();
     });
 
     document.getElementById('btn-add-kpi-widget')?.addEventListener('click', () => {
@@ -3239,6 +3269,186 @@ class MeuPlugin {
     });
 
     logger.info('[UIManager] Dashboard initialized', { sheetId, widgetCount: layout.widgets.length });
+  }
+
+  /**
+   * Toggle dashboard view mode (edit <-> view)
+   */
+  public toggleDashboardViewMode(): void {
+    const sheet = kernel.workbookManager.getActiveSheet();
+    if (!sheet) {
+      alert('Nenhuma sheet ativa');
+      return;
+    }
+
+    if (!this.isDashboardMode) {
+      alert('Ative o modo Dashboard primeiro');
+      return;
+    }
+
+    // Toggle view mode
+    const newViewMode = kernel.dashboardManager.toggleViewMode(sheet.id);
+
+    // Update UI button
+    const btn = document.getElementById('btn-toggle-view-mode');
+    const icon = document.getElementById('view-mode-icon');
+    const label = document.getElementById('view-mode-label');
+    const hint = document.getElementById('view-mode-hint');
+    const panelAddWidgets = document.getElementById('panel-add-widgets');
+    const widgetSettings = document.getElementById('widget-specific-settings')?.parentElement;
+    const exportButtons = document.getElementById('export-buttons');
+
+    if (newViewMode === 'view') {
+      // Switch to VIEW mode
+      if (icon) icon.textContent = '👁️';
+      if (label) label.textContent = 'Modo Visualização';
+      if (hint) hint.textContent = 'Modo somente leitura - clique para editar';
+      if (btn) btn.classList.add('active');
+
+      // Hide add widgets panel and settings in view mode
+      panelAddWidgets?.classList.add('hidden');
+      widgetSettings?.classList.add('hidden');
+
+      // Show export buttons in view mode
+      exportButtons?.classList.remove('hidden');
+    } else {
+      // Switch to EDIT mode
+      if (icon) icon.textContent = '✏️';
+      if (label) label.textContent = 'Modo Edição';
+      if (hint) hint.textContent = 'Clique para visualizar o dashboard sem controles';
+      if (btn) btn.classList.remove('active');
+
+      // Show add widgets panel and settings in edit mode
+      panelAddWidgets?.classList.remove('hidden');
+      widgetSettings?.classList.remove('hidden');
+
+      // Hide export buttons in edit mode
+      exportButtons?.classList.add('hidden');
+    }
+
+    // Refresh dashboard renderer
+    if (this.dashboardRenderer) {
+      this.dashboardRenderer.setViewMode(newViewMode);
+    }
+
+    logger.info('[UIManager] Dashboard view mode changed', { viewMode: newViewMode });
+  }
+
+  /**
+   * Export dashboard to PDF (using browser print)
+   */
+  public exportDashboardPDF(): void {
+    const sheet = kernel.workbookManager.getActiveSheet();
+    if (!sheet) {
+      alert('Nenhuma sheet ativa');
+      return;
+    }
+
+    if (!this.isDashboardMode) {
+      alert('Ative o modo Dashboard primeiro');
+      return;
+    }
+
+    // Ensure we're in view mode for clean export
+    const currentMode = kernel.dashboardManager.getViewMode(sheet.id);
+    if (currentMode !== 'view') {
+      alert('Alterne para Modo Visualização antes de exportar');
+      return;
+    }
+
+    // Use browser print dialog for PDF generation
+    const printTitle = `Dashboard - ${sheet.name}`;
+    const originalTitle = document.title;
+    document.title = printTitle;
+
+    window.print();
+
+    // Restore original title after print dialog closes
+    setTimeout(() => {
+      document.title = originalTitle;
+    }, 100);
+
+    logger.info('[UIManager] Dashboard exported to PDF', { sheetId: sheet.id });
+  }
+
+  /**
+   * Export dashboard data to Excel (CSV format)
+   */
+  public exportDashboardExcel(): void {
+    const sheet = kernel.workbookManager.getActiveSheet();
+    if (!sheet) {
+      alert('Nenhuma sheet ativa');
+      return;
+    }
+
+    if (!this.isDashboardMode) {
+      alert('Ative o modo Dashboard primeiro');
+      return;
+    }
+
+    const layout = kernel.dashboardManager.getLayout(sheet.id);
+    if (!layout || layout.widgets.length === 0) {
+      alert('Nenhum widget para exportar');
+      return;
+    }
+
+    try {
+      // Create CSV content from dashboard data
+      let csvContent = `Dashboard: ${sheet.name}\n\n`;
+
+      layout.widgets.forEach((widget, index) => {
+        csvContent += `\nWidget ${index + 1}: ${widget.title}\n`;
+        csvContent += `Tipo: ${widget.type}\n`;
+
+        // Export widget-specific data
+        if (widget.type === 'table' && widget.tableId) {
+          const tableManager = kernel.tableManager;
+          const table = tableManager.getTable(widget.tableId);
+          if (table) {
+            csvContent += `\nTabela: ${table.name}\n`;
+            // Add table headers
+            csvContent += table.columns.map(col => col.name).join(',') + '\n';
+
+            // Add table data
+            const tableData = tableManager.getTableData(widget.tableId);
+            tableData.forEach(row => {
+              csvContent += row.map(cell => {
+                const cellStr = String(cell || '');
+                // Escape commas and quotes
+                return cellStr.includes(',') || cellStr.includes('"')
+                  ? `"${cellStr.replace(/"/g, '""')}"`
+                  : cellStr;
+              }).join(',') + '\n';
+            });
+          }
+        } else if (widget.type === 'kpi' && widget.kpiConfig) {
+          const kpi = widget.kpiConfig;
+          csvContent += `Valor: ${kpi.cellRef || kpi.formula || 'N/A'}\n`;
+          csvContent += `Formato: ${kpi.format}\n`;
+        } else if (widget.type === 'text' && widget.textConfig) {
+          csvContent += `Conteúdo: ${widget.textConfig.content}\n`;
+        }
+
+        csvContent += '\n';
+      });
+
+      // Create blob and download
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const link = document.createElement('a');
+      const url = URL.createObjectURL(blob);
+
+      link.setAttribute('href', url);
+      link.setAttribute('download', `dashboard_${sheet.name}_${new Date().toISOString().split('T')[0]}.csv`);
+      link.style.visibility = 'hidden';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+
+      logger.info('[UIManager] Dashboard exported to Excel', { sheetId: sheet.id, widgetCount: layout.widgets.length });
+    } catch (error) {
+      logger.error('[UIManager] Error exporting dashboard to Excel', error);
+      alert('Erro ao exportar dashboard para Excel');
+    }
   }
 
   /**

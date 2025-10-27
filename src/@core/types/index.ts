@@ -465,6 +465,7 @@ export interface TableCreationOptions {
 // ============================================================================
 
 export type DashboardMode = 'grid' | 'dashboard';
+export type DashboardViewMode = 'edit' | 'view';
 
 export type WidgetType = 'kpi' | 'table' | 'text' | 'image' | 'chart' | 'pivot';
 
@@ -611,7 +612,8 @@ export interface TableWidgetConfig {
 export interface DashboardLayout {
   id: string;
   sheetId: string;           // Dashboard belongs to a sheet
-  mode: DashboardMode;       // Current mode
+  mode: DashboardMode;       // Current mode (grid or dashboard)
+  viewMode?: DashboardViewMode; // View mode (edit or view) - only applies when mode='dashboard'
   widgets: WidgetConfig[];   // List of widgets
   gridVisible?: boolean;     // Show grid lines in dashboard mode
   snapToGrid?: boolean;      // Snap widgets to grid when moving

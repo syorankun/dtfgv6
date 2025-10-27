@@ -26,11 +26,13 @@ class WidgetRenderer {
   private sheet: Sheet;
   private onWidgetChange?: () => void;
   private internalRenderer: any;
+  private viewMode: 'edit' | 'view' = 'edit';
 
-  constructor(config: WidgetConfig, sheet: Sheet, onWidgetChange?: () => void) {
+  constructor(config: WidgetConfig, sheet: Sheet, onWidgetChange?: () => void, viewMode: 'edit' | 'view' = 'edit') {
     this.config = config;
     this.sheet = sheet;
     this.onWidgetChange = onWidgetChange;
+    this.viewMode = viewMode;
     this.element = this.createWidgetElement();
   }
 
@@ -44,74 +46,99 @@ class WidgetRenderer {
     widget.style.width = `${this.config.position.width}px`;
     widget.style.height = `${this.config.position.height}px`;
     widget.style.backgroundColor = this.config.backgroundColor || '#ffffff';
-    widget.style.border = `${this.config.borderWidth || 1}px solid ${this.config.borderColor || '#e5e7eb'}`;
-    widget.style.borderRadius = '8px';
-    widget.style.boxShadow = '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)';
     widget.style.overflow = 'hidden';
     widget.style.display = 'flex';
     widget.style.flexDirection = 'column';
-    widget.style.cursor = 'move';
 
-    // Widget header (title bar)
-    if (this.config.showTitle !== false) {
+    // View mode: clean appearance, no borders or shadows
+    if (this.viewMode === 'view') {
+      widget.style.border = 'none';
+      widget.style.borderRadius = '0';
+      widget.style.boxShadow = 'none';
+      widget.style.cursor = 'default';
+    } else {
+      // Edit mode: visible borders and shadows
+      widget.style.border = `${this.config.borderWidth || 1}px solid ${this.config.borderColor || '#e5e7eb'}`;
+      widget.style.borderRadius = '8px';
+      widget.style.boxShadow = '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)';
+      widget.style.cursor = 'move';
+    }
+
+    // Widget header (title bar) - only in edit mode or if showTitle is true in view mode
+    const shouldShowHeader = this.viewMode === 'edit' || (this.viewMode === 'view' && this.config.showTitle !== false);
+
+    if (shouldShowHeader) {
       const header = document.createElement('div');
       header.className = 'widget-header';
       header.style.padding = '12px 16px';
-      header.style.borderBottom = '1px solid #e5e7eb';
-      header.style.backgroundColor = '#f9fafb';
       header.style.fontWeight = '600';
       header.style.fontSize = '14px';
       header.style.display = 'flex';
       header.style.justifyContent = 'space-between';
       header.style.alignItems = 'center';
-      header.style.cursor = 'move';
+
+      // View mode: cleaner header style
+      if (this.viewMode === 'view') {
+        header.style.borderBottom = 'none';
+        header.style.backgroundColor = 'transparent';
+        header.style.cursor = 'default';
+        header.style.padding = '8px 0 4px 0';
+      } else {
+        // Edit mode: traditional header style
+        header.style.borderBottom = '1px solid #e5e7eb';
+        header.style.backgroundColor = '#f9fafb';
+        header.style.cursor = 'move';
+      }
 
       const title = document.createElement('span');
       title.textContent = this.config.title;
       header.appendChild(title);
 
-      // Widget controls
-      const controls = document.createElement('div');
-      controls.style.display = 'flex';
-      controls.style.gap = '8px';
+      // Widget controls - ONLY in edit mode
+      if (this.viewMode === 'edit') {
+        const controls = document.createElement('div');
+        controls.style.display = 'flex';
+        controls.style.gap = '8px';
 
-      // Settings button (only for table widgets)
-      if (this.config.type === 'table') {
-        const settingsBtn = document.createElement('button');
-        settingsBtn.textContent = '⚙️';
-        settingsBtn.style.border = 'none';
-        settingsBtn.style.background = 'transparent';
-        settingsBtn.style.cursor = 'pointer';
-        settingsBtn.style.fontSize = '16px';
-        settingsBtn.style.color = '#6b7280';
-        settingsBtn.title = 'Configurar tabela';
-        settingsBtn.onclick = (e) => {
+        // Settings button (only for table widgets)
+        if (this.config.type === 'table') {
+          const settingsBtn = document.createElement('button');
+          settingsBtn.textContent = '⚙️';
+          settingsBtn.style.border = 'none';
+          settingsBtn.style.background = 'transparent';
+          settingsBtn.style.cursor = 'pointer';
+          settingsBtn.style.fontSize = '16px';
+          settingsBtn.style.color = '#6b7280';
+          settingsBtn.title = 'Configurar tabela';
+          settingsBtn.onclick = (e) => {
+            e.stopPropagation();
+            this.element.dispatchEvent(new CustomEvent('widget-settings', {
+              detail: { widgetId: this.config.id }
+            }));
+          };
+          controls.appendChild(settingsBtn);
+        }
+
+        // Remove button
+        const removeBtn = document.createElement('button');
+        removeBtn.textContent = '✕';
+        removeBtn.style.border = 'none';
+        removeBtn.style.background = 'transparent';
+        removeBtn.style.cursor = 'pointer';
+        removeBtn.style.fontSize = '16px';
+        removeBtn.style.color = '#6b7280';
+        removeBtn.title = 'Remover widget';
+        removeBtn.onclick = (e) => {
           e.stopPropagation();
-          this.element.dispatchEvent(new CustomEvent('widget-settings', {
+          this.element.dispatchEvent(new CustomEvent('widget-remove', {
             detail: { widgetId: this.config.id }
           }));
         };
-        controls.appendChild(settingsBtn);
+        controls.appendChild(removeBtn);
+
+        header.appendChild(controls);
       }
 
-      // Remove button
-      const removeBtn = document.createElement('button');
-      removeBtn.textContent = '✕';
-      removeBtn.style.border = 'none';
-      removeBtn.style.background = 'transparent';
-      removeBtn.style.cursor = 'pointer';
-      removeBtn.style.fontSize = '16px';
-      removeBtn.style.color = '#6b7280';
-      removeBtn.title = 'Remover widget';
-      removeBtn.onclick = (e) => {
-        e.stopPropagation();
-        this.element.dispatchEvent(new CustomEvent('widget-remove', {
-          detail: { widgetId: this.config.id }
-        }));
-      };
-      controls.appendChild(removeBtn);
-
-      header.appendChild(controls);
       widget.appendChild(header);
     }
 
@@ -126,8 +153,10 @@ class WidgetRenderer {
     this.renderContent(content);
     widget.appendChild(content);
 
-    // Resize handles
-    this.addResizeHandles(widget);
+    // Resize handles - ONLY in edit mode
+    if (this.viewMode === 'edit') {
+      this.addResizeHandles(widget);
+    }
 
     return widget;
   }
@@ -273,15 +302,25 @@ export class DashboardRenderer {
     this.container.style.width = '100%';
     this.container.style.height = '100%';
     this.container.style.overflow = 'auto';
-    this.container.style.backgroundColor = '#f9fafb';
 
-    if (this.layout.gridVisible) {
-      const gridSize = this.layout.gridSize || 20;
-      this.container.style.backgroundImage = `
-        linear-gradient(to right, #e5e7eb 1px, transparent 1px),
-        linear-gradient(to bottom, #e5e7eb 1px, transparent 1px)
-      `;
-      this.container.style.backgroundSize = `${gridSize}px ${gridSize}px`;
+    const viewMode = this.layout.viewMode || 'edit';
+
+    if (viewMode === 'view') {
+      // View mode: clean white background, no grid
+      this.container.style.backgroundColor = '#ffffff';
+      this.container.style.backgroundImage = 'none';
+    } else {
+      // Edit mode: show grid if enabled
+      this.container.style.backgroundColor = '#f9fafb';
+
+      if (this.layout.gridVisible) {
+        const gridSize = this.layout.gridSize || 20;
+        this.container.style.backgroundImage = `
+          linear-gradient(to right, #e5e7eb 1px, transparent 1px),
+          linear-gradient(to bottom, #e5e7eb 1px, transparent 1px)
+        `;
+        this.container.style.backgroundSize = `${gridSize}px ${gridSize}px`;
+      }
     }
   }
 
@@ -300,9 +339,10 @@ export class DashboardRenderer {
   }
 
   private renderWidget(config: WidgetConfig): void {
+    const viewMode = this.layout.viewMode || 'edit';
     const renderer = new WidgetRenderer(config, this.sheet, () => {
       this.onWidgetChange?.();
-    });
+    }, viewMode);
     const element = renderer.getElement();
 
     element.addEventListener('click', () => {
@@ -321,23 +361,26 @@ export class DashboardRenderer {
       this.renderSelectedWidgetSettings();
     });
 
-    element.addEventListener('mousedown', (e) => {
-      if ((e.target as HTMLElement).classList.contains('resize-handle')) return;
-      this.startDrag(config.id, e.clientX, e.clientY);
-    });
+    // Drag/resize only in edit mode
+    if (viewMode === 'edit') {
+      element.addEventListener('mousedown', (e) => {
+        if ((e.target as HTMLElement).classList.contains('resize-handle')) return;
+        this.startDrag(config.id, e.clientX, e.clientY);
+      });
 
-    element.addEventListener('widget-remove', ((e: CustomEvent) => {
-      this.removeWidget(e.detail.widgetId);
-    }) as EventListener);
+      element.addEventListener('widget-remove', ((e: CustomEvent) => {
+        this.removeWidget(e.detail.widgetId);
+      }) as EventListener);
 
-    element.addEventListener('widget-settings', ((e: CustomEvent) => {
-      this.selectedWidgetId = e.detail.widgetId;
-      this.renderSelectedWidgetSettings();
-    }) as EventListener);
+      element.addEventListener('widget-settings', ((e: CustomEvent) => {
+        this.selectedWidgetId = e.detail.widgetId;
+        this.renderSelectedWidgetSettings();
+      }) as EventListener);
 
-    element.addEventListener('widget-resize-start', ((e: CustomEvent) => {
-      this.startResize(e.detail.widgetId, e.detail.handle, e.detail.x, e.detail.y);
-    }) as EventListener);
+      element.addEventListener('widget-resize-start', ((e: CustomEvent) => {
+        this.startResize(e.detail.widgetId, e.detail.handle, e.detail.x, e.detail.y);
+      }) as EventListener);
+    }
 
     this.container.appendChild(element);
     this.widgets.set(config.id, renderer);
@@ -513,6 +556,22 @@ export class DashboardRenderer {
 
   setChangeHandler(handler: () => void): void {
     this.onWidgetChange = handler;
+  }
+
+  /**
+   * Set view mode and refresh dashboard
+   */
+  setViewMode(viewMode: 'edit' | 'view'): void {
+    this.layout.viewMode = viewMode;
+    this.layout.modified = new Date();
+
+    // Refresh container (updates grid visibility)
+    this.setupContainer();
+
+    // Re-render all widgets to update their appearance
+    this.renderAllWidgets();
+
+    logger.info('[DashboardRenderer] View mode changed', { viewMode });
   }
 
   private renderSelectedWidgetSettings(): void {

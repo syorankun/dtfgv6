@@ -386,6 +386,12 @@ export class UIManager {
                         </button>
                     </div>
                 </div>
+                <div class="panel">
+                    <h4>⚙️ Configurações do Widget</h4>
+                    <div id="widget-specific-settings" style="font-size: 12px;">
+                        <p style="color: #9ca3af; padding: 10px;">Selecione um widget ou clique na engrenagem ⚙️ para configurar.</p>
+                    </div>
+                </div>
             </div>
           </aside>
         </div>

@@ -476,6 +476,9 @@ export interface WidgetConfig {
   // Image widget configuration
   imageConfig?: ImageConfig;
 
+  // Table widget configuration
+  tableWidgetConfig?: TableWidgetConfig;
+
   // Visual settings
   showTitle?: boolean;
   backgroundColor?: string;
@@ -566,6 +569,24 @@ export interface ImageConfig {
   fit?: ImageFit;             // How image fits in widget
   opacity?: number;           // 0-1
   borderRadius?: number;      // Border radius in px
+}
+
+// ============================================================================
+// TABLE WIDGET TYPES
+// ============================================================================
+
+export interface TableWidgetConfig {
+  hiddenColumns?: string[];        // Column IDs to hide
+  sort?: {
+    columnId: string;
+    direction: 'asc' | 'desc';
+  };
+  topN?: number | null;            // Show only top N rows (rest grouped as "Others")
+  showTotalRow?: boolean;          // Override table's showTotalRow setting
+  textFilter?: string;             // Filter rows by text search
+  itemsPerPage?: number | null;    // Pagination: items per page
+  currentPage?: number;            // Pagination: current page (0-indexed)
+  showAlternatingRows?: boolean;   // Override table's showBandedRows
 }
 
 export interface DashboardLayout {

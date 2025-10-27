@@ -24,10 +24,13 @@ class WidgetRenderer {
   private element: HTMLDivElement;
   private config: WidgetConfig;
   private sheet: Sheet;
+  private onWidgetChange?: () => void;
+  private internalRenderer: any;
 
-  constructor(config: WidgetConfig, sheet: Sheet) {
+  constructor(config: WidgetConfig, sheet: Sheet, onWidgetChange?: () => void) {
     this.config = config;
     this.sheet = sheet;
+    this.onWidgetChange = onWidgetChange;
     this.element = this.createWidgetElement();
   }
 
@@ -72,6 +75,25 @@ class WidgetRenderer {
       controls.style.display = 'flex';
       controls.style.gap = '8px';
 
+      // Settings button (only for table widgets)
+      if (this.config.type === 'table') {
+        const settingsBtn = document.createElement('button');
+        settingsBtn.textContent = '⚙️';
+        settingsBtn.style.border = 'none';
+        settingsBtn.style.background = 'transparent';
+        settingsBtn.style.cursor = 'pointer';
+        settingsBtn.style.fontSize = '16px';
+        settingsBtn.style.color = '#6b7280';
+        settingsBtn.title = 'Configurar tabela';
+        settingsBtn.onclick = (e) => {
+          e.stopPropagation();
+          this.element.dispatchEvent(new CustomEvent('widget-settings', {
+            detail: { widgetId: this.config.id }
+          }));
+        };
+        controls.appendChild(settingsBtn);
+      }
+
       // Remove button
       const removeBtn = document.createElement('button');
       removeBtn.textContent = '✕';
@@ -110,48 +132,36 @@ class WidgetRenderer {
     return widget;
   }
 
-  /**
-   * Renderiza o conteúdo do widget usando o renderizador apropriado
-   */
   private renderContent(container: HTMLDivElement): void {
     try {
       const RendererClass = widgetRegistry.get(this.config.type);
-
       if (RendererClass) {
-        new RendererClass(this.config, this.sheet, container).render();
+        this.internalRenderer = new RendererClass(this.config, this.sheet, container, this.onWidgetChange);
+        this.internalRenderer.render();
       } else {
-        // Handle unknown or in-development widgets
         const isKnownButNotReady = ['chart', 'pivot'].includes(this.config.type);
         if (isKnownButNotReady) {
-          container.innerHTML = `
-            <div style="
-              display: flex;
-              align-items: center;
-              justify-content: center;
-              height: 100%;
-              color: #9ca3af;
-              flex-direction: column;
-              gap: 12px;
-            ">
-              <div style="font-size: 48px;">📊</div>
-              <div>Widget tipo "${this.config.type}" em desenvolvimento</div>
-            </div>
-          `;
+          container.innerHTML = `<div style="display: flex; align-items: center; justify-content: center; height: 100%; color: #9ca3af; flex-direction: column; gap: 12px;"><div style="font-size: 48px;">📊</div><div>Widget tipo "${this.config.type}" em desenvolvimento</div></div>`;
         } else {
-          container.innerHTML = `
-            <div style="color: #ef4444; text-align: center; padding: 20px;">
-              ⚠️ Tipo de widget desconhecido: "${this.config.type}"
-            </div>
-          `;
+          container.innerHTML = `<div style="color: #ef4444; text-align: center; padding: 20px;">⚠️ Tipo de widget desconhecido: "${this.config.type}"</div>`;
         }
       }
     } catch (error) {
       logger.error('[WidgetRenderer] Error rendering widget', error);
-      container.innerHTML = `
-        <div style="color: #ef4444; text-align: center; padding: 20px;">
-          ❌ Erro ao renderizar widget
-        </div>
-      `;
+      container.innerHTML = `<div style="color: #ef4444; text-align: center; padding: 20px;">❌ Erro ao renderizar widget</div>`;
+    }
+  }
+
+  public renderSettings(container: HTMLElement): void {
+    try {
+      if (this.internalRenderer && 'renderSettings' in this.internalRenderer && typeof this.internalRenderer.renderSettings === 'function') {
+        this.internalRenderer.renderSettings(container);
+      } else {
+        container.innerHTML = '<p style="font-size: 12px; color: #6b7280;">Este widget não possui configurações.</p>';
+      }
+    } catch (error) {
+      logger.error('[WidgetRenderer] Error rendering settings', error);
+      container.innerHTML = '<p style="color: #ef4444;">Erro ao renderizar configurações.</p>';
     }
   }
 
@@ -220,6 +230,7 @@ export class DashboardRenderer {
   private sheet: Sheet;
   private layout: DashboardLayout;
   private widgets: Map<string, WidgetRenderer> = new Map();
+  private selectedWidgetId: string | null = null;
 
   // Drag state
   private draggedWidget: string | null = null;
@@ -255,8 +266,6 @@ export class DashboardRenderer {
   }
 
   private _registerWidgets(): void {
-    // Register all available widget types.
-    // This is done once when the dashboard is initialized.
     widgetRegistry.register('table', TableWidgetRenderer);
     widgetRegistry.register('kpi', KPIWidgetRenderer);
     widgetRegistry.register('text', TextWidgetRenderer);
@@ -270,7 +279,6 @@ export class DashboardRenderer {
     this.container.style.overflow = 'auto';
     this.container.style.backgroundColor = '#f9fafb';
 
-    // Add grid background if enabled
     if (this.layout.gridVisible) {
       const gridSize = this.layout.gridSize || 20;
       this.container.style.backgroundImage = `
@@ -282,50 +290,57 @@ export class DashboardRenderer {
   }
 
   private setupEventListeners(): void {
-    // Global mouse move and up handlers for drag/resize
     document.addEventListener('mousemove', this.handleMouseMove.bind(this));
     document.addEventListener('mouseup', this.handleMouseUp.bind(this));
   }
 
   private renderAllWidgets(): void {
-    // Clear existing widgets
     this.widgets.forEach(widget => widget.destroy());
     this.widgets.clear();
-
-    // Render all widgets
     this.layout.widgets.forEach(config => {
       this.renderWidget(config);
     });
-
     logger.info('[DashboardRenderer] Rendered all widgets', { count: this.layout.widgets.length });
   }
 
   private renderWidget(config: WidgetConfig): void {
-    const renderer = new WidgetRenderer(config, this.sheet);
+    const renderer = new WidgetRenderer(config, this.sheet, () => {
+      this.onWidgetChange?.();
+    });
     const element = renderer.getElement();
 
-    // Add drag handler
-    element.addEventListener('mousedown', (e) => {
-      if ((e.target as HTMLElement).classList.contains('resize-handle')) {
-        return; // Let resize handler take care of it
+    element.addEventListener('click', () => {
+      if (this.selectedWidgetId === config.id) return;
+
+      if (this.selectedWidgetId) {
+        const oldRenderer = this.widgets.get(this.selectedWidgetId);
+        if (oldRenderer) {
+            oldRenderer.getElement().style.borderColor = config.borderColor || '#e5e7eb';
+        }
       }
 
+      this.selectedWidgetId = config.id;
+      element.style.borderColor = '#2563eb';
+
+      this.renderSelectedWidgetSettings();
+    });
+
+    element.addEventListener('mousedown', (e) => {
+      if ((e.target as HTMLElement).classList.contains('resize-handle')) return;
       this.startDrag(config.id, e.clientX, e.clientY);
     });
 
-    // Add remove handler
     element.addEventListener('widget-remove', ((e: CustomEvent) => {
       this.removeWidget(e.detail.widgetId);
     }) as EventListener);
 
-    // Add resize handler
+    element.addEventListener('widget-settings', ((e: CustomEvent) => {
+      this.selectedWidgetId = e.detail.widgetId;
+      this.renderSelectedWidgetSettings();
+    }) as EventListener);
+
     element.addEventListener('widget-resize-start', ((e: CustomEvent) => {
-      this.startResize(
-        e.detail.widgetId,
-        e.detail.handle,
-        e.detail.x,
-        e.detail.y
-      );
+      this.startResize(e.detail.widgetId, e.detail.handle, e.detail.x, e.detail.y);
     }) as EventListener);
 
     this.container.appendChild(element);
@@ -378,14 +393,12 @@ export class DashboardRenderer {
     let newX = this.widgetStartX + deltaX;
     let newY = this.widgetStartY + deltaY;
 
-    // Snap to grid if enabled
     if (this.layout.snapToGrid && this.layout.gridSize) {
       const gridSize = this.layout.gridSize;
       newX = Math.round(newX / gridSize) * gridSize;
       newY = Math.round(newY / gridSize) * gridSize;
     }
 
-    // Update widget position
     const renderer = this.widgets.get(this.draggedWidget);
     if (renderer) {
       renderer.updatePosition(newX, newY);
@@ -403,7 +416,6 @@ export class DashboardRenderer {
     let newWidth = this.widgetStartWidth;
     let newHeight = this.widgetStartHeight;
 
-    // Calculate new dimensions based on handle
     const handle = this.resizeHandle;
 
     if (handle.includes('e')) newWidth = this.widgetStartWidth + deltaX;
@@ -417,11 +429,9 @@ export class DashboardRenderer {
       newY = this.widgetStartY + deltaY;
     }
 
-    // Minimum size
     newWidth = Math.max(200, newWidth);
     newHeight = Math.max(150, newHeight);
 
-    // Snap to grid if enabled
     if (this.layout.snapToGrid && this.layout.gridSize) {
       const gridSize = this.layout.gridSize;
       newWidth = Math.round(newWidth / gridSize) * gridSize;
@@ -430,7 +440,6 @@ export class DashboardRenderer {
       newY = Math.round(newY / gridSize) * gridSize;
     }
 
-    // Update widget
     const renderer = this.widgets.get(this.resizedWidget);
     if (renderer) {
       renderer.updatePosition(newX, newY);
@@ -440,7 +449,6 @@ export class DashboardRenderer {
 
   private handleMouseUp(): void {
     if (this.draggedWidget) {
-      // Save final position
       const config = this.layout.widgets.find(w => w.id === this.draggedWidget);
       const renderer = this.widgets.get(this.draggedWidget!);
 
@@ -451,11 +459,7 @@ export class DashboardRenderer {
         config.modified = new Date();
         this.layout.modified = new Date();
 
-        logger.info('[DashboardRenderer] Widget moved', {
-          widgetId: this.draggedWidget,
-          position: config.position
-        });
-
+        logger.info('[DashboardRenderer] Widget moved', { widgetId: this.draggedWidget, position: config.position });
         this.onWidgetChange?.();
       }
 
@@ -463,7 +467,6 @@ export class DashboardRenderer {
     }
 
     if (this.resizedWidget) {
-      // Save final size
       const config = this.layout.widgets.find(w => w.id === this.resizedWidget);
       const renderer = this.widgets.get(this.resizedWidget!);
 
@@ -476,11 +479,7 @@ export class DashboardRenderer {
         config.modified = new Date();
         this.layout.modified = new Date();
 
-        logger.info('[DashboardRenderer] Widget resized', {
-          widgetId: this.resizedWidget,
-          position: config.position
-        });
-
+        logger.info('[DashboardRenderer] Widget resized', { widgetId: this.resizedWidget, position: config.position });
         this.onWidgetChange?.();
       }
 
@@ -506,32 +505,32 @@ export class DashboardRenderer {
     }
   }
 
-  /**
-   * Refresh all widgets (e.g., after data change)
-   */
   refresh(): void {
     this.renderAllWidgets();
   }
 
-  /**
-   * Add new widget to dashboard
-   */
   addWidget(config: WidgetConfig): void {
     this.layout.widgets.push(config);
     this.renderWidget(config);
     this.onWidgetChange?.();
   }
 
-  /**
-   * Set callback for widget changes
-   */
   setChangeHandler(handler: () => void): void {
     this.onWidgetChange = handler;
   }
 
-  /**
-   * Clean up
-   */
+  private renderSelectedWidgetSettings(): void {
+    const settingsContainer = document.getElementById('widget-specific-settings');
+    if (!settingsContainer) return;
+
+    settingsContainer.innerHTML = '';
+
+    if (this.selectedWidgetId) {
+      const renderer = this.widgets.get(this.selectedWidgetId);
+      renderer?.renderSettings(settingsContainer);
+    }
+  }
+
   destroy(): void {
     this.widgets.forEach(widget => widget.destroy());
     this.widgets.clear();

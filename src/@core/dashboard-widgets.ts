@@ -351,7 +351,7 @@ export class TextWidgetRenderer {
   private config: WidgetConfig;
   private container: HTMLDivElement;
 
-  constructor(config: WidgetConfig, container: HTMLDivElement) {
+  constructor(config: WidgetConfig, _sheet: Sheet, container: HTMLDivElement) {
     this.config = config;
     this.container = container;
   }
@@ -427,7 +427,7 @@ export class ImageWidgetRenderer {
   private config: WidgetConfig;
   private container: HTMLDivElement;
 
-  constructor(config: WidgetConfig, container: HTMLDivElement) {
+  constructor(config: WidgetConfig, _sheet: Sheet, container: HTMLDivElement) {
     this.config = config;
     this.container = container;
   }
@@ -520,51 +520,281 @@ import { kernel } from './kernel';
  */
 export class TableWidgetRenderer {
   private config: WidgetConfig;
-  private sheet: Sheet;
   private container: HTMLDivElement;
   private tableManager: TableManager;
+  private onWidgetChange?: () => void;
 
-  constructor(config: WidgetConfig, sheet: Sheet, container: HTMLDivElement) {
+  constructor(config: WidgetConfig, _sheet: Sheet, container: HTMLDivElement, onWidgetChange?: () => void) {
     this.config = config;
-    this.sheet = sheet;
     this.container = container;
     this.tableManager = TableManager.getInstance();
+    this.onWidgetChange = onWidgetChange;
   }
 
   render(): void {
+    this.config.tableWidgetConfig = this.config.tableWidgetConfig || {};
+    this.container.innerHTML = ''; // Clear previous content
+
     if (!this.config.tableId) {
       this.container.innerHTML = '<div style="color: #ef4444;">Erro: Tabela não especificada</div>';
       return;
     }
-
     const table = this.tableManager.getTable(this.config.tableId);
     if (!table) {
       this.container.innerHTML = '<div style="color: #ef4444;">Erro: Tabela não encontrada</div>';
       return;
     }
 
-    // Container com scroll
-    const wrapper = document.createElement('div');
-    wrapper.style.width = '100%';
-    wrapper.style.height = '100%';
-    wrapper.style.overflow = 'auto';
+    const tableWrapper = document.createElement('div');
+    tableWrapper.style.width = '100%';
+    tableWrapper.style.height = '100%';
+    tableWrapper.style.display = 'flex';
+    tableWrapper.style.flexDirection = 'column';
+    this.container.appendChild(tableWrapper);
 
-    // Create HTML table
-    const htmlTable = this.createTable(table);
-    wrapper.appendChild(htmlTable);
-    this.container.appendChild(wrapper);
+    const scrollArea = document.createElement('div');
+    scrollArea.style.flex = '1';
+    scrollArea.style.overflow = 'auto';
+    tableWrapper.appendChild(scrollArea);
 
-    logger.debug('[TableWidget] Rendered', { tableId: this.config.tableId });
+    const { htmlTable, paginationInfo } = this.createTable(table);
+    scrollArea.appendChild(htmlTable);
+
+    // Add pagination controls if needed
+    if (paginationInfo) {
+      const paginationControls = this.createPaginationControls(paginationInfo);
+      tableWrapper.appendChild(paginationControls);
+    }
   }
 
-  private createTable(table: StructuredTable): HTMLTableElement {
+  public renderSettings(container: HTMLElement): void {
+    const config = this.config.tableWidgetConfig || {};
+    const table = this.tableManager.getTable(this.config.tableId!)
+    if (!table) {
+        container.innerHTML = '<p style="color: #ef4444;">Tabela associada não encontrada.</p>';
+        return;
+    }
+
+    const hidden = config.hiddenColumns || [];
+    const sort = config.sort;
+    const topN = config.topN;
+    const showTotal = config.showTotalRow ?? table.showTotalRow;
+
+    const columnsOptions = table.columns.map(col => `<option value="${col.id}" ${sort?.columnId === col.id ? 'selected' : ''}>${col.name}</option>`).join('');
+
+    container.innerHTML = `
+        <div style="display: flex; flex-direction: column; gap: 8px; max-width: 100%; overflow: hidden;">
+            <!-- Colunas -->
+            <div class="accordion-section" data-section="columns">
+                <div class="accordion-header" style="display: flex; justify-content: space-between; align-items: center; padding: 10px; background: #f3f4f6; cursor: pointer; border-radius: 4px; user-select: none;">
+                    <span style="font-weight: 600; font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">📋 Colunas</span>
+                    <span class="accordion-icon" style="font-size: 12px; flex-shrink: 0; margin-left: 8px;">▼</span>
+                </div>
+                <div class="accordion-content" style="padding: 10px; border: 1px solid #e5e7eb; border-top: none; border-radius: 0 0 4px 4px; box-sizing: border-box;">
+                    <div style="max-height: 150px; overflow-y: auto; overflow-x: hidden; background: #fff; padding: 8px; border-radius: 4px; border: 1px solid #ddd; box-sizing: border-box;">
+                        ${table.columns.map(col => `
+                            <div style="display: flex; align-items: center; margin-bottom: 4px; overflow: hidden;">
+                                <label style="flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 12px; min-width: 0;">
+                                    <input type="checkbox" class="table-widget-col-toggle" data-col-id="${col.id}" ${hidden.includes(col.id) ? '' : 'checked'} style="flex-shrink: 0;">
+                                    ${col.name}
+                                </label>
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+            </div>
+
+            <!-- Ordenação -->
+            <div class="accordion-section" data-section="sort">
+                <div class="accordion-header" style="display: flex; justify-content: space-between; align-items: center; padding: 10px; background: #f3f4f6; cursor: pointer; border-radius: 4px; user-select: none;">
+                    <span style="font-weight: 600; font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">↕️ Ordenação</span>
+                    <span class="accordion-icon" style="font-size: 12px; flex-shrink: 0; margin-left: 8px;">▶</span>
+                </div>
+                <div class="accordion-content" style="display: none; padding: 10px; border: 1px solid #e5e7eb; border-top: none; border-radius: 0 0 4px 4px; box-sizing: border-box;">
+                    <div style="display: flex; gap: 8px; max-width: 100%;">
+                        <select class="table-widget-sort-col" style="flex: 1; min-width: 0; font-size: 12px; padding: 4px; box-sizing: border-box;">
+                            <option value="">Nenhuma</option>
+                            ${columnsOptions}
+                        </select>
+                        <button class="table-widget-sort-dir" style="font-size: 12px; padding: 4px 8px; cursor: pointer; flex-shrink: 0; border: 1px solid #ddd; background: #fff; border-radius: 4px;">${sort?.direction === 'desc' ? '🔽' : '🔼'}</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Filtro -->
+            <div class="accordion-section" data-section="filter">
+                <div class="accordion-header" style="display: flex; justify-content: space-between; align-items: center; padding: 10px; background: #f3f4f6; cursor: pointer; border-radius: 4px; user-select: none;">
+                    <span style="font-weight: 600; font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">🔍 Filtro de Texto</span>
+                    <span class="accordion-icon" style="font-size: 12px; flex-shrink: 0; margin-left: 8px;">▶</span>
+                </div>
+                <div class="accordion-content" style="display: none; padding: 10px; border: 1px solid #e5e7eb; border-top: none; border-radius: 0 0 4px 4px; box-sizing: border-box;">
+                    <input type="text" class="table-widget-text-filter" placeholder="Buscar..." value="${config.textFilter || ''}" style="width: 100%; padding: 6px 8px; font-size: 12px; border: 1px solid #ddd; border-radius: 4px; box-sizing: border-box;">
+                </div>
+            </div>
+
+            <!-- Visualização -->
+            <div class="accordion-section" data-section="display">
+                <div class="accordion-header" style="display: flex; justify-content: space-between; align-items: center; padding: 10px; background: #f3f4f6; cursor: pointer; border-radius: 4px; user-select: none;">
+                    <span style="font-weight: 600; font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">👁️ Visualização</span>
+                    <span class="accordion-icon" style="font-size: 12px; flex-shrink: 0; margin-left: 8px;">▶</span>
+                </div>
+                <div class="accordion-content" style="display: none; padding: 10px; border: 1px solid #e5e7eb; border-top: none; border-radius: 0 0 4px 4px; box-sizing: border-box; overflow: hidden;">
+                    <div style="font-size: 12px; margin-bottom: 8px; overflow: hidden;">
+                        <div style="margin-bottom: 4px;">Top N:</div>
+                        <input type="number" class="table-widget-top-n" value="${topN || ''}" placeholder="Todos" style="width: 100%; max-width: 80px; padding: 4px; font-size: 12px; box-sizing: border-box;">
+                    </div>
+                    <label style="font-size: 12px; display: flex; align-items: center; margin-bottom: 8px; overflow: hidden;">
+                        <input type="checkbox" class="table-widget-total-row" ${showTotal ? 'checked' : ''} style="flex-shrink: 0; margin-right: 6px;">
+                        <span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">Linha de totais</span>
+                    </label>
+                    <label style="font-size: 12px; display: flex; align-items: center; overflow: hidden;">
+                        <input type="checkbox" class="table-widget-alternating" ${config.showAlternatingRows ?? table.showBandedRows ? 'checked' : ''} style="flex-shrink: 0; margin-right: 6px;">
+                        <span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">Linhas alternadas</span>
+                    </label>
+                </div>
+            </div>
+
+            <!-- Paginação -->
+            <div class="accordion-section" data-section="pagination">
+                <div class="accordion-header" style="display: flex; justify-content: space-between; align-items: center; padding: 10px; background: #f3f4f6; cursor: pointer; border-radius: 4px; user-select: none;">
+                    <span style="font-weight: 600; font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">📄 Paginação</span>
+                    <span class="accordion-icon" style="font-size: 12px; flex-shrink: 0; margin-left: 8px;">▶</span>
+                </div>
+                <div class="accordion-content" style="display: none; padding: 10px; border: 1px solid #e5e7eb; border-top: none; border-radius: 0 0 4px 4px; box-sizing: border-box; overflow: hidden;">
+                    <div style="font-size: 12px;">
+                        <div style="margin-bottom: 4px;">Itens/página:</div>
+                        <input type="number" class="table-widget-items-per-page" value="${config.itemsPerPage || ''}" placeholder="Todos" style="width: 100%; max-width: 80px; padding: 4px; font-size: 12px; box-sizing: border-box;">
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+
+    // Accordion toggle functionality
+    const accordionHeaders = container.querySelectorAll('.accordion-header');
+    accordionHeaders.forEach((header) => {
+        // Hover effect
+        header.addEventListener('mouseenter', () => {
+            (header as HTMLElement).style.backgroundColor = '#e5e7eb';
+        });
+        header.addEventListener('mouseleave', () => {
+            (header as HTMLElement).style.backgroundColor = '#f3f4f6';
+        });
+
+        // Toggle click
+        header.addEventListener('click', () => {
+            const section = header.parentElement;
+            const content = section?.querySelector('.accordion-content') as HTMLElement;
+            const icon = header.querySelector('.accordion-icon');
+
+            if (content && icon) {
+                const isExpanded = content.style.display !== 'none';
+                content.style.display = isExpanded ? 'none' : 'block';
+                icon.textContent = isExpanded ? '▶' : '▼';
+            }
+        });
+    });
+
+    // --- Event Listeners ---
+    container.querySelectorAll('.table-widget-col-toggle').forEach(checkbox => {
+        checkbox.addEventListener('change', (e) => {
+            const target = e.target as HTMLInputElement;
+            const colId = target.dataset.colId;
+            if (!colId) return;
+
+            if (!this.config.tableWidgetConfig) this.config.tableWidgetConfig = {};
+            const currentHidden = this.config.tableWidgetConfig.hiddenColumns || [];
+            if (target.checked) {
+                this.config.tableWidgetConfig.hiddenColumns = currentHidden.filter(id => id !== colId);
+            } else {
+                this.config.tableWidgetConfig.hiddenColumns = [...currentHidden, colId];
+            }
+            this.render();
+            this.onWidgetChange?.();
+        });
+    });
+
+    const sortColSelect = container.querySelector('.table-widget-sort-col') as HTMLSelectElement;
+    sortColSelect.addEventListener('change', () => {
+        if (!this.config.tableWidgetConfig) this.config.tableWidgetConfig = {};
+        const colId = sortColSelect.value;
+        if (colId) {
+            this.config.tableWidgetConfig.sort = {
+                columnId: colId,
+                direction: this.config.tableWidgetConfig.sort?.direction || 'asc'
+            };
+        } else {
+            delete this.config.tableWidgetConfig.sort;
+        }
+        this.render();
+        this.onWidgetChange?.();
+    });
+
+    const sortDirButton = container.querySelector('.table-widget-sort-dir') as HTMLButtonElement;
+    sortDirButton.addEventListener('click', () => {
+        if (!this.config.tableWidgetConfig) this.config.tableWidgetConfig = {};
+        if (this.config.tableWidgetConfig.sort) {
+            this.config.tableWidgetConfig.sort.direction = this.config.tableWidgetConfig.sort.direction === 'asc' ? 'desc' : 'asc';
+            this.render();
+            this.onWidgetChange?.();
+        }
+    });
+
+    const topNInput = container.querySelector('.table-widget-top-n') as HTMLInputElement;
+    topNInput.addEventListener('change', () => {
+        if (!this.config.tableWidgetConfig) this.config.tableWidgetConfig = {};
+        const value = parseInt(topNInput.value, 10);
+        this.config.tableWidgetConfig.topN = isNaN(value) || value <= 0 ? null : value;
+        this.render();
+        this.onWidgetChange?.();
+    });
+
+    const totalRowCheckbox = container.querySelector('.table-widget-total-row') as HTMLInputElement;
+    totalRowCheckbox.addEventListener('change', () => {
+        if (!this.config.tableWidgetConfig) this.config.tableWidgetConfig = {};
+        this.config.tableWidgetConfig.showTotalRow = totalRowCheckbox.checked;
+        this.render();
+        this.onWidgetChange?.();
+    });
+
+    const alternatingCheckbox = container.querySelector('.table-widget-alternating') as HTMLInputElement;
+    alternatingCheckbox.addEventListener('change', () => {
+        if (!this.config.tableWidgetConfig) this.config.tableWidgetConfig = {};
+        this.config.tableWidgetConfig.showAlternatingRows = alternatingCheckbox.checked;
+        this.render();
+        this.onWidgetChange?.();
+    });
+
+    const textFilterInput = container.querySelector('.table-widget-text-filter') as HTMLInputElement;
+    textFilterInput.addEventListener('input', () => {
+        if (!this.config.tableWidgetConfig) this.config.tableWidgetConfig = {};
+        this.config.tableWidgetConfig.textFilter = textFilterInput.value;
+        this.config.tableWidgetConfig.currentPage = 0; // Reset to first page on filter
+        this.render();
+        this.onWidgetChange?.();
+    });
+
+    const itemsPerPageInput = container.querySelector('.table-widget-items-per-page') as HTMLInputElement;
+    itemsPerPageInput.addEventListener('change', () => {
+        if (!this.config.tableWidgetConfig) this.config.tableWidgetConfig = {};
+        const value = parseInt(itemsPerPageInput.value, 10);
+        this.config.tableWidgetConfig.itemsPerPage = isNaN(value) || value <= 0 ? null : value;
+        this.config.tableWidgetConfig.currentPage = 0; // Reset to first page
+        this.render();
+        this.onWidgetChange?.();
+    });
+  }
+
+  private createTable(table: StructuredTable): {
+    htmlTable: HTMLTableElement;
+    paginationInfo: { currentPage: number; totalPages: number; totalRows: number; itemsPerPage: number } | null
+  } {
     const htmlTable = document.createElement('table');
     htmlTable.style.width = '100%';
     htmlTable.style.borderCollapse = 'collapse';
     htmlTable.style.fontSize = '13px';
 
     const tableSheet = kernel.workbookManager.getSheet(table.sheetId);
-
     if (!tableSheet) {
         const errorRow = document.createElement('tr');
         const errorCell = document.createElement('td');
@@ -572,8 +802,95 @@ export class TableWidgetRenderer {
         errorCell.innerHTML = `<div style="color: #ef4444; padding: 20px; text-align: center;">Erro: A planilha de origem da tabela (ID: ${table.sheetId}) não foi encontrada.</div>`;
         errorRow.appendChild(errorCell);
         htmlTable.appendChild(errorRow);
-        return htmlTable;
+        return { htmlTable, paginationInfo: null };
     }
+
+    const config = this.config.tableWidgetConfig || {};
+    const hiddenCols = config.hiddenColumns || [];
+    const visibleCols = table.columns.filter(c => !hiddenCols.includes(c.id));
+
+    // --- Data Transformation ---
+    let displayRows: { [key: string]: any }[] = [];
+    const dataStartRow = table.hasHeaders ? table.range.startRow + 1 : table.range.startRow;
+    const dataEndRow = table.showTotalRow ? table.range.endRow - 1 : table.range.endRow;
+
+    for (let r = dataStartRow; r <= dataEndRow; r++) {
+        const rowData: { [key: string]: any } = {};
+        table.columns.forEach((col, colIndex) => {
+            const cell = tableSheet.getCell(r, table.range.startCol + colIndex);
+            rowData[col.id] = cell?.value;
+        });
+        displayRows.push(rowData);
+    }
+
+    // Text Filter
+    if (config.textFilter && config.textFilter.trim()) {
+        const filterText = config.textFilter.toLowerCase();
+        displayRows = displayRows.filter(row => {
+            return visibleCols.some(col => {
+                const value = row[col.id];
+                return value != null && String(value).toLowerCase().includes(filterText);
+            });
+        });
+    }
+
+    // Sorting
+    if (config.sort) {
+        const { columnId, direction } = config.sort;
+        displayRows.sort((a, b) => {
+            const valA = a[columnId];
+            const valB = b[columnId];
+            if (valA == null) return 1;
+            if (valB == null) return -1;
+            if (typeof valA === 'number' && typeof valB === 'number') {
+                return direction === 'asc' ? valA - valB : valB - valA;
+            }
+            const strA = String(valA).toLocaleLowerCase();
+            const strB = String(valB).toLocaleLowerCase();
+            if (strA < strB) return direction === 'asc' ? -1 : 1;
+            if (strA > strB) return direction === 'asc' ? 1 : -1;
+            return 0;
+        });
+    }
+
+    // Top N with "Others" row
+    if (config.topN && config.topN > 0 && config.topN < displayRows.length) {
+        const topRows = displayRows.slice(0, config.topN);
+        const otherRows = displayRows.slice(config.topN);
+        const othersData: { [key: string]: any } = {};
+
+        visibleCols.forEach((col, index) => {
+            if (index === 0) {
+                othersData[col.id] = `Outros (${otherRows.length})`;
+            } else if (col.dataType === 'number' || col.dataType === 'currency') {
+                othersData[col.id] = otherRows.reduce((sum, row) => sum + (Number(row[col.id]) || 0), 0);
+            } else {
+                othersData[col.id] = '';
+            }
+        });
+        displayRows = [...topRows, othersData];
+    }
+
+    // Pagination
+    const totalRows = displayRows.length;
+    let currentPage = config.currentPage ?? 0;
+    const itemsPerPage = config.itemsPerPage;
+    const hasPagination = itemsPerPage && itemsPerPage > 0;
+    const totalPages = hasPagination ? Math.ceil(totalRows / itemsPerPage) : 1;
+
+    // Ensure currentPage is valid
+    if (currentPage >= totalPages) currentPage = Math.max(0, totalPages - 1);
+    if (currentPage < 0) currentPage = 0;
+
+    if (hasPagination) {
+        const startIdx = currentPage * itemsPerPage;
+        const endIdx = Math.min(startIdx + itemsPerPage, totalRows);
+        displayRows = displayRows.slice(startIdx, endIdx);
+    }
+
+    // --- Rendering ---
+    const showTotalRow = config.showTotalRow ?? table.showTotalRow;
+    const showAlternating = config.showAlternatingRows ?? table.showBandedRows;
 
     // Headers
     if (table.hasHeaders && table.showHeaderRow) {
@@ -581,9 +898,8 @@ export class TableWidgetRenderer {
       thead.style.position = 'sticky';
       thead.style.top = '0';
       thead.style.zIndex = '1';
-
       const headerRow = document.createElement('tr');
-      table.columns.forEach((column) => {
+      visibleCols.forEach((column) => {
         const th = document.createElement('th');
         th.textContent = column.name;
         th.style.padding = '12px';
@@ -595,80 +911,140 @@ export class TableWidgetRenderer {
         th.style.whiteSpace = 'nowrap';
         headerRow.appendChild(th);
       });
-
       thead.appendChild(headerRow);
       htmlTable.appendChild(thead);
     }
 
     // Data rows
     const tbody = document.createElement('tbody');
-    const dataStartRow = table.hasHeaders ? table.range.startRow + 1 : table.range.startRow;
-    const dataEndRow = table.showTotalRow ? table.range.endRow - 1 : table.range.endRow;
-
-    for (let r = dataStartRow; r <= dataEndRow; r++) {
+    displayRows.forEach((rowData, rowIndex) => {
       const tr = document.createElement('tr');
-      const isEven = (r - dataStartRow) % 2 === 0;
+      const isEven = rowIndex % 2 === 0;
+      const isOthersRow = rowIndex === displayRows.length - 1 && config.topN && config.topN < (config.sort ? displayRows.length : dataEndRow - dataStartRow + 1);
 
-      // Hover effect
-      tr.addEventListener('mouseenter', () => {
-        tr.style.backgroundColor = table.style.highlightColor || '#f3f4f6';
-      });
-      tr.addEventListener('mouseleave', () => {
-        tr.style.backgroundColor = table.showBandedRows
-          ? (isEven ? table.style.evenRowBg : table.style.oddRowBg)
-          : 'transparent';
-      });
-
-      if (table.showBandedRows) {
-        tr.style.backgroundColor = isEven ? table.style.evenRowBg : table.style.oddRowBg;
+      tr.style.backgroundColor = showAlternating ? (isEven ? table.style.evenRowBg : table.style.oddRowBg) : 'transparent';
+      if (isOthersRow) {
+        tr.style.fontWeight = 'bold';
+        tr.style.backgroundColor = '#f3f4f6';
       }
 
-      for (let c = table.range.startCol; c <= table.range.endCol; c++) {
-        const cell = tableSheet.getCell(r, c);
+      visibleCols.forEach((column) => {
         const td = document.createElement('td');
-        td.textContent = cell?.value != null ? String(cell.value) : '';
+        const cellValue = rowData[column.id];
+        td.textContent = cellValue != null ? String(cellValue) : '';
         td.style.padding = '10px 12px';
         td.style.borderBottom = `1px solid ${table.style.borderColor}`;
-
-        // Apply column format
-        const column = table.columns[c - table.range.startCol];
         if (column?.format) {
           if (column.format.textColor) td.style.color = column.format.textColor;
           if (column.format.alignment) td.style.textAlign = column.format.alignment;
           if (column.format.bold) td.style.fontWeight = 'bold';
         }
-
         tr.appendChild(td);
-      }
-
+      });
       tbody.appendChild(tr);
-    }
-
+    });
     htmlTable.appendChild(tbody);
 
     // Total row
-    if (table.showTotalRow) {
+    if (showTotalRow) {
       const tfoot = document.createElement('tfoot');
       tfoot.style.position = 'sticky';
       tfoot.style.bottom = '0';
-
-      const totalRow = document.createElement('tr');
-      for (let c = table.range.startCol; c <= table.range.endCol; c++) {
-        const cell = tableSheet.getCell(table.range.endRow, c);
+      const totalRowTr = document.createElement('tr');
+      visibleCols.forEach((column) => {
         const td = document.createElement('td');
+        const cell = tableSheet.getCell(table.range.endRow, table.range.startCol + column.index);
         td.textContent = cell?.value != null ? String(cell.value) : '';
         td.style.padding = '12px';
         td.style.backgroundColor = table.style.totalRowBg;
         td.style.color = table.style.headerText;
         td.style.fontWeight = 'bold';
         td.style.borderTop = `2px solid ${table.style.borderColor}`;
-        totalRow.appendChild(td);
-      }
-
-      tfoot.appendChild(totalRow);
+        totalRowTr.appendChild(td);
+      });
+      tfoot.appendChild(totalRowTr);
       htmlTable.appendChild(tfoot);
     }
 
-    return htmlTable;
+    // Return table and pagination info
+    const paginationInfo = hasPagination ? {
+      currentPage,
+      totalPages,
+      totalRows,
+      itemsPerPage: itemsPerPage!
+    } : null;
+
+    return { htmlTable, paginationInfo };
+  }
+
+  private createPaginationControls(info: { currentPage: number; totalPages: number; totalRows: number; itemsPerPage: number }): HTMLDivElement {
+    const controls = document.createElement('div');
+    controls.style.display = 'flex';
+    controls.style.justifyContent = 'space-between';
+    controls.style.alignItems = 'center';
+    controls.style.padding = '8px 12px';
+    controls.style.borderTop = '1px solid #e5e7eb';
+    controls.style.backgroundColor = '#f9fafb';
+    controls.style.fontSize = '12px';
+
+    // Info text
+    const infoText = document.createElement('div');
+    const startItem = info.currentPage * info.itemsPerPage + 1;
+    const endItem = Math.min((info.currentPage + 1) * info.itemsPerPage, info.totalRows);
+    infoText.textContent = `Mostrando ${startItem}-${endItem} de ${info.totalRows}`;
+    infoText.style.color = '#6b7280';
+    controls.appendChild(infoText);
+
+    // Navigation buttons
+    const navButtons = document.createElement('div');
+    navButtons.style.display = 'flex';
+    navButtons.style.gap = '4px';
+
+    const prevBtn = document.createElement('button');
+    prevBtn.textContent = '← Anterior';
+    prevBtn.style.padding = '4px 8px';
+    prevBtn.style.fontSize = '12px';
+    prevBtn.style.border = '1px solid #d1d5db';
+    prevBtn.style.borderRadius = '4px';
+    prevBtn.style.backgroundColor = '#ffffff';
+    prevBtn.style.cursor = info.currentPage > 0 ? 'pointer' : 'not-allowed';
+    prevBtn.disabled = info.currentPage === 0;
+    prevBtn.onclick = () => {
+      if (info.currentPage > 0) {
+        if (!this.config.tableWidgetConfig) this.config.tableWidgetConfig = {};
+        this.config.tableWidgetConfig.currentPage = info.currentPage - 1;
+        this.render();
+        this.onWidgetChange?.();
+      }
+    };
+    navButtons.appendChild(prevBtn);
+
+    const pageInfo = document.createElement('span');
+    pageInfo.textContent = `Página ${info.currentPage + 1} de ${info.totalPages}`;
+    pageInfo.style.padding = '4px 8px';
+    pageInfo.style.color = '#374151';
+    navButtons.appendChild(pageInfo);
+
+    const nextBtn = document.createElement('button');
+    nextBtn.textContent = 'Próxima →';
+    nextBtn.style.padding = '4px 8px';
+    nextBtn.style.fontSize = '12px';
+    nextBtn.style.border = '1px solid #d1d5db';
+    nextBtn.style.borderRadius = '4px';
+    nextBtn.style.backgroundColor = '#ffffff';
+    nextBtn.style.cursor = info.currentPage < info.totalPages - 1 ? 'pointer' : 'not-allowed';
+    nextBtn.disabled = info.currentPage >= info.totalPages - 1;
+    nextBtn.onclick = () => {
+      if (info.currentPage < info.totalPages - 1) {
+        if (!this.config.tableWidgetConfig) this.config.tableWidgetConfig = {};
+        this.config.tableWidgetConfig.currentPage = info.currentPage + 1;
+        this.render();
+        this.onWidgetChange?.();
+      }
+    };
+    navButtons.appendChild(nextBtn);
+
+    controls.appendChild(navButtons);
+    return controls;
   }
 }

@@ -10,8 +10,9 @@ import type { Sheet } from './workbook-consolidated';
 
 // Interface for a widget renderer class constructor
 export interface IWidgetRenderer {
-  new (config: WidgetConfig, sheet: Sheet, container: HTMLDivElement): {
+  new (config: WidgetConfig, sheet: Sheet, container: HTMLDivElement, onWidgetChange?: () => void): {
     render(): void;
+    renderSettings?(container: HTMLElement): void;
   };
 }
 

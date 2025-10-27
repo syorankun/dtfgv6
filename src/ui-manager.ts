@@ -3351,6 +3351,11 @@ class MeuPlugin {
     const spreadsheetPanels = document.getElementById('spreadsheet-panels');
     const dashboardPanels = document.getElementById('dashboard-panels');
 
+    // --- INÍCIO DA CORREÇÃO ---
+    // 1. Obtenha o elemento do ribbon
+    const ribbon = document.querySelector('.ribbon') as HTMLElement;
+    // --- FIM DA CORREÇÃO ---
+
     if (this.isDashboardMode) {
       // Enter dashboard mode
       gridWrapper?.classList.add('hidden');
@@ -3362,6 +3367,14 @@ class MeuPlugin {
       // Update button label
       const btnLabel = toggleBtn?.querySelector('.ribbon-label');
       if (btnLabel) btnLabel.textContent = 'Grade';
+
+      // --- INÍCIO DA CORREÇÃO ---
+      // 2. Verifique a configuração e oculte o ribbon se necessário
+      const autoHide = localStorage.getItem('autoHideRibbon') === 'true';
+      if (autoHide && ribbon) {
+        ribbon.classList.add('hidden');
+      }
+      // --- FIM DA CORREÇÃO ---
 
       // Initialize dashboard
       this.initDashboard(sheet.id);
@@ -3378,6 +3391,13 @@ class MeuPlugin {
       // Update button label
       const btnLabel = toggleBtn?.querySelector('.ribbon-label');
       if (btnLabel) btnLabel.textContent = 'Dashboard';
+
+      // --- INÍCIO DA CORREÇÃO ---
+      // 3. Sempre mostre o ribbon ao sair do modo dashboard
+      if (ribbon) {
+        ribbon.classList.remove('hidden');
+      }
+      // --- FIM DA CORREÇÃO ---
 
       // Clean up dashboard
       if (this.dashboardRenderer) {

@@ -74,6 +74,7 @@ export class UIManager {
             <span class="company-badge" id="company-badge">${company?.name || 'Sem empresa'}</span>
           </div>
           <div class="header-right">
+            <button id="btn-toggle-fullscreen" class="btn" title="Tela Cheia">⛶</button>
             <button id="btn-toggle-dark-mode" class="btn" title="Alternar Modo Escuro">🌙</button>
             <button id="btn-clear-session" class="btn" title="Limpar Sessão">🗑️</button>
             <button id="btn-settings" class="btn" title="Configurações">⚙️</button>
@@ -375,6 +376,9 @@ export class UIManager {
                         Clique para alternar entre edição e visualização
                     </p>
                     <div id="export-buttons" class="hidden" style="display: flex; flex-direction: column; gap: 6px;">
+                        <button id="btn-dashboard-fullscreen" class="btn" style="width: 100%; font-size: 12px;">
+                            ⛶ Tela Cheia
+                        </button>
                         <button id="btn-export-pdf" class="btn" style="width: 100%; font-size: 12px;">
                             📄 Exportar PDF
                         </button>
@@ -1047,6 +1051,14 @@ export class UIManager {
 
     document.getElementById('btn-export-excel')?.addEventListener('click', () => {
       this.exportDashboardExcel();
+    });
+
+    document.getElementById('btn-toggle-fullscreen')?.addEventListener('click', () => {
+      this.toggleFullscreen();
+    });
+
+    document.getElementById('btn-dashboard-fullscreen')?.addEventListener('click', () => {
+      this.toggleFullscreen();
     });
 
     document.getElementById('btn-add-kpi-widget')?.addEventListener('click', () => {
@@ -2922,6 +2934,17 @@ export class UIManager {
                 <option value="en-US">English (US)</option>
               </select>
             </div>
+            <hr style="border: none; border-top: 1px solid var(--theme-border-color); margin: var(--spacing-md) 0;">
+            <h4 style="font-size: 14px; margin-bottom: var(--spacing-sm); color: var(--theme-text-primary);">Dashboard</h4>
+            <div class="form-group">
+              <label style="display: flex; align-items: center; gap: var(--spacing-sm); cursor: pointer;">
+                <input type="checkbox" id="auto-hide-ribbon" ${localStorage.getItem('autoHideRibbon') === 'true' ? 'checked' : ''}>
+                <span>Ocultar ribbon automaticamente ao abrir dashboard</span>
+              </label>
+              <small style="color: var(--theme-text-tertiary); font-size: 12px; display: block; margin-top: 4px;">
+                Quando ativado, o ribbon menu será ocultado automaticamente ao entrar no modo dashboard
+              </small>
+            </div>
           </div>
 
           <!-- Plugins Tab -->
@@ -3093,6 +3116,10 @@ class MeuPlugin {
         // TODO: Implementar sistema de configurações globais
         // kernel.settings.set('language', languageSelect.value);
         localStorage.setItem('language', languageSelect.value);
+
+        // Salvar configuração de auto-hide ribbon
+        const autoHideRibbon = (document.getElementById('auto-hide-ribbon') as HTMLInputElement)?.checked;
+        localStorage.setItem('autoHideRibbon', String(autoHideRibbon));
 
         settingsModal.remove();
         logger.info('[UIManager] Configurações salvas.');

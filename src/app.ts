@@ -14,6 +14,7 @@ import { logger } from './@core/storage-utils-consolidated';
 import { FXPackPlugin, PivotPlugin } from './@core/plugin-system-consolidated';
 import { ChartsPlugin } from './plugins/charts-plugin';
 import { ProLeasePlugin } from './plugins/prolease-ifrs16-plugin';
+import { FXFinancePlugin } from './plugins/fx-finance-plugin';
 import { UIManager } from './ui-manager';
 import './style.css';
 
@@ -72,6 +73,10 @@ class DJDataForgeApp {
       await kernel['pluginHost'].loadPlugin(
         { default: ProLeasePlugin },
         new ProLeasePlugin().manifest
+      );
+      await kernel['pluginHost'].loadPlugin(
+        { default: FXFinancePlugin },
+        new FXFinancePlugin().manifest
       );
       logger.info('[App] Built-in plugins loaded');
     } catch (error) {

@@ -1139,34 +1139,27 @@ body.dark .toast.warning {
 /* ============================================================================
      FULLSCREEN
      ============================================================================ */
-body.fullscreen-active .app-header,
-body.fullscreen-active .ribbon,
-body.fullscreen-active .formula-bar,
-body.fullscreen-active .sidebar,
-body.fullscreen-active .panels,
-body.fullscreen-active .status-bar {
+
+/* Dashboard Fullscreen Specific */
+#dashboard-container.dashboard-fullscreen-active {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  z-index: 9999; /* Ensure it's above other content */
+  background: var(--theme-bg-primary); /* Ensure background is not transparent */
+}
+
+/* Hide other elements when dashboard is in fullscreen */
+#dashboard-container.dashboard-fullscreen-active ~ .app-header,
+#dashboard-container.dashboard-fullscreen-active ~ .ribbon,
+#dashboard-container.dashboard-fullscreen-active ~ .formula-bar,
+#dashboard-container.dashboard-fullscreen-active ~ .sidebar,
+#dashboard-container.dashboard-fullscreen-active ~ .panels,
+#dashboard-container.dashboard-fullscreen-active ~ .status-bar,
+#dashboard-container.dashboard-fullscreen-active ~ .app-content .grid-container {
   display: none !important;
-}
-
-body.fullscreen-active .app-container {
-  display: block !important; /* Override flex display to allow main content to take full space */
-}
-
-body.fullscreen-active .app-content {
-  height: 100vh !important;
-  width: 100vw !important;
-  display: block !important;
-}
-
-body.fullscreen-active .grid-container,
-body.fullscreen-active #dashboard-container {
-  height: 100% !important;
-  width: 100% !important;
-}
-
-body.fullscreen-active .grid-wrapper {
-  height: 100% !important;
-  width: 100% !important;
 }
 
 

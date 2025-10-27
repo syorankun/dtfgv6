@@ -9,9 +9,11 @@ export class UIManager {
   private grid?: VirtualGrid;
   private dashboardRenderer?: DashboardRenderer;
   private isDashboardMode = false;
+  private contextMenu?: HTMLElement;
 
   constructor(app: HTMLElement) {
     this.app = app;
+    this.createContextMenu();
   }
 
   public setupGrid() {
@@ -1115,6 +1117,9 @@ export class UIManager {
         }
         this.showAddItemUI('dashboard', 'add-sheet-container');
     });
+
+    // Setup context menu listeners
+    this.setupContextMenuListeners();
 
     logger.info('[UIManager] Event listeners configured');
   }
@@ -3522,17 +3527,26 @@ class MeuPlugin {
             // Add table headers
             csvContent += table.columns.map(col => col.name).join(',') + '\n';
 
-            // Add table data
-            const tableData = tableManager.getTableData(widget.tableId);
-            tableData.forEach(row => {
-              csvContent += row.map(cell => {
-                const cellStr = String(cell || '');
+            // Add table data from sheet
+            const range = table.range;
+            const startRow = range.startRow;
+            const endRow = range.endRow;
+            const startCol = range.startCol;
+
+            for (let row = startRow + 1; row <= endRow; row++) {
+              const rowData: any[] = [];
+              table.columns.forEach((_col, colIdx) => {
+                const cell = sheet.getCell(row, startCol + colIdx);
+                rowData.push(cell?.value || '');
+              });
+              csvContent += rowData.map((cellValue: any) => {
+                const cellStr = String(cellValue || '');
                 // Escape commas and quotes
                 return cellStr.includes(',') || cellStr.includes('"')
                   ? `"${cellStr.replace(/"/g, '""')}"`
                   : cellStr;
               }).join(',') + '\n';
-            });
+            }
           }
         } else if (widget.type === 'kpi' && widget.kpiConfig) {
           const kpi = widget.kpiConfig;
@@ -3886,6 +3900,192 @@ class MeuPlugin {
 
       modal.remove();
       logger.info('[UIManager] Image widget added', { widgetId: widget.id });
+    });
+  }
+
+  /**
+   * Create the context menu element
+   */
+  private createContextMenu(): void {
+    const menu = document.createElement('div');
+    menu.className = 'context-menu';
+    menu.id = 'context-menu';
+    document.body.appendChild(menu);
+    this.contextMenu = menu;
+
+    // Hide menu when clicking outside
+    document.addEventListener('click', () => {
+      this.hideContextMenu();
+    });
+
+    // Prevent closing when clicking inside menu
+    menu.addEventListener('click', (e) => {
+      e.stopPropagation();
+    });
+  }
+
+  /**
+   * Show context menu at specified position
+   */
+  private showContextMenu(x: number, y: number, items: Array<{label: string, icon: string, action: () => void, isDanger?: boolean}>): void {
+    if (!this.contextMenu) return;
+
+    // Build menu HTML
+    const html = items.map(item =>
+      `<div class="context-menu-item ${item.isDanger ? 'danger' : ''}" data-action="${item.label}">
+        <span>${item.icon}</span>
+        <span>${item.label}</span>
+      </div>`
+    ).join('');
+
+    this.contextMenu.innerHTML = html;
+
+    // Position menu
+    this.contextMenu.style.left = `${x}px`;
+    this.contextMenu.style.top = `${y}px`;
+    this.contextMenu.classList.add('visible');
+
+    // Add click handlers
+    items.forEach((item, index) => {
+      const menuItem = this.contextMenu?.querySelectorAll('.context-menu-item')[index];
+      menuItem?.addEventListener('click', () => {
+        item.action();
+        this.hideContextMenu();
+      });
+    });
+  }
+
+  /**
+   * Hide context menu
+   */
+  private hideContextMenu(): void {
+    if (!this.contextMenu) return;
+    this.contextMenu.classList.remove('visible');
+  }
+
+  /**
+   * Delete a sheet with confirmation
+   */
+  private async deleteSheet(sheetId: string): Promise<void> {
+    const wb = kernel.workbookManager.getActiveWorkbook();
+    if (!wb) return;
+
+    const sheet = wb.getSheet(sheetId);
+    if (!sheet) return;
+
+    // Confirm deletion
+    if (!confirm(`Tem certeza que deseja apagar a planilha "${sheet.name}"?`)) {
+      return;
+    }
+
+    // Check if it's the last sheet
+    if (wb.listSheets().length <= 1) {
+      alert('Não é possível apagar a última planilha do workbook.');
+      return;
+    }
+
+    // Delete the sheet
+    const deleted = wb.deleteSheet(sheetId);
+
+    if (deleted) {
+      // Delete dashboard layout if exists
+      kernel.dashboardManager.deleteLayout(sheetId);
+
+      // Refresh UI
+      this.refreshSheetList();
+      this.refreshGrid();
+
+      logger.info('[UIManager] Sheet deleted', { sheetId, sheetName: sheet.name });
+    } else {
+      alert('Erro ao apagar planilha.');
+    }
+  }
+
+  /**
+   * Delete a workbook with confirmation
+   */
+  private async deleteWorkbook(workbookId: string): Promise<void> {
+    const wb = kernel.workbookManager.getWorkbook(workbookId);
+    if (!wb) return;
+
+    // Confirm deletion
+    if (!confirm(`Tem certeza que deseja apagar o workbook "${wb.name}"?\n\nTodas as planilhas serão perdidas!`)) {
+      return;
+    }
+
+    try {
+      // Delete the workbook
+      const deleted = await kernel.deleteWorkbook(workbookId);
+
+      if (deleted) {
+        // Refresh UI
+        this.refreshWorkbookList();
+        this.refreshSheetList();
+        this.refreshGrid();
+
+        logger.info('[UIManager] Workbook deleted', { workbookId, workbookName: wb.name });
+      } else {
+        alert('Erro ao apagar workbook.');
+      }
+    } catch (error) {
+      logger.error('[UIManager] Failed to delete workbook', error);
+      alert('Erro ao apagar workbook.');
+    }
+  }
+
+  /**
+   * Setup context menu listeners
+   */
+  private setupContextMenuListeners(): void {
+    // Context menu for sheet items
+    document.getElementById('sheet-list')?.addEventListener('contextmenu', (e) => {
+      e.preventDefault();
+      const target = e.target as HTMLElement;
+      const sheetItem = target.closest('.sheet-item') as HTMLElement;
+
+      if (sheetItem) {
+        const sheetId = sheetItem.dataset.sheetId;
+        if (sheetId) {
+          const wb = kernel.workbookManager.getActiveWorkbook();
+          const sheet = wb?.getSheet(sheetId);
+
+          if (sheet) {
+            this.showContextMenu(e.clientX, e.clientY, [
+              {
+                label: 'Apagar Planilha',
+                icon: '🗑️',
+                action: () => this.deleteSheet(sheetId),
+                isDanger: true
+              }
+            ]);
+          }
+        }
+      }
+    });
+
+    // Context menu for workbook items
+    document.getElementById('workbook-list')?.addEventListener('contextmenu', (e) => {
+      e.preventDefault();
+      const target = e.target as HTMLElement;
+      const workbookItem = target.closest('.workbook-item') as HTMLElement;
+
+      if (workbookItem) {
+        const workbookId = workbookItem.dataset.workbookId;
+        if (workbookId) {
+          const wb = kernel.workbookManager.getWorkbook(workbookId);
+
+          if (wb) {
+            this.showContextMenu(e.clientX, e.clientY, [
+              {
+                label: 'Apagar Workbook',
+                icon: '🗑️',
+                action: () => this.deleteWorkbook(workbookId),
+                isDanger: true
+              }
+            ]);
+          }
+        }
+      }
     });
   }
 }

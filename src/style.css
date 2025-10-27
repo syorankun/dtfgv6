@@ -1805,3 +1805,54 @@ a:focus-visible {
     border-bottom: 1px solid var(--theme-border-color);
   }
 }
+
+/* ============================================================================
+     CONTEXT MENU
+     ============================================================================ */
+
+.context-menu {
+  position: fixed;
+  background: var(--theme-bg-primary);
+  border: 1px solid var(--theme-border-color);
+  border-radius: var(--border-radius);
+  box-shadow: var(--shadow-lg);
+  padding: var(--spacing-xs);
+  min-width: 180px;
+  z-index: 10000;
+  display: none;
+}
+
+.context-menu.visible {
+  display: block;
+}
+
+.context-menu-item {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-sm) var(--spacing-md);
+  border-radius: var(--border-radius-sm);
+  cursor: pointer;
+  font-size: 14px;
+  color: var(--theme-text-primary);
+  transition: background-color var(--transition-fast);
+  user-select: none;
+}
+
+.context-menu-item:hover {
+  background: var(--theme-bg-hover);
+}
+
+.context-menu-item.danger {
+  color: var(--theme-color-error);
+}
+
+.context-menu-item.danger:hover {
+  background: rgba(239, 68, 68, 0.1);
+}
+
+.context-menu-separator {
+  height: 1px;
+  background: var(--theme-border-color);
+  margin: var(--spacing-xs) 0;
+}

@@ -519,20 +519,32 @@ export class FXFinancePlugin implements Plugin {
   private async loadRatesCache(): Promise<void> {
     this.ratesCache.clear();
 
+    console.log('[FXFinancePlugin] Loading rates cache...');
+
     // Load PTAX rates
     const ptaxSheet = this.getSheet(SHEET_NAMES.PTAX);
     if (ptaxSheet) {
+      console.log('[FXFinancePlugin] Loading PTAX sheet with', ptaxSheet.rows.size, 'rows');
       this.loadSheetIntoCache(ptaxSheet, 'PTAX');
+    } else {
+      console.log('[FXFinancePlugin] PTAX sheet not found');
     }
 
     // Load Manual rates
     const manualSheet = this.getSheet(SHEET_NAMES.MANUAL);
     if (manualSheet) {
+      console.log('[FXFinancePlugin] Loading Manual sheet with', manualSheet.rows.size, 'rows');
       this.loadSheetIntoCache(manualSheet, 'MANUAL');
+    } else {
+      console.log('[FXFinancePlugin] Manual sheet not found');
     }
+
+    console.log('[FXFinancePlugin] Rates cache loaded. Total entries:', this.ratesCache.size);
   }
 
   private loadSheetIntoCache(sheet: Sheet, source: RateSource): void {
+    let loadedCount = 0;
+
     // Iterate through all rows
     for (const [rowIndex, rowData] of sheet.rows.entries()) {
       if (rowIndex === 0) continue; // Skip header row
@@ -551,8 +563,11 @@ export class FXFinancePlugin implements Plugin {
           source
         };
         this.ratesCache.set(this.getRateCacheKey(date, currency, source), rate);
+        loadedCount++;
       }
     }
+
+    console.log(`[FXFinancePlugin] Loaded ${loadedCount} ${source} rates into cache`);
   }
 
   private getRateCacheKey(date: string, currency: CurrencyCode, source: RateSource): string {
@@ -643,10 +658,14 @@ export class FXFinancePlugin implements Plugin {
   private registerFXFormulas(): void {
     const registry = this.context.kernel.calcEngine.getRegistry();
 
+    console.log('[FXFinancePlugin] Registering FX formulas...');
+    console.log('[FXFinancePlugin] Cache size:', this.ratesCache.size);
+
     // FX_RATE(date, currency, [source])
     registry.register('FX_RATE', (date: string, currency: string, source?: string) => {
       const rateSource = (source?.toUpperCase() || 'AUTO') as RateSource;
       const rate = this.getRateFromCache(date, currency as CurrencyCode, rateSource, true);
+      console.log(`[FXFinancePlugin] FX_RATE called: date=${date}, currency=${currency}, source=${rateSource}, result=${rate}`);
       return rate || '#N/A';
     }, {
       argCount: [2, 3],
@@ -663,6 +682,7 @@ export class FXFinancePlugin implements Plugin {
         rate = this.getLastAvailableRate(currency as CurrencyCode);
       }
 
+      console.log(`[FXFinancePlugin] FX_TODAY called: currency=${currency}, today=${today}, rate=${rate}, cache size=${this.ratesCache.size}`);
       return rate || '#N/A';
     }, {
       argCount: 1,
@@ -777,6 +797,8 @@ export class FXFinancePlugin implements Plugin {
       argCount: 5,
       description: 'Calculate theoretical forward rate'
     });
+
+    console.log('[FXFinancePlugin] All FX formulas registered successfully');
   }
 
   /**
@@ -1059,7 +1081,7 @@ export class FXFinancePlugin implements Plugin {
     wb.setActiveSheet(sheet.id);
 
     // Recalculate sheet formulas
-    this.context.kernel.kernel.recalculate(sheet.id, undefined, { force: true });
+    await this.context.kernel.recalculate(sheet.id, undefined, { force: true });
 
     this.context.ui.showToast('Dashboard criado com sucesso!', 'success');
   }

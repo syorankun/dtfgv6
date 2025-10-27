@@ -70,20 +70,24 @@ export class FormulaParser {
       }
 
       // Cell references (A1, B2, AA10) and function names (with underscore support)
-      if (/[A-ZÀ-Ú]/.test(char)) {
+      // Support both uppercase and lowercase, but normalize to uppercase
+      if (/[A-ZÀ-Úa-zà-ú]/.test(char)) {
         let ref = "";
-        while (i < formula.length && /[A-Z0-9À-Ú_:]/.test(formula[i])) {
+        while (i < formula.length && /[A-Z0-9À-Ú_:a-zà-ú]/.test(formula[i])) {
           ref += formula[i++];
         }
 
+        // Normalize to uppercase for consistency
+        const normalizedRef = ref.toUpperCase();
+
         // Check if it's a range (A1:B10) or cell ref
-        if (ref.includes(":")) {
-          tokens.push({ type: "RANGE_REF", value: ref, position: i });
-        } else if (/^[A-Z]+\d+$/.test(ref)) {
-          tokens.push({ type: "CELL_REF", value: ref, position: i });
+        if (normalizedRef.includes(":")) {
+          tokens.push({ type: "RANGE_REF", value: normalizedRef, position: i });
+        } else if (/^[A-Z]+\d+$/.test(normalizedRef)) {
+          tokens.push({ type: "CELL_REF", value: normalizedRef, position: i });
         } else {
           // It's a function name
-          tokens.push({ type: "FUNCTION", value: ref, position: i });
+          tokens.push({ type: "FUNCTION", value: normalizedRef, position: i });
         }
         continue;
       }

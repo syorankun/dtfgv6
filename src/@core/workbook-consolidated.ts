@@ -384,13 +384,15 @@ export class Workbook {
   modified: Date;
   author?: string;
   companyId?: string;
+  private eventBus?: any;
 
-  constructor(options: WorkbookOptions = {}) {
+  constructor(options: WorkbookOptions = {}, eventBus?: any) {
     this.id = options.id || nanoid();
     this.name = options.name || "Sem título";
     this.created = options.created || new Date();
     this.modified = new Date();
     this.author = options.author;
+    this.eventBus = eventBus;
   }
 
   // --------------------------------------------------------------------------
@@ -408,6 +410,7 @@ export class Workbook {
     }
 
     this.modified = new Date();
+    this.eventBus?.emit("sheet:created", { sheetId: sheet.id, workbookId: this.id });
     return sheet;
   }
 
@@ -447,6 +450,7 @@ export class Workbook {
 
     if (deleted) {
       this.modified = new Date();
+      this.eventBus?.emit("sheet:deleted", { sheetId: id, workbookId: this.id });
     }
 
     return deleted;
@@ -523,13 +527,23 @@ export class Workbook {
 export class WorkbookManager {
   private workbooks: Map<string, Workbook> = new Map();
   private activeWorkbookId?: string;
+  private eventBus?: any;
+
+  constructor(eventBus?: any) {
+    this.eventBus = eventBus;
+  }
+
+  setEventBus(eventBus: any) {
+    this.eventBus = eventBus;
+    this.workbooks.forEach(wb => (wb as any).eventBus = eventBus);
+  }
 
   // --------------------------------------------------------------------------
   // WORKBOOK CRUD
   // --------------------------------------------------------------------------
 
   createWorkbook(name?: string, options?: WorkbookOptions): Workbook {
-    const wb = new Workbook({ ...options, name: name || "Sem título" });
+    const wb = new Workbook({ ...options, name: name || "Sem título" }, this.eventBus);
 
     // Add default sheet
     wb.addSheet("Sheet1");

@@ -615,23 +615,25 @@ export class UIManager {
         } else if (type === 'sheet') {
           const wb = kernel.workbookManager.getActiveWorkbook();
           if (wb) {
-            kernel.createSheet(name);
-            logger.info('[UIManager] Sheet creation requested', { name });
+            wb.addSheet(name);
+            this.refreshSheetList();
+            this.refreshGrid();
+            logger.info('[UIManager] Sheet created', { name });
           } else {
             alert('Selecione um workbook primeiro');
           }
         } else { // dashboard
             const wb = kernel.workbookManager.getActiveWorkbook();
             if (wb) {
-                const sheet = kernel.createSheet(name);
-                if (sheet) {
-                    wb.setActiveSheet(sheet.id);
-                    kernel.dashboardManager.getOrCreateLayout(sheet.id);
-                    if (!this.isDashboardMode) {
-                        this.toggleDashboardMode();
-                    }
-                    logger.info('[UIManager] Dashboard sheet created', { name });
+                const sheet = wb.addSheet(name);
+                wb.setActiveSheet(sheet.id);
+                kernel.dashboardManager.getOrCreateLayout(sheet.id);
+                this.refreshSheetList();
+                this.refreshGrid();
+                if (!this.isDashboardMode) {
+                    this.toggleDashboardMode();
                 }
+                logger.info('[UIManager] Dashboard sheet created', { name });
             } else {
                 alert('Selecione um workbook primeiro');
             }
@@ -4013,14 +4015,18 @@ class MeuPlugin {
       return;
     }
 
-    // Delete the sheet through the kernel
-    const deleted = kernel.deleteSheet(wb.id, sheetId);
+    // Delete the sheet
+    const deleted = wb.deleteSheet(sheetId);
 
     if (deleted) {
       // Delete dashboard layout if exists
       kernel.dashboardManager.deleteLayout(sheetId);
 
-      logger.info('[UIManager] Sheet deletion requested', { sheetId, sheetName: sheet.name });
+      // Refresh UI
+      this.refreshSheetList();
+      this.refreshGrid();
+
+      logger.info('[UIManager] Sheet deleted', { sheetId, sheetName: sheet.name });
     } else {
       alert('Erro ao apagar planilha.');
     }

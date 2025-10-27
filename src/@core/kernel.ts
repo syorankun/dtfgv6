@@ -281,12 +281,12 @@ export class DJDataForgeKernel {
   private grid?: any;
   
   private constructor() {
-    this.workbookManager = new WorkbookManager();
+    this.eventBus = new EventBus();
+    this.workbookManager = new WorkbookManager(this.eventBus);
     this.calcEngine = new CalcEngine();
     this.storageManager = new PersistenceManager();
     this.companyManager = new CompanyManager(this.storageManager);
     this.sessionManager = new SessionManager();
-    this.eventBus = new EventBus();
     this.pluginHost = new PluginHost(this, this.storageManager);
     this.tableManager = TableManager.getInstance();
     this.dashboardManager = DashboardManager.getInstance();
@@ -339,7 +339,9 @@ export class DJDataForgeKernel {
                   } else if (workbooksData.length > 0) {
                     // Fallback to first workbook
                     this.workbookManager.setActiveWorkbook(workbooksData[0].id);
-                  }        }
+                  }
+        }
+        this.workbookManager.setEventBus(this.eventBus);
         
         // If no workbooks were loaded from storage, and none exist in the manager, create a default one.
         if (this.workbookManager.listWorkbooks().length === 0) {
@@ -558,34 +560,6 @@ export class DJDataForgeKernel {
       logger.info("[Kernel] Workbook deleted", { id });
     }
     
-    return deleted;
-  }
-
-  createSheet(name: string): any {
-    const wb = this.workbookManager.getActiveWorkbook();
-    if (!wb) {
-      logger.error("[Kernel] No active workbook to add sheet to");
-      return null;
-    }
-
-    const sheet = wb.addSheet(name);
-    this.eventBus.emit("sheet:created", { sheetId: sheet.id, workbookId: wb.id });
-    logger.info("[Kernel] Sheet created", { sheetId: sheet.id, workbookId: wb.id });
-    return sheet;
-  }
-
-  deleteSheet(workbookId: string, sheetId: string): boolean {
-    const wb = this.workbookManager.getWorkbook(workbookId);
-    if (!wb) {
-      logger.error("[Kernel] Workbook not found for sheet deletion", { workbookId });
-      return false;
-    }
-
-    const deleted = wb.deleteSheet(sheetId);
-    if (deleted) {
-      this.eventBus.emit("sheet:deleted", { sheetId, workbookId });
-      logger.info("[Kernel] Sheet deleted", { sheetId, workbookId });
-    }
     return deleted;
   }
   

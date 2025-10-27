@@ -1136,6 +1136,41 @@ body.dark .toast.warning {
      MODAL
      ============================================================================ */
 
+/* ============================================================================
+     FULLSCREEN
+     ============================================================================ */
+body.fullscreen-active .app-header,
+body.fullscreen-active .ribbon,
+body.fullscreen-active .formula-bar,
+body.fullscreen-active .sidebar,
+body.fullscreen-active .panels,
+body.fullscreen-active .status-bar {
+  display: none !important;
+}
+
+body.fullscreen-active .app-container {
+  display: block !important; /* Override flex display to allow main content to take full space */
+}
+
+body.fullscreen-active .app-content {
+  height: 100vh !important;
+  width: 100vw !important;
+  display: block !important;
+}
+
+body.fullscreen-active .grid-container,
+body.fullscreen-active #dashboard-container {
+  height: 100% !important;
+  width: 100% !important;
+}
+
+body.fullscreen-active .grid-wrapper {
+  height: 100% !important;
+  width: 100% !important;
+}
+
+
+
 .modal-overlay {
   position: fixed;
   top: 0;

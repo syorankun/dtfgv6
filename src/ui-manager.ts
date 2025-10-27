@@ -1061,6 +1061,16 @@ export class UIManager {
       this.toggleFullscreen();
     });
 
+    // Listen for native fullscreen changes (e.g., user presses Esc)
+    document.addEventListener('fullscreenchange', () => {
+      if (!document.fullscreenElement) {
+        document.body.classList.remove('fullscreen-active');
+      } else {
+        document.body.classList.add('fullscreen-active');
+      }
+      this.updateFullscreenButtonIcon();
+    });
+
     document.getElementById('btn-add-kpi-widget')?.addEventListener('click', () => {
       this.addWidget('kpi');
     });
@@ -3204,6 +3214,37 @@ class MeuPlugin {
     const element = document.querySelector('.status-plugins');
     if (element) {
       element.textContent = `Plugins: ${count}`;
+    }
+  }
+
+  /**
+   * Toggles fullscreen mode for the application.
+   */
+  public toggleFullscreen(): void {
+    if (!document.fullscreenElement) {
+      this.app.requestFullscreen().then(() => {
+        document.body.classList.add('fullscreen-active');
+      }).catch(err => {
+        alert(`Error attempting to enable full-screen mode: ${err.message} (${err.name})`);
+      });
+    } else {
+      document.exitFullscreen().then(() => {
+        document.body.classList.remove('fullscreen-active');
+      });
+    }
+    this.updateFullscreenButtonIcon();
+  }
+
+  private updateFullscreenButtonIcon(): void {
+    const toggleBtn = document.getElementById('btn-toggle-fullscreen');
+    const dashboardFullscreenBtn = document.getElementById('btn-dashboard-fullscreen');
+    
+    if (document.fullscreenElement) {
+      if (toggleBtn) toggleBtn.innerHTML = '▤'; // Exit fullscreen icon
+      if (dashboardFullscreenBtn) dashboardFullscreenBtn.innerHTML = '▤'; // Exit fullscreen icon
+    } else {
+      if (toggleBtn) toggleBtn.innerHTML = '⛶'; // Enter fullscreen icon
+      if (dashboardFullscreenBtn) dashboardFullscreenBtn.innerHTML = '⛶'; // Enter fullscreen icon
     }
   }
 

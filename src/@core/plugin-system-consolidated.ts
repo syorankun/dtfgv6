@@ -9,19 +9,24 @@
  * - plugin/registry.ts (Plugin registry)
  */
 
-import type { 
-    PluginManifest, 
-    PluginContext, 
+import type {
+    PluginManifest,
+    PluginContext,
     PluginPermission,
     PluginStorageAPI,
     PluginUIAPI,
     PluginEventAPI,
+    PluginWidgetAPI,
     ToolbarButtonConfig,
+    DashboardButtonConfig,
     PanelConfig,
-    MenuItemConfig
+    MenuItemConfig,
+    WidgetConfig
   } from './types';
   import { PersistenceManager, logger } from './storage-utils-consolidated';
   import type { DJDataForgeKernel } from './kernel';
+  import { widgetRegistry } from './widget-registry';
+  import { dashboardManager } from './dashboard-manager';
   
   // ============================================================================
   // PLUGIN INTERFACE
@@ -66,23 +71,52 @@ import type {
   
   class PluginUIAPIImpl implements PluginUIAPI {
     private toolbarButtons: Map<string, ToolbarButtonConfig> = new Map();
+    private dashboardButtons: Map<string, DashboardButtonConfig> = new Map();
     private panels: Map<string, PanelConfig> = new Map();
     private menuItems: Map<string, MenuItemConfig> = new Map();
-    
+
     constructor(private pluginId: string, private eventBus: any) {}
-    
+
     addToolbarButton(config: ToolbarButtonConfig): void {
       this.toolbarButtons.set(config.id, config);
       this.eventBus.emit('ui:add-toolbar-button', { pluginId: this.pluginId, config });
       logger.debug(`[Plugin] Toolbar button added`, { pluginId: this.pluginId, id: config.id });
     }
-    
+
+    addDashboardButton(config: DashboardButtonConfig): void {
+      this.dashboardButtons.set(config.id, config);
+
+      // Adicionar botão no painel de dashboard
+      const dashboardPanel = document.querySelector('.dashboard-toolbar-buttons');
+      if (dashboardPanel) {
+        const button = document.createElement('button');
+        button.id = `plugin-dashboard-btn-${config.id}`;
+        button.className = 'dashboard-widget-btn';
+        button.title = `Adicionar ${config.label}`;
+        button.onclick = config.onClick;
+
+        const icon = document.createElement('span');
+        icon.className = 'widget-icon';
+        icon.textContent = config.icon;
+
+        const label = document.createElement('span');
+        label.className = 'widget-label';
+        label.textContent = config.label;
+
+        button.appendChild(icon);
+        button.appendChild(label);
+        dashboardPanel.appendChild(button);
+      }
+
+      logger.debug(`[Plugin] Dashboard button added`, { pluginId: this.pluginId, id: config.id });
+    }
+
     addPanel(config: PanelConfig): void {
       this.panels.set(config.id, config);
       this.eventBus.emit('ui:add-panel', { pluginId: this.pluginId, config });
       logger.debug(`[Plugin] Panel added`, { pluginId: this.pluginId, id: config.id });
     }
-    
+
     addMenuItem(config: MenuItemConfig): void {
       this.menuItems.set(config.id, config);
       this.eventBus.emit('ui:add-menu-item', { pluginId: this.pluginId, config });
@@ -133,12 +167,17 @@ import type {
       this.toolbarButtons.forEach((_, id) => {
         document.getElementById(`plugin-btn-${id}`)?.remove();
       });
-      
+
+      this.dashboardButtons.forEach((_, id) => {
+        document.getElementById(`plugin-dashboard-btn-${id}`)?.remove();
+      });
+
       this.panels.forEach((_, id) => {
         document.getElementById(`plugin-panel-${id}`)?.remove();
       });
-      
+
       this.toolbarButtons.clear();
+      this.dashboardButtons.clear();
       this.panels.clear();
       this.menuItems.clear();
     }
@@ -150,9 +189,9 @@ import type {
   
   class PluginEventAPIImpl implements PluginEventAPI {
     private handlers: Map<string, Set<Function>> = new Map();
-    
+
     constructor(private pluginId: string, private eventBus: any) {}
-    
+
     on(event: string, handler: (...args: any[]) => void): void {
       if (!this.handlers.has(event)) {
         this.handlers.set(event, new Set());
@@ -160,17 +199,17 @@ import type {
       this.handlers.get(event)!.add(handler);
       this.eventBus.on(event, handler);
     }
-    
+
     off(event: string, handler: (...args: any[]) => void): void {
       this.handlers.get(event)?.delete(handler);
       this.eventBus.off(event, handler);
     }
-    
+
     emit(event: string, ...args: any[]): void {
       // Prefix with plugin ID to avoid conflicts
       this.eventBus.emit(`plugin:${this.pluginId}:${event}`, ...args);
     }
-    
+
     cleanup(): void {
       // Remove all handlers
       this.handlers.forEach((handlers, event) => {
@@ -181,7 +220,115 @@ import type {
       this.handlers.clear();
     }
   }
-  
+
+  // ============================================================================
+  // PLUGIN WIDGET API
+  // ============================================================================
+
+  /**
+   * Plugin Widget API Implementation
+   * Allows plugins to register custom widget types and create widget instances
+   */
+  class PluginWidgetAPIImpl implements PluginWidgetAPI {
+    private registeredTypes: Set<string> = new Set();
+
+    constructor(
+      private pluginId: string
+    ) {}
+
+    /**
+     * Register a custom widget renderer
+     * @param type - Unique type identifier for the widget (e.g., 'custom-chart', 'gantt')
+     * @param rendererClass - Class implementing IWidgetRenderer interface with render(), renderSettings?(), and destroy?() methods
+     * @example
+     * ```typescript
+     * class MyChartRenderer {
+     *   constructor(config, sheet, container, onWidgetChange) { ... }
+     *   render() { ... }
+     *   renderSettings(container) { ... }
+     *   destroy() { ... }
+     * }
+     * context.widgets.register('my-chart', MyChartRenderer);
+     * ```
+     */
+    register(type: string, rendererClass: any): void {
+      widgetRegistry.register(type, rendererClass);
+      this.registeredTypes.add(type);
+
+      logger.info(`[PluginWidgetAPI] Widget registered`, { pluginId: this.pluginId, type });
+    }
+
+    /**
+     * Unregister a widget renderer
+     * @param type - Widget type to unregister
+     */
+    unregister(type: string): void {
+      widgetRegistry.unregister(type);
+      this.registeredTypes.delete(type);
+
+      logger.info(`[PluginWidgetAPI] Widget unregistered`, { pluginId: this.pluginId, type });
+    }
+
+    /**
+     * Create a widget instance on a dashboard
+     * @param sheetId - ID of the sheet where the widget will be added
+     * @param type - Widget type (must be registered first)
+     * @param config - Partial widget configuration (position, title, etc.)
+     * @returns Created widget configuration with generated ID
+     * @throws Error if widget type is not registered or configuration is invalid
+     * @example
+     * ```typescript
+     * const widget = context.widgets.create(sheetId, 'my-chart', {
+     *   title: 'Sales Chart',
+     *   position: { x: 100, y: 100, width: 400, height: 300 }
+     * });
+     * ```
+     */
+    create(sheetId: string, type: string, config: Partial<WidgetConfig>): WidgetConfig {
+      const widget = dashboardManager.addWidget(sheetId, type as any, config);
+
+      logger.info(`[PluginWidgetAPI] Widget created`, { pluginId: this.pluginId, type, widgetId: widget.id });
+
+      return widget;
+    }
+
+    /**
+     * Get all available widget types (built-in + plugin-registered)
+     * @returns Array of widget type names
+     * @example
+     * ```typescript
+     * const types = context.widgets.getAvailableTypes();
+     * console.log('Available widgets:', types); // ['kpi', 'table', 'text', 'image', 'my-custom-widget']
+     * ```
+     */
+    getAvailableTypes(): string[] {
+      return widgetRegistry.getRegisteredTypes();
+    }
+
+    /**
+     * Check if a widget type is available
+     * @param type - Widget type to check
+     * @returns True if the widget type is registered
+     * @example
+     * ```typescript
+     * if (context.widgets.isTypeAvailable('chart')) {
+     *   // Create chart widget
+     * }
+     * ```
+     */
+    isTypeAvailable(type: string): boolean {
+      return widgetRegistry.has(type);
+    }
+
+    cleanup(): void {
+      // Unregister all widget types registered by this plugin
+      this.registeredTypes.forEach(type => {
+        this.unregister(type);
+      });
+      this.registeredTypes.clear();
+    }
+  }
+
   // ============================================================================
   // PLUGIN HOST
   // ============================================================================
@@ -246,19 +393,22 @@ import type {
         if (plugin.dispose) {
           await plugin.dispose();
         }
-        
+
         // Cleanup UI
         (context.ui as PluginUIAPIImpl).cleanup();
-        
+
         // Cleanup events
         (context.events as PluginEventAPIImpl).cleanup();
-        
+
+        // Cleanup widgets
+        (context.widgets as PluginWidgetAPIImpl).cleanup();
+
         // Remove from maps
         this.plugins.delete(pluginId);
         this.contexts.delete(pluginId);
-        
+
         logger.info(`[PluginHost] Plugin unloaded`, { pluginId });
-        
+
         // Emit event
         this.kernel.eventBus.emit('plugin:unloaded', { pluginId });
       } catch (error) {
@@ -285,7 +435,8 @@ import type {
       const storage = new PluginStorageAPIImpl(manifest.id, this.storage);
       const ui = new PluginUIAPIImpl(manifest.id, this.kernel.eventBus);
       const events = new PluginEventAPIImpl(manifest.id, this.kernel.eventBus);
-      
+      const widgets = new PluginWidgetAPIImpl(manifest.id);
+
       return {
         pluginId: manifest.id,
         manifest,
@@ -293,6 +444,7 @@ import type {
         storage,
         ui,
         events,
+        widgets,
       };
     }
     

@@ -190,6 +190,7 @@ export interface PluginContext {
   storage: PluginStorageAPI;
   ui: PluginUIAPI;
   events: PluginEventAPI;
+  widgets: PluginWidgetAPI;  // Nova API para widgets
 }
 
 export interface PluginStorageAPI {
@@ -201,6 +202,7 @@ export interface PluginStorageAPI {
 
 export interface PluginUIAPI {
   addToolbarButton(config: ToolbarButtonConfig): void;
+  addDashboardButton(config: DashboardButtonConfig): void;
   addPanel(config: PanelConfig): void;
   addMenuItem(config: MenuItemConfig): void;
   showToast(
@@ -215,11 +217,26 @@ export interface PluginEventAPI {
   emit(event: string, ...args: any[]): void;
 }
 
+export interface PluginWidgetAPI {
+  register(type: string, rendererClass: any): void;
+  unregister(type: string): void;
+  create(sheetId: string, type: string, config: Partial<WidgetConfig>): WidgetConfig;
+  getAvailableTypes(): string[];  // List all registered widget types
+  isTypeAvailable(type: string): boolean;  // Check if a widget type is registered
+}
+
 export interface ToolbarButtonConfig {
   id: string;
   label: string;
   icon?: string;
   tooltip?: string;
+  onClick: () => void;
+}
+
+export interface DashboardButtonConfig {
+  id: string;
+  label: string;
+  icon: string;
   onClick: () => void;
 }
 
@@ -294,6 +311,8 @@ export interface KernelContext {
   companyManager: any;
   eventBus: any;
   storage: any;
+  tableManager: any;      // TableManager for structured tables
+  dashboardManager: any;  // DashboardManager for dashboard layouts
   getGrid: () => any;
 }
 

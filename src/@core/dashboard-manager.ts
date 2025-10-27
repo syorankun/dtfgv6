@@ -14,6 +14,8 @@ import type {
   DashboardMode
 } from './types';
 import { logger } from './storage-utils-consolidated';
+import { widgetRegistry } from './widget-registry';
+import { TableManager } from './table-manager';
 
 // ============================================================================
 // DASHBOARD MANAGER (Singleton)
@@ -22,6 +24,7 @@ import { logger } from './storage-utils-consolidated';
 export class DashboardManager {
   private static instance: DashboardManager;
   private layouts: Map<string, DashboardLayout> = new Map(); // sheetId -> layout
+  private eventBus?: any; // EventBus para emitir eventos de lifecycle
 
   private constructor() {
     // Private constructor for singleton
@@ -32,6 +35,13 @@ export class DashboardManager {
       DashboardManager.instance = new DashboardManager();
     }
     return DashboardManager.instance;
+  }
+
+  /**
+   * Set EventBus for emitting lifecycle events
+   */
+  setEventBus(eventBus: any): void {
+    this.eventBus = eventBus;
   }
 
   /**
@@ -87,11 +97,61 @@ export class DashboardManager {
   }
 
   /**
+   * Validate widget configuration
+   */
+  private validateWidgetConfig(widgetType: WidgetType, options: any): { valid: boolean; error?: string } {
+    // Check if widget type is registered
+    if (!widgetRegistry.has(widgetType)) {
+      return {
+        valid: false,
+        error: `Widget type "${widgetType}" is not registered. Available types: ${widgetRegistry.getRegisteredTypes().join(', ')}`
+      };
+    }
+
+    // Validate table widget
+    if (widgetType === 'table') {
+      if (options.tableId) {
+        const tableManager = TableManager.getInstance();
+        const table = tableManager.getTable(options.tableId);
+        if (!table) {
+          return { valid: false, error: `Table with ID "${options.tableId}" not found` };
+        }
+      }
+    }
+
+    // Validate KPI widget
+    if (widgetType === 'kpi' && options.kpiConfig) {
+      const kpi = options.kpiConfig;
+      if (kpi.valueSource === 'cell' && !kpi.cellRef) {
+        return { valid: false, error: 'KPI widget with cell source requires cellRef' };
+      }
+      if (kpi.valueSource === 'formula' && !kpi.formula) {
+        return { valid: false, error: 'KPI widget with formula source requires formula' };
+      }
+      if (kpi.valueSource === 'aggregation' && (!kpi.tableId || kpi.columnIndex === undefined)) {
+        return { valid: false, error: 'KPI widget with aggregation source requires tableId and columnIndex' };
+      }
+    }
+
+    return { valid: true };
+  }
+
+  /**
    * Add widget to dashboard
    */
   addWidget(sheetId: string, widgetType: WidgetType, options: Partial<Omit<WidgetConfig, 'id' | 'type' | 'created' | 'modified' | 'position'>> & {
     position?: Partial<WidgetPosition>;
   } = {}): WidgetConfig {
+    // Validate configuration
+    const validation = this.validateWidgetConfig(widgetType, options);
+    if (!validation.valid) {
+      logger.error('[DashboardManager] Widget validation failed', {
+        type: widgetType,
+        error: validation.error
+      });
+      throw new Error(`Widget validation failed: ${validation.error}`);
+    }
+
     const layout = this.getOrCreateLayout(sheetId);
 
     // Default position (center of viewport, or stack if multiple widgets)
@@ -128,6 +188,14 @@ export class DashboardManager {
       type: widgetType
     });
 
+    // Emit lifecycle event
+    this.eventBus?.emit('widget:created', {
+      sheetId,
+      widgetId: widget.id,
+      type: widgetType,
+      widget
+    });
+
     return widget;
   }
 
@@ -145,6 +213,13 @@ export class DashboardManager {
     layout.modified = new Date();
 
     logger.info('[DashboardManager] Widget removed', { sheetId, widgetId });
+
+    // Emit lifecycle event
+    this.eventBus?.emit('widget:removed', {
+      sheetId,
+      widgetId
+    });
+
     return true;
   }
 
@@ -185,6 +260,13 @@ export class DashboardManager {
       position: widget.position
     });
 
+    // Emit lifecycle event
+    this.eventBus?.emit('widget:moved', {
+      sheetId,
+      widgetId,
+      position: widget.position
+    });
+
     return true;
   }
 
@@ -211,6 +293,14 @@ export class DashboardManager {
       sheetId,
       widgetId,
       updates: Object.keys(updates)
+    });
+
+    // Emit lifecycle event
+    this.eventBus?.emit('widget:updated', {
+      sheetId,
+      widgetId,
+      updates: Object.keys(updates),
+      widget
     });
 
     return true;
@@ -357,6 +447,21 @@ export class DashboardManager {
    */
   listLayouts(): DashboardLayout[] {
     return Array.from(this.layouts.values());
+  }
+
+  /**
+   * Get all registered widget types
+   * Useful for plugins to discover available widget types
+   */
+  getAvailableWidgetTypes(): string[] {
+    return widgetRegistry.getRegisteredTypes();
+  }
+
+  /**
+   * Check if a widget type is available
+   */
+  isWidgetTypeAvailable(type: string): boolean {
+    return widgetRegistry.has(type);
   }
 }
 

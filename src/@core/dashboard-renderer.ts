@@ -217,6 +217,10 @@ class WidgetRenderer {
   }
 
   destroy(): void {
+    // Call destroy on internal renderer if it exists
+    if (this.internalRenderer && 'destroy' in this.internalRenderer && typeof this.internalRenderer.destroy === 'function') {
+      this.internalRenderer.destroy();
+    }
     this.element.remove();
   }
 }
@@ -261,15 +265,7 @@ export class DashboardRenderer {
 
     this.setupContainer();
     this.setupEventListeners();
-    this._registerWidgets();
     this.renderAllWidgets();
-  }
-
-  private _registerWidgets(): void {
-    widgetRegistry.register('table', TableWidgetRenderer);
-    widgetRegistry.register('kpi', KPIWidgetRenderer);
-    widgetRegistry.register('text', TextWidgetRenderer);
-    widgetRegistry.register('image', ImageWidgetRenderer);
   }
 
   private setupContainer(): void {
@@ -537,3 +533,22 @@ export class DashboardRenderer {
     this.container.innerHTML = '';
   }
 }
+
+// ============================================================================
+// REGISTER BUILT-IN WIDGETS GLOBALLY
+// ============================================================================
+
+/**
+ * Register built-in widget renderers
+ * This runs on module load to ensure widgets are always available
+ */
+function registerBuiltInWidgets(): void {
+  widgetRegistry.register('table', TableWidgetRenderer);
+  widgetRegistry.register('kpi', KPIWidgetRenderer);
+  widgetRegistry.register('text', TextWidgetRenderer);
+  widgetRegistry.register('image', ImageWidgetRenderer);
+  logger.info('[DashboardRenderer] Built-in widgets registered');
+}
+
+// Register widgets immediately on module load
+registerBuiltInWidgets();

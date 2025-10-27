@@ -17,6 +17,7 @@ import { CalcEngine } from './calc-engine-consolidated';
 import { PersistenceManager, logger, Perf } from './storage-utils-consolidated';
 import { PluginHost } from './plugin-system-consolidated';
 import { DashboardManager } from './dashboard-manager';
+import { TableManager } from './table-manager';
 import type { KernelState, KernelContext, CompanyContext, Session } from './types';
 
 // ============================================================================
@@ -272,6 +273,7 @@ export class DJDataForgeKernel {
   sessionManager: SessionManager;
   eventBus: EventBus;
   pluginHost: PluginHost;
+  tableManager: TableManager;
   dashboardManager: DashboardManager;
   
   // Auto-save
@@ -286,7 +288,9 @@ export class DJDataForgeKernel {
     this.sessionManager = new SessionManager();
     this.eventBus = new EventBus();
     this.pluginHost = new PluginHost(this, this.storageManager);
+    this.tableManager = TableManager.getInstance();
     this.dashboardManager = DashboardManager.getInstance();
+    this.dashboardManager.setEventBus(this.eventBus); // Connect eventBus for lifecycle events
 
     logger.info(`[Kernel] DJ DataForge v${this.version} initialized`);
   }
@@ -450,6 +454,8 @@ export class DJDataForgeKernel {
       companyManager: this.companyManager,
       eventBus: this.eventBus,
       storage: this.storageManager,
+      tableManager: this.tableManager,
+      dashboardManager: this.dashboardManager,
       getGrid: this.getGrid.bind(this),
     };
   }
@@ -695,7 +701,126 @@ export class DJDataForgeKernel {
 // Export global instance
 export const kernel = DJDataForgeKernel.getInstance();
 
+// ============================================================================
+// DEBUG HELPERS
+// ============================================================================
+
+/**
+ * Debug utilities for widget system
+ */
+export const WidgetDebugger = {
+  /**
+   * List all registered widget types
+   */
+  listWidgetTypes(): string[] {
+    return kernel.dashboardManager.getAvailableWidgetTypes();
+  },
+
+  /**
+   * Get all widgets for current sheet
+   */
+  getCurrentWidgets(): any[] {
+    const sheet = kernel.workbookManager.getActiveSheet();
+    if (!sheet) {
+      console.warn('No active sheet');
+      return [];
+    }
+    return kernel.dashboardManager.getWidgets(sheet.id);
+  },
+
+  /**
+   * Get layout for current sheet
+   */
+  getCurrentLayout(): any {
+    const sheet = kernel.workbookManager.getActiveSheet();
+    if (!sheet) {
+      console.warn('No active sheet');
+      return null;
+    }
+    return kernel.dashboardManager.getLayout(sheet.id);
+  },
+
+  /**
+   * Get all layouts
+   */
+  getAllLayouts(): any[] {
+    return kernel.dashboardManager.listLayouts();
+  },
+
+  /**
+   * Widget statistics
+   */
+  getStats(): any {
+    const layouts = kernel.dashboardManager.listLayouts();
+    const types = kernel.dashboardManager.getAvailableWidgetTypes();
+
+    let totalWidgets = 0;
+    const widgetsByType: Record<string, number> = {};
+
+    layouts.forEach(layout => {
+      totalWidgets += layout.widgets.length;
+      layout.widgets.forEach(widget => {
+        widgetsByType[widget.type] = (widgetsByType[widget.type] || 0) + 1;
+      });
+    });
+
+    return {
+      totalSheets: layouts.length,
+      totalWidgets,
+      widgetsByType,
+      availableTypes: types,
+      sheetsWithWidgets: layouts.filter(l => l.widgets.length > 0).length
+    };
+  },
+
+  /**
+   * Check if widget type is available
+   */
+  isTypeAvailable(type: string): boolean {
+    return kernel.dashboardManager.isWidgetTypeAvailable(type);
+  },
+
+  /**
+   * Create a test widget
+   */
+  createTestWidget(type: string = 'text'): any {
+    const sheet = kernel.workbookManager.getActiveSheet();
+    if (!sheet) {
+      console.error('No active sheet');
+      return null;
+    }
+
+    if (!kernel.dashboardManager.isWidgetTypeAvailable(type)) {
+      console.error(`Widget type "${type}" not available. Available: ${kernel.dashboardManager.getAvailableWidgetTypes().join(', ')}`);
+      return null;
+    }
+
+    return kernel.dashboardManager.addWidget(sheet.id, type as any, {
+      title: `Test ${type} Widget`,
+      position: { x: 100, y: 100, width: 300, height: 200 }
+    });
+  },
+
+  /**
+   * Print widget system info
+   */
+  info(): void {
+    console.group('🎨 DJ DataForge Widget System');
+    console.log('Available Widget Types:', this.listWidgetTypes());
+    console.log('Statistics:', this.getStats());
+    console.log('Current Layout:', this.getCurrentLayout());
+    console.log('Current Widgets:', this.getCurrentWidgets());
+    console.groupEnd();
+  }
+};
+
 // Expose to window for debugging
 if (typeof window !== 'undefined') {
   (window as any).DJKernel = kernel;
+  (window as any).WidgetDebug = WidgetDebugger;
+
+  console.log('💡 Debug helpers available:');
+  console.log('  - window.DJKernel: Access to kernel');
+  console.log('  - window.WidgetDebug: Widget debugging utilities');
+  console.log('  - Try: WidgetDebug.info()');
 }

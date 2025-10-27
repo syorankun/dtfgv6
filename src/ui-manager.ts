@@ -1121,6 +1121,12 @@ export class UIManager {
     // Setup context menu listeners
     this.setupContextMenuListeners();
 
+    // Listen for kernel recalculation events
+    kernel.eventBus.on('kernel:recalc-done', () => {
+      logger.info('[UIManager] Recalculation done, rendering grid.');
+      this.grid?.render();
+    });
+
     logger.info('[UIManager] Event listeners configured');
   }
 

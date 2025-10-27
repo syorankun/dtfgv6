@@ -30,6 +30,7 @@ export class FormulaParser {
    * Tokenize formula string into tokens
    */
   tokenize(formula: string): Token[] {
+    console.log(`[FormulaParser] Tokenizing formula: "${formula}"`);
     const tokens: Token[] = [];
     let i = 0;
 
@@ -73,7 +74,7 @@ export class FormulaParser {
       // Support both uppercase and lowercase, but normalize to uppercase
       if (/[A-ZÀ-Úa-zà-ú]/.test(char)) {
         let ref = "";
-        while (i < formula.length && /[A-Z0-9À-Ú_:a-zà-ú]/.test(formula[i])) {
+        while (i < formula.length && /[A-Z0-9À-Ú_:a-zà-ú.]/.test(formula[i])) {
           ref += formula[i++];
         }
 
@@ -150,6 +151,7 @@ export class FormulaParser {
    * Parse tokens into AST
    */
   parse(tokens: Token[]): ASTNode {
+    console.log(`[FormulaParser] Parsing tokens:`, tokens);
     let pos = 0;
 
     const parseExpression = (): ASTNode => {
@@ -282,6 +284,7 @@ export class FormulaParser {
     };
 
     const parseFunction = (name: string): ASTNode => {
+      console.log(`[FormulaParser] Parsing function: ${name}. Next token type: ${tokens[pos]?.type}`);
       if (tokens[pos]?.type !== "LPAREN") {
         throw new Error(`Expected '(' after function ${name}`);
       }
@@ -745,24 +748,51 @@ export class CalcEngine {
   ): Promise<number> {
     let cellsProcessed = 0;
 
-    // Build dependency graph
-    const dag = this.buildDependencyGraph(sheet);
+    // Build dependency graph and identify independent formulas
+    const dag = new DependencyGraph();
+    const independentCells: string[] = [];
+
+    for (let r = 0; r < sheet.rowCount; r++) {
+      for (let c = 0; c < sheet.colCount; c++) {
+        const cell = sheet.getCell(r, c);
+        if (cell?.formula) {
+          const cellRef = this.coordToCellRef(r, c);
+          console.log(`[CalcEngine] Building dependency graph: Found formula in cell ${cellRef}: "${cell.formula}"`);
+          const refs = this.parser.extractReferences(cell.formula);
+
+          if (refs.length === 0) {
+            independentCells.push(cellRef);
+          } else {
+            refs.forEach((ref) => {
+              dag.addEdge(cellRef, ref);
+            });
+          }
+        }
+      }
+    }
 
     try {
-      const order = dag.topologicalSort();
+      const dependentOrder = dag.topologicalSort();
+      console.log(`[CalcEngine] Dependent recalculation order:`, dependentOrder);
+      console.log(`[CalcEngine] Independent cells:`, independentCells);
+
+      // Combine independent cells and dependent cells
+      let cellsToRecalc = [...independentCells, ...dependentOrder];
 
       // Filter by cellRef if provided
-      const cellsToRecalc = cellRef
-        ? order.filter(
-            (ref) =>
-              ref === cellRef || order.indexOf(ref) > order.indexOf(cellRef)
-          )
-        : order;
+      if (cellRef) {
+        cellsToRecalc = cellsToRecalc.filter(
+          (ref) =>
+            ref === cellRef || cellsToRecalc.indexOf(ref) > cellsToRecalc.indexOf(cellRef)
+        );
+      }
+      console.log(`[CalcEngine] Final cells to recalculate:`, cellsToRecalc);
 
       // Recalculate in order
       for (const ref of cellsToRecalc) {
         const coord = this.cellRefToCoord(ref);
         const cell = sheet.getCell(coord.row, coord.col);
+        console.log(`[CalcEngine] Processing cell ${ref}. Has formula: ${!!cell?.formula}`);
 
         if (cell?.formula) {
           // If force is true, clear cache first to ensure recalculation
@@ -789,6 +819,7 @@ export class CalcEngine {
    * Evaluate a single cell formula
    */
   async evalCell(cellRef: string, sheet: Sheet): Promise<void> {
+    console.log(`[CalcEngine] Evaluating cell: ${cellRef}, formula: ${sheet.getCell(this.cellRefToCoord(cellRef).row, this.cellRefToCoord(cellRef).col)?.formula}`);
     const coord = this.cellRefToCoord(cellRef);
     const cell = sheet.getCell(coord.row, coord.col);
 
@@ -799,6 +830,7 @@ export class CalcEngine {
       const dependencies = new Set<string>();
 
       const tokens = this.parser.tokenize(cell.formula);
+      console.log(`[CalcEngine] Tokens for ${cellRef}:`, tokens);
       const ast = this.parser.parse(tokens);
       const result = await this.evalASTWithTracking(ast, sheet, dependencies);
 
@@ -972,6 +1004,7 @@ export class CalcEngine {
         const cell = sheet.getCell(r, c);
         if (cell?.formula) {
           const cellRef = this.coordToCellRef(r, c);
+          console.log(`[CalcEngine] Building dependency graph: Found formula in cell ${cellRef}: "${cell.formula}"`);
           const refs = this.parser.extractReferences(cell.formula);
 
           refs.forEach((ref) => {

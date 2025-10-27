@@ -662,7 +662,7 @@ export class FXFinancePlugin implements Plugin {
     console.log('[FXFinancePlugin] Cache size:', this.ratesCache.size);
 
     // FX_RATE(date, currency, [source])
-    registry.register('FX_RATE', (date: string, currency: string, source?: string) => {
+    registry.register('FX.RATE', (date: string, currency: string, source?: string) => {
       const rateSource = (source?.toUpperCase() || 'AUTO') as RateSource;
       const rate = this.getRateFromCache(date, currency as CurrencyCode, rateSource, true);
       console.log(`[FXFinancePlugin] FX_RATE called: date=${date}, currency=${currency}, source=${rateSource}, result=${rate}`);
@@ -673,7 +673,7 @@ export class FXFinancePlugin implements Plugin {
     });
 
     // FX_TODAY(currency)
-    registry.register('FX_TODAY', (currency: string) => {
+    registry.register('FX.TODAY', (currency: string) => {
       const today = new Date().toISOString().split('T')[0];
       let rate = this.getRateFromCache(today, currency as CurrencyCode, 'AUTO', true);
 
@@ -690,7 +690,7 @@ export class FXFinancePlugin implements Plugin {
     });
 
     // FX_CONVERT(value, fromCurrency, toCurrency, [date])
-    registry.register('FX_CONVERT', (value: number, from: string, to: string, date?: string) => {
+    registry.register('FX.CONVERT', (value: number, from: string, to: string, date?: string) => {
       const conversionDate = date || new Date().toISOString().split('T')[0];
 
       // BRL to BRL = no conversion
@@ -726,7 +726,7 @@ export class FXFinancePlugin implements Plugin {
     });
 
     // FX_VARIATION(currency, startDate, endDate, [source])
-    registry.register('FX_VARIATION', (currency: string, startDate: string, endDate: string, source?: string) => {
+    registry.register('FX.VARIATION', (currency: string, startDate: string, endDate: string, source?: string) => {
       const rateSource = (source?.toUpperCase() || 'AUTO') as RateSource;
       const startRate = this.getRateFromCache(startDate, currency as CurrencyCode, rateSource, true);
       const endRate = this.getRateFromCache(endDate, currency as CurrencyCode, rateSource, true);
@@ -740,7 +740,7 @@ export class FXFinancePlugin implements Plugin {
     });
 
     // FX_AVG(currency, startDate, endDate, [source])
-    registry.register('FX_AVG', (currency: string, startDate: string, endDate: string, source?: string) => {
+    registry.register('FX.AVG', (currency: string, startDate: string, endDate: string, source?: string) => {
       const rates = this.getRatesInRange(currency as CurrencyCode, startDate, endDate, source as RateSource);
       if (rates.length === 0) return '#N/A';
 
@@ -752,7 +752,7 @@ export class FXFinancePlugin implements Plugin {
     });
 
     // FX_MAX(currency, startDate, endDate, [source])
-    registry.register('FX_MAX', (currency: string, startDate: string, endDate: string, source?: string) => {
+    registry.register('FX.MAX', (currency: string, startDate: string, endDate: string, source?: string) => {
       const rates = this.getRatesInRange(currency as CurrencyCode, startDate, endDate, source as RateSource);
       if (rates.length === 0) return '#N/A';
 
@@ -763,7 +763,7 @@ export class FXFinancePlugin implements Plugin {
     });
 
     // FX_MIN(currency, startDate, endDate, [source])
-    registry.register('FX_MIN', (currency: string, startDate: string, endDate: string, source?: string) => {
+    registry.register('FX.MIN', (currency: string, startDate: string, endDate: string, source?: string) => {
       const rates = this.getRatesInRange(currency as CurrencyCode, startDate, endDate, source as RateSource);
       if (rates.length === 0) return '#N/A';
 
@@ -774,7 +774,7 @@ export class FXFinancePlugin implements Plugin {
     });
 
     // FX_FORWARD(spotDate, forwardDate, currency, domesticRate, foreignRate)
-    registry.register('FX_FORWARD', (
+    registry.register('FX.FORWARD', (
       spotDate: string,
       forwardDate: string,
       currency: string,
@@ -883,7 +883,7 @@ export class FXFinancePlugin implements Plugin {
     const registry = this.context.kernel.calcEngine.getRegistry();
 
     // FIN_PV(rate, nper, pmt, [fv], [type])
-    registry.register('FIN_PV', (rate: number, nper: number, pmt: number, fv = 0, type = 0) => {
+    registry.register('FIN.PV', (rate: number, nper: number, pmt: number, fv = 0, type = 0) => {
       if (rate === 0) {
         return -(pmt * nper + fv);
       }
@@ -898,7 +898,7 @@ export class FXFinancePlugin implements Plugin {
     });
 
     // FIN_FV(rate, nper, pmt, [pv], [type])
-    registry.register('FIN_FV', (rate: number, nper: number, pmt: number, pv = 0, type = 0) => {
+    registry.register('FIN.FV', (rate: number, nper: number, pmt: number, pv = 0, type = 0) => {
       if (rate === 0) {
         return -(pv + pmt * nper);
       }
@@ -912,7 +912,7 @@ export class FXFinancePlugin implements Plugin {
     });
 
     // FIN_PMT(rate, nper, pv, [fv], [type])
-    registry.register('FIN_PMT', (rate: number, nper: number, pv: number, fv = 0, type = 0) => {
+    registry.register('FIN.PMT', (rate: number, nper: number, pv: number, fv = 0, type = 0) => {
       if (rate === 0) {
         return -(pv + fv) / nper;
       }
@@ -927,7 +927,7 @@ export class FXFinancePlugin implements Plugin {
     });
 
     // FIN_NPER(rate, pmt, pv, [fv], [type])
-    registry.register('FIN_NPER', (rate: number, pmt: number, pv: number, fv = 0, type = 0) => {
+    registry.register('FIN.NPER', (rate: number, pmt: number, pv: number, fv = 0, type = 0) => {
       if (rate === 0) {
         return -(pv + fv) / pmt;
       }
@@ -948,7 +948,7 @@ export class FXFinancePlugin implements Plugin {
     });
 
     // FIN_RATE(nper, pmt, pv, [fv], [type], [guess])
-    registry.register('FIN_RATE', (
+    registry.register('FIN.RATE', (
       nper: number,
       pmt: number,
       pv: number,
@@ -988,7 +988,7 @@ export class FXFinancePlugin implements Plugin {
     });
 
     // FIN_RATE_EQUIVALENT(rate, fromPeriods, toPeriods)
-    registry.register('FIN_RATE_EQUIVALENT', (rate: number, fromPeriods: number, toPeriods: number) => {
+    registry.register('FIN.RATE.EQUIVALENT', (rate: number, fromPeriods: number, toPeriods: number) => {
       // Convert rate from one period to another
       // Example: monthly to annual: (1 + rate)^(12/1) - 1
       const equivalentRate = Math.pow(1 + rate, toPeriods / fromPeriods) - 1;
@@ -1051,27 +1051,27 @@ export class FXFinancePlugin implements Plugin {
       // Use formulas (value will be calculated by recalculate)
       sheet.setCell(row, 1, 0, {
         type: 'formula',
-        formula: `=FX_TODAY("${currency}")`
+        formula: `=FX.TODAY("${currency}")`
       });
 
       sheet.setCell(row, 2, 0, {
         type: 'formula',
-        formula: `=FX_VARIATION("${currency}","${thirtyDaysAgo}","${today}")`
+        formula: `=FX.VARIATION("${currency}","${thirtyDaysAgo}","${today}")`
       });
 
       sheet.setCell(row, 3, 0, {
         type: 'formula',
-        formula: `=FX_AVG("${currency}","${thirtyDaysAgo}","${today}")`
+        formula: `=FX.AVG("${currency}","${thirtyDaysAgo}","${today}")`
       });
 
       sheet.setCell(row, 4, 0, {
         type: 'formula',
-        formula: `=FX_MAX("${currency}","${thirtyDaysAgo}","${today}")`
+        formula: `=FX.MAX("${currency}","${thirtyDaysAgo}","${today}")`
       });
 
       sheet.setCell(row, 5, 0, {
         type: 'formula',
-        formula: `=FX_MIN("${currency}","${thirtyDaysAgo}","${today}")`
+        formula: `=FX.MIN("${currency}","${thirtyDaysAgo}","${today}")`
       });
 
       row++;
@@ -1081,7 +1081,9 @@ export class FXFinancePlugin implements Plugin {
     wb.setActiveSheet(sheet.id);
 
     // Recalculate sheet formulas
-    await this.context.kernel.recalculate(sheet.id, undefined, { force: true });
+    console.log('[FXFinancePlugin] Triggering recalculation for dashboard sheet:', sheet.id, sheet.name);
+    await this.context.kernel.calcEngine.recalculate(sheet);
+    console.log('[FXFinancePlugin] Recalculation triggered for dashboard sheet.');
 
     this.context.ui.showToast('Dashboard criado com sucesso!', 'success');
   }

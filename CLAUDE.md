@@ -42,22 +42,28 @@ npm run build:standalone # Build standalone version (pre + post processing)
 - **NEVER** open `dist/index.html` directly in browser (CORS policy blocks `file://` protocol)
 - **ALWAYS** use `npm run preview` or a local HTTP server to test builds
 - Production deployments should serve files from dist/ via HTTP server
+- **Node.js version:** Requires Node.js >= 18.0.0 (specified in package.json)
 
 ## Architecture Overview
 
 ### Core Layers
 ```
-┌─────────────────────────────┐
-│     UI Layer (app.ts)       │  Excel-style UI, virtual grid
-├─────────────────────────────┤
-│   Plugin Layer              │  FX-Pack, Charts, Pivot, ProLease
-├─────────────────────────────┤
-│   API Layer (KernelContext) │  Events, UI Integration, Storage
-├─────────────────────────────┤
-│   Core Services (Kernel)    │  WorkbookManager, CalcEngine, etc.
-├─────────────────────────────┤
-│   Persistence (IndexedDB)   │  Companies, Workbooks, Plugin Data
-└─────────────────────────────┘
+┌─────────────────────────────────────────────────────┐
+│              UI Layer (ui-manager.ts)               │
+│  Grid View | Dashboard Mode | Selection | Toolbar  │
+├─────────────────────────────────────────────────────┤
+│                 Plugin Layer                        │
+│  FX-Finance | Charts | ProLease | Custom Plugins   │
+├─────────────────────────────────────────────────────┤
+│          API Layer (PluginContext + EventBus)       │
+│  Events | UI Integration | Storage API | Formulas  │
+├─────────────────────────────────────────────────────┤
+│                Core Services (Kernel)               │
+│  Workbook | CalcEngine | Dashboard | Table | Grid  │
+├─────────────────────────────────────────────────────┤
+│        Persistence Layer (storage-utils)            │
+│  IndexedDB | Companies | Workbooks | Plugin Data   │
+└─────────────────────────────────────────────────────┘
 ```
 
 ### Kernel as Central Orchestrator
@@ -72,6 +78,8 @@ kernel.companyManager    // Multi-company contexts
 kernel.pluginHost        // Plugin loading and management
 kernel.eventBus          // Pub/sub event system
 kernel.sessionManager    // Session tracking
+kernel.dashboardManager  // Dashboard creation and management
+kernel.tableManager      // Table operations and data structures
 ```
 
 Access kernel via: `import { kernel } from '@core/kernel'` or `DJDataForgeKernel.getInstance()`
@@ -80,15 +88,33 @@ Access kernel via: `import { kernel } from '@core/kernel'` or `DJDataForgeKernel
 
 The codebase uses **consolidated files** (not yet split into modules):
 
-- `src/@core/types/index.ts` - All TypeScript types
-- `src/@core/workbook-consolidated.ts` - Workbook, Sheet, Column, Cell, WorkbookManager
-- `src/@core/calc-engine-consolidated.ts` - Parser, Evaluator, Registry, DAG
-- `src/@core/storage-utils-consolidated.ts` - Storage, Logger, Formatters, Assert
-- `src/@core/kernel.ts` - Kernel orchestrator, EventBus, CompanyManager
-- `src/@core/plugin-system-consolidated.ts` - Plugin host and interfaces
-- `src/@core/grid-virtual-consolidated.ts` - Virtual grid rendering
-- `src/@core/io-transform-consolidated.ts` - Import/export, transformations
-- `src/app.ts` - Application entry point
+**Core Layer** (`src/@core/`):
+- `types/index.ts` - All TypeScript types
+- `workbook-consolidated.ts` - Workbook, Sheet, Column, Cell, WorkbookManager
+- `calc-engine-consolidated.ts` - Parser, Evaluator, Registry, DAG
+- `calc/parser.ts` - Tokenizer and AST builder (modular)
+- `storage-utils-consolidated.ts` - Storage, Logger, Formatters, Assert
+- `kernel.ts` - Kernel orchestrator, EventBus, CompanyManager
+- `plugin-system-consolidated.ts` - Plugin host and interfaces
+- `grid-virtual-consolidated.ts` - Virtual grid rendering
+- `io-transform-consolidated.ts` - Import/export, transformations
+- `dashboard-manager.ts` - Dashboard orchestration and state management
+- `dashboard-widgets.ts` - Widget definitions and lifecycle
+- `dashboard-renderer.ts` - Canvas/SVG rendering engine
+- `widget-registry.ts` - Widget catalog and registration
+- `table-manager.ts` - Table data structures and operations
+
+**UI Layer**:
+- `src/app.ts` - Application entry point and initialization
+- `src/main.ts` - Vite entry point
+- `src/ui-manager.ts` - UI state management and event handling
+
+**Plugin Layer** (`src/plugins/`):
+- `fx-finance-plugin.ts` - FX rates and financial formulas
+- `charts-plugin.ts` - Chart.js integration
+- `prolease-ifrs16-plugin.ts` - IFRS 16 lease accounting
+- `chart-manager.ts` - Chart configuration manager
+- `index.ts` - Plugin registry and loader
 
 **NOTE**: Consolidated files have `// FUTURE SPLIT POINTS:` comments indicating where to split when refactoring.
 
@@ -120,13 +146,20 @@ When writing code, ensure full type safety and handle all edge cases explicitly.
 
 The CalcEngine provides a full formula parser and evaluator:
 
-**Built-in Functions** (20+ formulas):
+**Built-in Functions** (40+ formulas across core + plugins):
+
+**Core Functions** (20 formulas):
 - Math: SOMA, MÉDIA, MÁXIMO, MÍNIMO, ARREDONDAR, ABS, RAIZ, POTÊNCIA
 - Text: CONCATENAR, MAIÚSCULA, MINÚSCULA, TEXTO, NÚM.CARACT
 - Logic: SE, E, OU, NÃO
 - Info: ÉNÚM, ÉTEXTO, ÉVAZIO
 - Count: CONT.NÚM, CONT.VALORES
 - Lookup: PROCV
+
+**Plugin Functions** (FX-Finance Plugin):
+- FX Functions: FX.RATE, FX.TODAY, FX.CONVERT, FX.VARIATION, FX.AVG, FX.MAX, FX.MIN, FX.FORWARD
+- Financial Functions: FIN.PV, FIN.FV, FIN.PMT, FIN.NPER, FIN.RATE, FIN.RATE.EQUIVALENT
+- Lease Functions: LEASE_PV, LEASE_MONTHLY_RATE, LEASE_ROU_OPENING (ProLease plugin)
 
 **Registering Custom Functions**:
 ```typescript
@@ -165,7 +198,9 @@ Each plugin receives a `PluginContext` with access to:
 - `context.events` - Event pub/sub system
 
 **Built-in Plugins**:
-- ProLease IFRS 16 (`src/plugins/prolease-ifrs16-plugin.ts`) - Lease accounting calculations
+- **FX-Finance** (`src/plugins/fx-finance-plugin.ts`) - Exchange rates (PTAX/BCB API), 8 FX formulas (FX.RATE, FX.CONVERT, etc.), 6 financial formulas (FIN.PV, FIN.FV, FIN.PMT, etc.), and economic indices tracking
+- **Charts Professional** (`src/plugins/charts-plugin.ts`) - Chart.js integration with 8 chart types, 5 themes, wizard-based creation, PNG export, and persistent storage
+- **ProLease IFRS 16** (`src/plugins/prolease-ifrs16-plugin.ts`) - Lease accounting with IFRS 16 compliance, amortization schedules, Web Worker calculations, and contract management
 
 ### Workbook and Sheet Structure
 
@@ -224,9 +259,12 @@ kernel.eventBus.emit('custom:event', { data: 'payload' });
 ```
 
 **Standard Events**:
-- `kernel:ready`, `kernel:shutdown`, `kernel:recalc-done`, `kernel:autosave-done`
-- `workbook:created`, `workbook:deleted`, `workbook:saved`
-- `plugin:loaded`, `plugin:unloaded`
+- **Kernel**: `kernel:ready`, `kernel:shutdown`, `kernel:recalc-done`, `kernel:autosave-done`
+- **Workbook**: `workbook:created`, `workbook:deleted`, `workbook:saved`
+- **Sheet**: `sheet:created`, `sheet:deleted`, `sheet:renamed`, `sheet:activated`
+- **Plugin**: `plugin:loaded`, `plugin:unloaded`
+- **Cell**: `cell:changed`, `cell:edited`
+- **Dashboard**: `dashboard:created`, `widget:added`, `widget:updated`
 
 ### IndexedDB Persistence
 
@@ -241,6 +279,78 @@ All data persists to IndexedDB (`DJ_DataForge_v6` database):
 - `settings` - Global settings
 
 **Auto-save**: Runs every 10 seconds automatically. Use `kernel.saveWorkbook(id)` or `kernel.saveAllWorkbooks()` for manual saves.
+
+### Dashboard System
+
+DJ DataForge v6 includes a dashboard system for creating interactive data visualizations and KPI displays:
+
+**Dashboard Manager** (`kernel.dashboardManager`):
+- Create and manage dashboards within workbooks
+- Widget lifecycle management (add, remove, update)
+- State persistence to IndexedDB
+- Dashboard-to-sheet rendering
+
+**Widget System**:
+- **Widget Registry**: Central catalog of available widget types
+- **Widget Definitions**: Reusable widget templates with configuration schemas
+- **Widget Renderer**: Canvas/SVG rendering engine for visualizations
+- **Widget Types**: KPI cards, charts, tables, gauges, sparklines, and custom widgets
+
+**Usage Example**:
+```typescript
+// Create dashboard
+const dashboard = kernel.dashboardManager.createDashboard('Sales Dashboard');
+
+// Add KPI widget
+dashboard.addWidget({
+  type: 'kpi-card',
+  config: {
+    title: 'Total Revenue',
+    dataSource: '=SOMA(Sales!D:D)',
+    format: 'currency'
+  }
+});
+
+// Render to sheet
+await dashboard.renderToSheet('Dashboard Sheet');
+```
+
+**Plugin Integration**: Dashboard widgets can be registered by plugins, allowing custom visualizations beyond the built-in types.
+
+### UI Manager
+
+The UI Manager (`src/ui-manager.ts`) handles all UI state and user interactions:
+
+**Key Responsibilities**:
+- **Mode Management**: Switch between Grid, Dashboard, and Plugin views
+- **Selection State**: Track active cells, ranges, and sheets
+- **Toolbar State**: Manage toolbar buttons, menus, and actions
+- **Panel Management**: Side panels, dialogs, and modals
+- **Keyboard Shortcuts**: Excel-like keyboard navigation (Arrow keys, F2, Ctrl+C/V, etc.)
+- **Ribbon Controls**: Context-sensitive toolbars based on selection
+
+**Dashboard Mode**:
+- Toggle with ribbon button or programmatically
+- Hides grid, shows dashboard canvas
+- Enables widget interaction and editing
+- Persists mode preference per workbook
+
+**Integration with Kernel**:
+```typescript
+// Access UI state
+const uiManager = window.DJUIManager;
+
+// Switch to dashboard mode
+uiManager.setMode('dashboard');
+
+// Get current selection
+const selection = uiManager.getSelection();
+
+// Register custom keyboard shortcut
+uiManager.registerShortcut('Ctrl+Shift+D', () => {
+  // Custom action
+});
+```
 
 ## Common Tasks
 
@@ -273,13 +383,44 @@ export class MyPlugin implements Plugin {
   };
 
   async init(context: PluginContext): Promise<void> {
-    // Setup UI, register formulas, etc.
+    // Register custom formulas
+    const registry = context.kernel.calcEngine.getRegistry();
+    registry.register('MY_FUNC', (arg: number) => arg * 2, {
+      argCount: 1,
+      description: 'Doubles a number'
+    });
+
+    // Add UI elements
+    context.ui.addToolbarButton({
+      id: 'my-button',
+      label: 'My Action',
+      icon: '🚀',
+      onClick: () => this.handleClick(context)
+    });
+
     context.ui.showToast('My Plugin loaded!', 'success');
+  }
+
+  private handleClick(context: PluginContext): void {
+    // Plugin logic here
+  }
+
+  async dispose(): Promise<void> {
+    // Cleanup resources
   }
 }
 ```
 
-2. Register in `src/app.ts` or `src/plugins/index.ts`
+2. Register in `src/plugins/index.ts`:
+```typescript
+import { MyPlugin } from './my-plugin';
+export const myPlugin = new MyPlugin();
+```
+
+3. Load in `src/app.ts` during kernel initialization:
+```typescript
+await kernel.pluginHost.loadPlugin(myPlugin);
+```
 
 ### Working with Sheets Programmatically
 
@@ -305,6 +446,36 @@ data.forEach((row, rowIdx) => {
 await kernel.recalculate(sheet.id);
 await kernel.saveWorkbook(wb.id);
 ```
+
+### Using FX-Finance Plugin Features
+
+The FX-Finance plugin provides exchange rate formulas and financial calculations:
+
+```typescript
+// Get exchange rate for a specific date
+sheet.setCell(0, 0, '=FX.RATE("USD", "2025-01-15")');
+
+// Get today's rate
+sheet.setCell(1, 0, '=FX.TODAY("EUR")');
+
+// Convert currency amounts
+sheet.setCell(2, 0, '=FX.CONVERT(1000, "USD", "BRL", "2025-01-15")');
+
+// Calculate variation between dates
+sheet.setCell(3, 0, '=FX.VARIATION("USD", "2025-01-01", "2025-01-15")');
+
+// Financial formulas
+sheet.setCell(4, 0, '=FIN.PV(0.05/12, 60, -500)'); // Present Value
+sheet.setCell(5, 0, '=FIN.FV(0.05/12, 60, -500)'); // Future Value
+sheet.setCell(6, 0, '=FIN.PMT(0.05/12, 60, 10000)'); // Payment
+
+// Sync PTAX rates from BCB (Brazilian Central Bank)
+// This is done via UI button or programmatically:
+const fxPlugin = kernel.pluginHost.getPlugin('fx-finance');
+await fxPlugin.syncPTAX('2025-01-01', '2025-12-31');
+```
+
+**FX Rate Cache**: Rates are cached in IndexedDB for fast O(1) lookups. Manual rates can be added via the plugin UI for currencies not covered by PTAX.
 
 ### Testing Changes
 

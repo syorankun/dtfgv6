@@ -1,0 +1,33 @@
+{
+  "name": "excel-loan-manager",
+  "version": "1.0.0",
+  "description": "Loan Manager Office Add-in for Excel - Versão standalone do Loan Plugin do DJ DataForge v6",
+  "main": "taskpane.html",
+  "scripts": {
+    "start": "http-server -p 3000 -c-1",
+    "start:python": "python -m http.server 3000",
+    "validate": "office-addin-manifest validate manifest.xml"
+  },
+  "keywords": [
+    "excel",
+    "office-addin",
+    "loan",
+    "empréstimo",
+    "finanças",
+    "price",
+    "sac"
+  ],
+  "author": "DJ DataForge",
+  "license": "MIT",
+  "devDependencies": {
+    "http-server": "^14.1.1",
+    "office-addin-manifest": "^1.13.2"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/djdataforge/loan-plugin"
+  },
+  "bugs": {
+    "url": "https://github.com/djdataforge/loan-plugin/issues"
+  }
+}

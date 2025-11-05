@@ -115,7 +115,7 @@ export class LoanPlugin implements Plugin {
       await this.accrualCustomizer.init();
 
       // Inicializa sistema de relatórios
-      this.reportManager = new LoanReportManager(context, this.scheduler, this.sheets);
+      this.reportManager = new LoanReportManager(context, this.scheduler, this.sheets, this.paymentManager);
       await this.reportManager.init();
       this.dashboard?.registerHandlers({
         showReportsMenu: (contracts) => this.reportManager.showReportSelector(contracts),
@@ -1810,6 +1810,26 @@ export class LoanPlugin implements Plugin {
     };
   }
 
+  private async renderAccrualSheet(
+    contract: LoanContract,
+    startDate: string,
+    endDate: string,
+    frequency: 'Diário' | 'Mensal' | 'Anual'
+  ): Promise<string> {
+    const rows = await this.scheduler.buildAccrualRows(
+      contract,
+      startDate,
+      endDate,
+      frequency,
+      this.accrualCustomizer.getActiveViewId(contract.id) === 'payment-accrual-view'
+    );
+
+    const { options, profile, view } = this.getAccrualSheetContext(contract, startDate, endDate);
+    const sheet = this.sheetRenderer.render(rows, options);
+    this.publishAccrualPivotDataset(contract, startDate, endDate, rows, view, profile);
+    return sheet;
+  }
+
   private getAccrualSheetContext(
     contract: LoanContract,
     startDate: string,
@@ -1820,16 +1840,26 @@ export class LoanPlugin implements Plugin {
     view: AccrualSheetViewConfig;
   } {
     const { profile, view } = this.accrualCustomizer.resolveView(contract.id);
+    const { interestConfig } = contract;
 
     const metadata: AccrualSheetMetadataEntry[] = [];
     metadata.push({ label: 'Moeda', value: contract.currency });
 
     if (contract.contractFXRate) {
       metadata.push({ label: 'FX Contrato', value: contract.contractFXRate.toFixed(6) });
+      if (contract.contractFXDate) {
+        metadata.push({ label: 'Data FX Contrato', value: contract.contractFXDate });
+      }
     }
 
     metadata.push({ label: 'Status', value: contract.status });
     metadata.push({ label: 'Apuração', value: `${startDate} → ${endDate}` });
+    if (interestConfig) {
+      const compoundingLabel = interestConfig.compounding === 'LINEAR' ? 'Juros Simples' : 'Capitalização Composta';
+      metadata.push({ label: 'Base Juros', value: `${interestConfig.dayCountBasis} · ${compoundingLabel}` });
+    }
+    metadata.push({ label: 'Normas IFRS/CPC', value: 'CPC 02 · CPC 08 · CPC 48 · IAS 21 · IFRS 9' });
+    metadata.push({ label: 'Diretriz', value: 'USD Loan → BRL (Accrual IFRS / CPC 02)' });
     metadata.push({ label: 'Layout', value: `${profile.name} (${profile.id})` });
 
     return {

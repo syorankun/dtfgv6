@@ -4,12 +4,12 @@
  * Define templates de visualização para:
  * - Análise de Juros
  * - Análise de Principal
- * - Visão Consolidada
  * - Fluxo de Caixa
- * - Análise Multi-Contrato
+ * - ACCRUAL com Pagamentos
  */
 
 import type { AccrualSheetViewConfig } from './loan-accrual-view';
+import { PAYMENT_ACCRUAL_VIEW } from './loan-accrual-view';
 
 /**
  * Template: Análise de Juros
@@ -142,10 +142,22 @@ export const INTEREST_ANALYSIS_TEMPLATE: AccrualSheetViewConfig = {
           summaryFormat: { bold: true, bgColor: '#D1FAE5' }
         },
         {
+          id: 'fx_variation_interest',
+          pivotKey: 'fxVariationInterestBRL',
+          field: 'fxVariationInterestBRL',
+          label: 'Δ Juros (BRL)',
+          type: 'number',
+          decimals: 2,
+          width: 150,
+          summary: 'sum',
+          format: { alignment: 'right', textColor: '#DC2626' },
+          summaryFormat: { bold: true, bgColor: '#FEE2E2' }
+        },
+        {
           id: 'fx_variation',
           pivotKey: 'fxVariationBRL',
           field: 'fxVariationBRL',
-          label: 'Variação Cambial',
+          label: 'Δ Saldo (BRL)',
           type: 'number',
           decimals: 2,
           width: 150,
@@ -468,7 +480,7 @@ export const CONSOLIDATED_TEMPLATE: AccrualSheetViewConfig = {
           id: 'fx_variation',
           pivotKey: 'fxVariationBRL',
           field: 'fxVariationBRL',
-          label: 'Var. Cambial (BRL)',
+          label: 'Δ Saldo (BRL)',
           type: 'number',
           decimals: 2,
           width: 140,
@@ -680,7 +692,8 @@ export const REPORT_TEMPLATES = {
   'principal-analysis': PRINCIPAL_ANALYSIS_TEMPLATE,
   'consolidated': CONSOLIDATED_TEMPLATE,
   'cashflow': CASHFLOW_TEMPLATE,
-  'executive-summary': EXECUTIVE_SUMMARY_TEMPLATE
+  'executive-summary': EXECUTIVE_SUMMARY_TEMPLATE,
+  'payment-accrual-view': PAYMENT_ACCRUAL_VIEW
 };
 
 /**
@@ -706,7 +719,7 @@ export const TEMPLATE_METADATA: ReportTemplateMetadata[] = [
     icon: '💰',
     tags: ['juros', 'taxa', 'fx', 'variação'],
     useCase: 'Ideal para análise de despesas financeiras e impacto cambial',
-    preview: 'Data | Dias | Juros (Origem) | Juros (BRL) | Var. Cambial | FX'
+  preview: 'Data | Dias | Juros (Origem) | Juros (BRL) | Δ Saldo FX | FX'
   },
   {
     id: 'principal-analysis',
@@ -747,5 +760,16 @@ export const TEMPLATE_METADATA: ReportTemplateMetadata[] = [
     tags: ['resumo', 'executivo', 'simples'],
     useCase: 'Ideal para apresentações executivas e decisões rápidas',
     preview: 'Data | Saldo | Juros | Impacto FX | Taxa Média'
+  },
+  {
+    id: 'payment-accrual-view',
+    name: 'ACCRUAL com Pagamentos',
+    description: 'Visão detalhada de juros acumulados, pagamentos realizados e saldo devedor recalculado',
+    category: 'Análise de Pagamentos',
+    icon: '💳',
+    tags: ['pagamentos', 'juros', 'amortização', 'recalculado'],
+    useCase: 'Ideal para acompanhar pagamentos realizados e seu impacto no saldo devedor',
+    preview: 'Data | Juros Acum. | Juros Pagos | Juros Pendentes | Principal Pago | Saldo Recalculado'
   }
 ];
+

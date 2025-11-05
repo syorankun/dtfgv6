@@ -16,6 +16,7 @@ import { LoanSheets } from './loan-sheets';
 import { LoanReportSelector, type ReportGenerationOptions } from './loan-report-selector';
 import { LoanReportBuilder } from './loan-report-builder';
 import { LoanReportGenerator } from './loan-report-generator';
+import { LoanPaymentManager } from './loan-payment-manager';
 import { TEMPLATE_METADATA } from './loan-report-templates';
 import { logger } from '@core/storage-utils-consolidated';
 
@@ -38,12 +39,12 @@ export class LoanReportManager {
   private generator: LoanReportGenerator;
   private customTemplates: Map<string, CustomTemplate> = new Map();
 
-  constructor(context: PluginContext, scheduler: LoanScheduler, sheets: LoanSheets) {
+  constructor(context: PluginContext, scheduler: LoanScheduler, sheets: LoanSheets, paymentManager?: LoanPaymentManager) {
     this.context = context;
 
     this.selector = new LoanReportSelector(context);
     this.builder = new LoanReportBuilder(context);
-    this.generator = new LoanReportGenerator(context, scheduler, sheets);
+    this.generator = new LoanReportGenerator(context, scheduler, sheets, paymentManager);
   }
 
   /**
@@ -51,7 +52,18 @@ export class LoanReportManager {
    */
   public async init(): Promise<void> {
     await this.loadCustomTemplates();
+    this.setupEventListeners();
     logger.info(`[LoanReportManager] Inicializado com ${this.customTemplates.size} templates customizados`);
+  }
+
+  /**
+   * Configura event listeners para eventos de templates
+   */
+  private setupEventListeners(): void {
+    // Listener para deletar template customizado
+    this.context.events.on('loan:delete-custom-template', async (data: { templateId: string }) => {
+      await this.deleteCustomTemplate(data.templateId);
+    });
   }
 
   /**
@@ -62,6 +74,9 @@ export class LoanReportManager {
     const endDate = now.toISOString().split('T')[0];
     const startDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
 
+    // Passa templates customizados para o selector
+    this.selector.setCustomTemplates(Array.from(this.customTemplates.values()));
+
     this.selector.open({
       contracts,
       startDate,
@@ -71,7 +86,7 @@ export class LoanReportManager {
         await this.generateReport(templateId, options);
       },
       onCustomize: (templateId) => {
-        this.customizeTemplate(templateId);
+        this.editTemplate(templateId);
       }
     });
   }
@@ -102,6 +117,14 @@ export class LoanReportManager {
 
       logger.info(`[LoanReportManager] Gerando relatório com ${contracts.length} contratos`);
 
+      // Verifica se é template customizado e injeta na geração
+      const customTemplate = this.customTemplates.get(templateId);
+      if (customTemplate) {
+        logger.info('[LoanReportManager] Usando template customizado', templateId);
+        // O generator precisa receber o template customizado
+        // Por enquanto, vamos apenas logar - a integração completa virá depois
+      }
+
       const report = await this.generator.generate({
         templateId,
         contracts,
@@ -124,12 +147,36 @@ export class LoanReportManager {
   }
 
   /**
-   * Abre o builder para customizar template
+   * Abre o builder para editar template (built-in ou customizado)
    */
-  private customizeTemplate(templateId: string): void {
-    this.builder.edit(templateId, async (template) => {
-      await this.saveCustomTemplate(template);
-    });
+  private editTemplate(templateId: string): void {
+    // Passa templates customizados para o builder
+    this.builder.setCustomTemplates(this.customTemplates);
+
+    // Verifica se é template customizado
+    const customTemplate = this.customTemplates.get(templateId);
+
+    if (customTemplate) {
+      // Edita template customizado existente
+      this.builder.edit(templateId, async (template) => {
+        // Atualiza template existente
+        const updatedTemplate: CustomTemplate = {
+          ...customTemplate,
+          name: template.title || template.id,
+          description: template.description,
+          updatedAt: new Date().toISOString(),
+          config: template
+        };
+        this.customTemplates.set(templateId, updatedTemplate);
+        await this.persistCustomTemplates();
+        this.context.ui.showToast(`✅ Template "${updatedTemplate.name}" atualizado!`, 'success');
+      });
+    } else {
+      // Cria novo template baseado em um built-in
+      this.builder.edit(templateId, async (template) => {
+        await this.saveCustomTemplate(template);
+      });
+    }
   }
 
   /**
@@ -235,18 +282,16 @@ export class LoanReportManager {
    */
   public async deleteCustomTemplate(templateId: string): Promise<void> {
     if (!this.customTemplates.has(templateId)) {
-      this.context.ui.showToast('Template não encontrado', 'warning');
+      logger.warn('[LoanReportManager] Template não encontrado para exclusão', templateId);
       return;
     }
 
     const template = this.customTemplates.get(templateId);
     if (!template) return;
 
-    if (confirm(`Remover template "${template.name}"?`)) {
-      this.customTemplates.delete(templateId);
-      await this.persistCustomTemplates();
-      this.context.ui.showToast(`Template "${template.name}" removido`, 'success');
-    }
+    this.customTemplates.delete(templateId);
+    await this.persistCustomTemplates();
+    logger.info('[LoanReportManager] Template customizado deletado', templateId);
   }
 
   /**

@@ -37,9 +37,17 @@ export class LoanReportSelector {
   private context: PluginContext;
   private modalElement: HTMLElement | null = null;
   private options: ReportSelectionOptions | null = null;
+  private customTemplates: Array<any> = [];
 
   constructor(context: PluginContext) {
     this.context = context;
+  }
+
+  /**
+   * Define templates customizados disponíveis
+   */
+  public setCustomTemplates(templates: Array<any>): void {
+    this.customTemplates = templates;
   }
 
   /**
@@ -208,24 +216,87 @@ export class LoanReportSelector {
    * Renderiza cards dos templates
    */
   private renderTemplateCards(): string {
-    return TEMPLATE_METADATA.map(template => `
-      <div class="template-card" data-template-id="${template.id}" style="
+    let cards = '';
+
+    // Templates built-in
+    if (TEMPLATE_METADATA.length > 0) {
+      cards += `
+        <div style="margin-bottom: 20px;">
+          <div style="font-size: 12px; font-weight: 700; color: #667eea; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 12px; display: flex; align-items: center; gap: 8px;">
+            <span>⭐</span>
+            <span>Templates Padrão</span>
+          </div>
+          ${TEMPLATE_METADATA.map(template => this.renderTemplateCard(template, false)).join('')}
+        </div>
+      `;
+    }
+
+    // Templates customizados
+    if (this.customTemplates.length > 0) {
+      cards += `
+        <div style="margin-bottom: 20px;">
+          <div style="font-size: 12px; font-weight: 700; color: #f59e0b; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 12px; display: flex; align-items: center; gap: 8px;">
+            <span>🎨</span>
+            <span>Meus Templates</span>
+          </div>
+          ${this.customTemplates.map(template => {
+            const metadata = {
+              id: template.id,
+              name: template.name,
+              description: template.description || 'Template personalizado',
+              category: template.category || 'Customizado',
+              icon: '🎨',
+              tags: ['customizado', 'personalizado'],
+              useCase: 'Template criado pelo usuário com campos personalizados',
+              preview: ''
+            };
+            return this.renderTemplateCard(metadata, true);
+          }).join('')}
+        </div>
+      `;
+    }
+
+    return cards || '<div style="padding: 20px; text-align: center; color: #6b7280;">Nenhum template disponível</div>';
+  }
+
+  /**
+   * Renderiza um card de template individual
+   */
+  private renderTemplateCard(template: any, isCustom: boolean): string {
+    return `
+      <div class="template-card" data-template-id="${template.id}" data-is-custom="${isCustom}" style="
         background: white;
-        border: 2px solid #e5e7eb;
+        border: 2px solid ${isCustom ? '#fbbf24' : '#e5e7eb'};
         border-radius: 10px;
         padding: 16px;
         cursor: pointer;
         transition: all 0.2s;
         position: relative;
+        margin-bottom: 12px;
       "
-      onmouseover="this.style.borderColor='#667eea'; this.style.transform='translateX(4px)'; this.style.boxShadow='0 4px 12px rgba(102, 126, 234, 0.15)';"
-      onmouseout="this.style.borderColor='#e5e7eb'; this.style.transform='translateX(0)'; this.style.boxShadow='none';">
+      onmouseover="this.style.borderColor='${isCustom ? '#f59e0b' : '#667eea'}'; this.style.transform='translateX(4px)'; this.style.boxShadow='0 4px 12px rgba(${isCustom ? '245, 158, 11' : '102, 126, 234'}, 0.15)';"
+      onmouseout="this.style.borderColor='${isCustom ? '#fbbf24' : '#e5e7eb'}'; this.style.transform='translateX(0)'; this.style.boxShadow='none';">
 
-        <div style="display: flex; align-items: start; gap: 12px; margin-bottom: 10px;">
+        ${isCustom ? `
+          <div style="position: absolute; top: 8px; right: 8px; display: flex; gap: 4px;">
+            <button class="edit-custom-template-btn" data-template-id="${template.id}" style="background: #3b82f6; color: white; border: none; padding: 4px 8px; border-radius: 4px; cursor: pointer; font-size: 11px; font-weight: 600; transition: all 0.2s;"
+              onmouseover="this.style.background='#2563eb'; event.stopPropagation();" onmouseout="this.style.background='#3b82f6';"
+              onclick="event.stopPropagation();">
+              ✏️ Editar
+            </button>
+            <button class="delete-custom-template-btn" data-template-id="${template.id}" style="background: #ef4444; color: white; border: none; padding: 4px 8px; border-radius: 4px; cursor: pointer; font-size: 11px; font-weight: 600; transition: all 0.2s;"
+              onmouseover="this.style.background='#dc2626'; event.stopPropagation();" onmouseout="this.style.background='#ef4444';"
+              onclick="event.stopPropagation();">
+              🗑️
+            </button>
+          </div>
+        ` : ''}
+
+        <div style="display: flex; align-items: start; gap: 12px; margin-bottom: 10px; ${isCustom ? 'margin-top: 32px;' : ''}">
           <div style="font-size: 28px; line-height: 1;">${template.icon}</div>
           <div style="flex: 1;">
             <div style="font-weight: 700; font-size: 15px; color: #1f2937; margin-bottom: 4px;">${template.name}</div>
-            <div style="font-size: 11px; color: #667eea; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;">${template.category}</div>
+            <div style="font-size: 11px; color: ${isCustom ? '#f59e0b' : '#667eea'}; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;">${template.category}</div>
           </div>
         </div>
 
@@ -234,14 +305,14 @@ export class LoanReportSelector {
         </p>
 
         <div style="display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px;">
-          ${template.tags.map(tag => `
-            <span style="background: #f3f4f6; color: #6b7280; padding: 3px 8px; border-radius: 4px; font-size: 11px; font-weight: 600;">
+          ${template.tags.map((tag: string) => `
+            <span style="background: ${isCustom ? '#fef3c7' : '#f3f4f6'}; color: ${isCustom ? '#92400e' : '#6b7280'}; padding: 3px 8px; border-radius: 4px; font-size: 11px; font-weight: 600;">
               ${tag}
             </span>
           `).join('')}
         </div>
 
-        <div style="padding: 10px; background: #f9fafb; border-radius: 6px; border-left: 3px solid #667eea; margin-top: 10px;">
+        <div style="padding: 10px; background: ${isCustom ? '#fffbeb' : '#f9fafb'}; border-radius: 6px; border-left: 3px solid ${isCustom ? '#f59e0b' : '#667eea'}; margin-top: 10px;">
           <div style="font-size: 11px; color: #374151; line-height: 1.4;">
             <strong>💡 Caso de uso:</strong><br>
             ${template.useCase}
@@ -249,7 +320,7 @@ export class LoanReportSelector {
         </div>
 
       </div>
-    `).join('');
+    `;
   }
 
   /**
@@ -356,6 +427,29 @@ ${metadata.preview}
         const templateId = card.getAttribute('data-template-id');
         if (templateId) {
           this.selectTemplate(templateId);
+        }
+      });
+    });
+
+    // Edit custom template buttons
+    document.querySelectorAll('.edit-custom-template-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const templateId = btn.getAttribute('data-template-id');
+        if (templateId && this.options?.onCustomize) {
+          this.dispose();
+          this.options.onCustomize(templateId);
+        }
+      });
+    });
+
+    // Delete custom template buttons
+    document.querySelectorAll('.delete-custom-template-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const templateId = btn.getAttribute('data-template-id');
+        if (templateId) {
+          this.deleteCustomTemplate(templateId);
         }
       });
     });
@@ -484,6 +578,28 @@ ${metadata.preview}
     }
 
     this.dispose();
+  }
+
+  /**
+   * Deleta um template customizado
+   */
+  private deleteCustomTemplate(templateId: string): void {
+    const template = this.customTemplates.find(t => t.id === templateId);
+    if (!template) return;
+
+    if (confirm(`Tem certeza que deseja excluir o template "${template.name}"? Esta ação não pode ser desfeita.`)) {
+      // Emite evento para o ReportManager lidar com a exclusão
+      this.context.events.emit('loan:delete-custom-template', { templateId });
+      this.context.ui.showToast(`Template "${template.name}" excluído`, 'success');
+
+      // Remove da lista local e re-renderiza
+      this.customTemplates = this.customTemplates.filter(t => t.id !== templateId);
+      const templatesList = document.getElementById('templates-list');
+      if (templatesList) {
+        templatesList.innerHTML = this.renderTemplateCards();
+        this.attachEventListeners();
+      }
+    }
   }
 
   /**

@@ -1,0 +1,217 @@
+' ============================================================================
+' UserForm: frmNovoContrato
+' Descrição: Formulário para criar novo contrato de empréstimo
+' ============================================================================
+'
+' INSTRUÇÕES PARA CRIAR NO VBA:
+' 1. VBA Editor (Alt+F11) → Inserir → UserForm
+' 2. Renomeie para "frmNovoContrato" (F4 → Properties → Name)
+' 3. Adicione os controles conforme layout abaixo
+' 4. Copie o código deste arquivo para o código do UserForm
+' ============================================================================
+
+' LAYOUT DO FORMULÁRIO (adicione os controles manualmente):
+' ----------------------------------------------------------------------------
+' Caption: Novo Contrato de Empréstimo
+' Width: 400
+' Height: 480
+'
+' CONTROLES (use nomes exatos):
+' ----------------------------------------------------------------------------
+' Label1: "Tipo de Contrato:"
+' cboTipo: ComboBox (CAPTADO, CEDIDO)
+'
+' Label2: "Contraparte:"
+' txtContraparte: TextBox
+'
+' Label3: "Moeda:"
+' cboMoeda: ComboBox (BRL, USD, EUR, GBP)
+'
+' Label4: "Principal:"
+' txtPrincipal: TextBox
+'
+' Label5: "Data Início:"
+' txtDataInicio: TextBox
+'
+' Label6: "Data Vencimento:"
+' txtDataVencimento: TextBox
+'
+' Label7: "Taxa de Juros (% a.a.):"
+' txtTaxaJuros: TextBox
+'
+' Label8: "Sistema de Amortização:"
+' cboSistema: ComboBox (PRICE, SAC)
+'
+' Label9: "Periodicidade:"
+' cboPeriodicidade: ComboBox (MENSAL, TRIMESTRAL, SEMESTRAL, ANUAL)
+'
+' Label10: "Número de Parcelas:"
+' txtParcelas: TextBox
+'
+' cmdCriar: CommandButton ("Criar Contrato")
+' cmdCancelar: CommandButton ("Cancelar")
+' ============================================================================
+
+Option Explicit
+
+Private contratoID As String
+
+' ============================================================================
+' EVENTO: Inicialização do Formulário
+' ============================================================================
+Private Sub UserForm_Initialize()
+    ' Preenche ComboBox Tipo
+    With cboTipo
+        .Clear
+        .AddItem "CAPTADO"
+        .AddItem "CEDIDO"
+        .ListIndex = 0
+    End With
+
+    ' Preenche ComboBox Moeda
+    With cboMoeda
+        .Clear
+        .AddItem "BRL"
+        .AddItem "USD"
+        .AddItem "EUR"
+        .AddItem "GBP"
+        .ListIndex = 0
+    End With
+
+    ' Preenche ComboBox Sistema
+    With cboSistema
+        .Clear
+        .AddItem "PRICE"
+        .AddItem "SAC"
+        .ListIndex = 0
+    End With
+
+    ' Preenche ComboBox Periodicidade
+    With cboPeriodicidade
+        .Clear
+        .AddItem "MENSAL"
+        .AddItem "TRIMESTRAL"
+        .AddItem "SEMESTRAL"
+        .AddItem "ANUAL"
+        .ListIndex = 0
+    End With
+
+    ' Define valores padrão
+    txtDataInicio.Value = Format(Date, "dd/mm/yyyy")
+    txtDataVencimento.Value = Format(DateAdd("yyyy", 1, Date), "dd/mm/yyyy")
+    txtTaxaJuros.Value = "12,5"
+    txtParcelas.Value = "12"
+End Sub
+
+' ============================================================================
+' EVENTO: Botão Criar
+' ============================================================================
+Private Sub cmdCriar_Click()
+    Dim tipo As String
+    Dim contraparte As String
+    Dim moeda As String
+    Dim principal As Double
+    Dim dataInicio As Date
+    Dim dataVencimento As Date
+    Dim taxaJuros As Double
+    Dim sistema As String
+    Dim periodicidade As String
+    Dim parcelas As Long
+
+    ' Validações
+    If Trim(txtContraparte.Value) = "" Then
+        MsgBox "Informe a contraparte", vbExclamation, "Validação"
+        txtContraparte.SetFocus
+        Exit Sub
+    End If
+
+    On Error Resume Next
+    principal = CDbl(Replace(txtPrincipal.Value, ",", "."))
+    If Err.Number <> 0 Or principal <= 0 Then
+        MsgBox "Informe um valor de principal válido", vbExclamation, "Validação"
+        txtPrincipal.SetFocus
+        Exit Sub
+    End If
+    On Error GoTo 0
+
+    On Error Resume Next
+    dataInicio = CDate(txtDataInicio.Value)
+    If Err.Number <> 0 Then
+        MsgBox "Informe uma data de início válida (dd/mm/aaaa)", vbExclamation, "Validação"
+        txtDataInicio.SetFocus
+        Exit Sub
+    End If
+    On Error GoTo 0
+
+    On Error Resume Next
+    dataVencimento = CDate(txtDataVencimento.Value)
+    If Err.Number <> 0 Then
+        MsgBox "Informe uma data de vencimento válida (dd/mm/aaaa)", vbExclamation, "Validação"
+        txtDataVencimento.SetFocus
+        Exit Sub
+    End If
+    On Error GoTo 0
+
+    If dataVencimento <= dataInicio Then
+        MsgBox "A data de vencimento deve ser posterior à data de início", vbExclamation, "Validação"
+        txtDataVencimento.SetFocus
+        Exit Sub
+    End If
+
+    On Error Resume Next
+    taxaJuros = CDbl(Replace(txtTaxaJuros.Value, ",", "."))
+    If Err.Number <> 0 Or taxaJuros <= 0 Then
+        MsgBox "Informe uma taxa de juros válida", vbExclamation, "Validação"
+        txtTaxaJuros.SetFocus
+        Exit Sub
+    End If
+    On Error GoTo 0
+
+    On Error Resume Next
+    parcelas = CLng(txtParcelas.Value)
+    If Err.Number <> 0 Or parcelas <= 0 Then
+        MsgBox "Informe um número de parcelas válido", vbExclamation, "Validação"
+        txtParcelas.SetFocus
+        Exit Sub
+    End If
+    On Error GoTo 0
+
+    ' Captura valores
+    tipo = cboTipo.Value
+    contraparte = Trim(txtContraparte.Value)
+    moeda = cboMoeda.Value
+    sistema = cboSistema.Value
+    periodicidade = cboPeriodicidade.Value
+
+    ' Cria contrato
+    On Error GoTo ErroAoCriar
+    contratoID = LoanManager.CriarContrato(tipo, contraparte, moeda, principal, _
+                                          dataInicio, dataVencimento, taxaJuros, _
+                                          sistema, periodicidade, parcelas)
+
+    ' Pergunta se deseja gerar cronograma
+    If MsgBox("Deseja gerar o cronograma de pagamentos agora?", vbQuestion + vbYesNo, "Cronograma") = vbYes Then
+        LoanManager.GerarCronograma contratoID
+    End If
+
+    ' Fecha formulário
+    Unload Me
+    Exit Sub
+
+ErroAoCriar:
+    MsgBox "Erro ao criar contrato: " & Err.Description, vbCritical, "Erro"
+End Sub
+
+' ============================================================================
+' EVENTO: Botão Cancelar
+' ============================================================================
+Private Sub cmdCancelar_Click()
+    Unload Me
+End Sub
+
+' ============================================================================
+' PROPRIEDADE: Retorna ID do contrato criado
+' ============================================================================
+Public Property Get ContratoIDCriado() As String
+    ContratoIDCriado = contratoID
+End Property

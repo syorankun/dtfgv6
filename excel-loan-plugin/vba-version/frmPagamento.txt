@@ -1,0 +1,148 @@
+' ============================================================================
+' UserForm: frmPagamento
+' Descrição: Formulário para registrar pagamento
+' ============================================================================
+'
+' INSTRUÇÕES PARA CRIAR NO VBA:
+' 1. VBA Editor (Alt+F11) → Inserir → UserForm
+' 2. Renomeie para "frmPagamento" (F4 → Properties → Name)
+' 3. Adicione os controles conforme layout abaixo
+' 4. Copie o código deste arquivo para o código do UserForm
+' ============================================================================
+
+' LAYOUT DO FORMULÁRIO:
+' ----------------------------------------------------------------------------
+' Caption: Registrar Pagamento
+' Width: 400
+' Height: 300
+'
+' CONTROLES:
+' ----------------------------------------------------------------------------
+' lblContratoID: Label ("ID do Contrato:")
+' txtContratoID: TextBox (Locked = True, ReadOnly)
+'
+' lblSaldoAtual: Label ("Saldo Atual:")
+' txtSaldoAtual: TextBox (Locked = True, ReadOnly)
+'
+' Label1: "Valor do Pagamento:"
+' txtValor: TextBox
+'
+' Label2: "Data do Pagamento:"
+' txtData: TextBox
+'
+' Label3: "Descrição (opcional):"
+' txtDescricao: TextBox
+'   MultiLine: True
+'   Height: 60
+'
+' cmdConfirmar: CommandButton ("Confirmar Pagamento")
+' cmdCancelar: CommandButton ("Cancelar")
+' ============================================================================
+
+Option Explicit
+
+Private mContratoID As String
+
+' ============================================================================
+' PROPRIEDADE: Define ID do contrato
+' ============================================================================
+Public Property Let ContratoID(ByVal valor As String)
+    mContratoID = valor
+    txtContratoID.Value = valor
+    Call CarregarSaldoAtual
+End Property
+
+Public Property Get ContratoID() As String
+    ContratoID = mContratoID
+End Property
+
+' ============================================================================
+' EVENTO: Inicialização do Formulário
+' ============================================================================
+Private Sub UserForm_Initialize()
+    ' Define data padrão
+    txtData.Value = Format(Date, "dd/mm/yyyy")
+End Sub
+
+' ============================================================================
+' SUB: Carrega saldo atual do contrato
+' ============================================================================
+Private Sub CarregarSaldoAtual()
+    Dim ws As Worksheet
+    Dim linha As Long
+    Dim saldo As Double
+    Dim moeda As String
+
+    On Error Resume Next
+    Set ws = ThisWorkbook.Worksheets("Contratos")
+    If Err.Number <> 0 Then
+        txtSaldoAtual.Value = "Erro ao carregar"
+        Exit Sub
+    End If
+    On Error GoTo 0
+
+    ' Busca saldo
+    For linha = 2 To ws.Cells(ws.Rows.Count, 1).End(xlUp).Row
+        If ws.Cells(linha, 1).Value = mContratoID Then
+            saldo = ws.Cells(linha, 12).Value
+            moeda = ws.Cells(linha, 4).Value
+            txtSaldoAtual.Value = moeda & " " & Format(saldo, "#,##0.00")
+            Exit For
+        End If
+    Next linha
+End Sub
+
+' ============================================================================
+' EVENTO: Botão Confirmar
+' ============================================================================
+Private Sub cmdConfirmar_Click()
+    Dim valor As Double
+    Dim dataPgto As Date
+    Dim descricao As String
+
+    ' Validações
+    On Error Resume Next
+    valor = CDbl(Replace(txtValor.Value, ",", "."))
+    If Err.Number <> 0 Or valor <= 0 Then
+        MsgBox "Informe um valor válido", vbExclamation, "Validação"
+        txtValor.SetFocus
+        Exit Sub
+    End If
+    On Error GoTo 0
+
+    On Error Resume Next
+    dataPgto = CDate(txtData.Value)
+    If Err.Number <> 0 Then
+        MsgBox "Informe uma data válida (dd/mm/aaaa)", vbExclamation, "Validação"
+        txtData.SetFocus
+        Exit Sub
+    End If
+    On Error GoTo 0
+
+    descricao = Trim(txtDescricao.Value)
+    If descricao = "" Then descricao = "Pagamento"
+
+    ' Confirmação
+    If MsgBox("Confirma o pagamento de " & Format(valor, "#,##0.00") & "?", _
+              vbQuestion + vbYesNo, "Confirmação") = vbNo Then
+        Exit Sub
+    End If
+
+    ' Registra pagamento
+    On Error GoTo ErroAoRegistrar
+    LoanManager.RegistrarPagamento mContratoID, valor, dataPgto, descricao
+
+    ' Fecha formulário
+    Unload Me
+    Exit Sub
+
+ErroAoRegistrar:
+    MsgBox "Erro ao registrar pagamento: " & Err.Description, vbCritical, "Erro"
+End Sub
+
+' ============================================================================
+' EVENTO: Botão Cancelar
+' ============================================================================
+Private Sub cmdCancelar_Click()
+    Unload Me
+End Sub

@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gestão de Empréstimos</title>
+
+    <!-- Office JS -->
+    <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
+
+    <!-- Estilos -->
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+
+        h1 {
+            color: #2c3e50;
+            font-size: 1.5rem;
+            margin-bottom: 20px;
+            border-bottom: 3px solid #3498db;
+            padding-bottom: 10px;
+        }
+
+        h2 {
+            color: #34495e;
+            font-size: 1.1rem;
+            margin: 20px 0 10px;
+        }
+
+        .section {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 600;
+            color: #555;
+            font-size: 0.9rem;
+        }
+
+        input,
+        select,
+        textarea {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 0.95rem;
+        }
+
+        input:focus,
+        select:focus,
+        textarea:focus {
+            outline: none;
+            border-color: #3498db;
+            box-shadow: 0 0 0 2px rgba(52, 152, 219, 0.2);
+        }
+
+        .row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+        }
+
+        button {
+            padding: 12px 20px;
+            border: none;
+            border-radius: 4px;
+            font-size: 0.95rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+
+        .btn-primary {
+            background-color: #3498db;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background-color: #2980b9;
+        }
+
+        .btn-success {
+            background-color: #27ae60;
+            color: white;
+        }
+
+        .btn-success:hover {
+            background-color: #229954;
+        }
+
+        .btn-secondary {
+            background-color: #95a5a6;
+            color: white;
+        }
+
+        .btn-secondary:hover {
+            background-color: #7f8c8d;
+        }
+
+        .btn-warning {
+            background-color: #f39c12;
+            color: white;
+        }
+
+        .btn-warning:hover {
+            background-color: #d68910;
+        }
+
+        .btn-full {
+            width: 100%;
+            margin-top: 10px;
+        }
+
+        .contracts-list {
+            max-height: 300px;
+            overflow-y: auto;
+        }
+
+        .contract-item {
+            padding: 12px;
+            border: 1px solid #e0e0e0;
+            border-radius: 4px;
+            margin-bottom: 10px;
+            background: #fafafa;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+
+        .contract-item:hover {
+            background-color: #e8f4f8;
+        }
+
+        .contract-item h3 {
+            font-size: 1rem;
+            color: #2c3e50;
+            margin-bottom: 5px;
+        }
+
+        .contract-item p {
+            font-size: 0.85rem;
+            color: #7f8c8d;
+            margin: 2px 0;
+        }
+
+        .contract-item .badge {
+            display: inline-block;
+            padding: 3px 8px;
+            border-radius: 3px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            margin-top: 5px;
+        }
+
+        .badge-active {
+            background-color: #27ae60;
+            color: white;
+        }
+
+        .badge-paid {
+            background-color: #95a5a6;
+            color: white;
+        }
+
+        #contractForm {
+            display: none;
+        }
+
+        .info-box {
+            background-color: #e8f4f8;
+            border-left: 4px solid #3498db;
+            padding: 12px;
+            margin: 15px 0;
+            border-radius: 4px;
+            font-size: 0.9rem;
+        }
+
+        .error-box {
+            background-color: #fadbd8;
+            border-left: 4px solid #e74c3c;
+            padding: 12px;
+            margin: 15px 0;
+            border-radius: 4px;
+            font-size: 0.9rem;
+            color: #c0392b;
+        }
+
+        .success-box {
+            background-color: #d5f4e6;
+            border-left: 4px solid #27ae60;
+            padding: 12px;
+            margin: 15px 0;
+            border-radius: 4px;
+            font-size: 0.9rem;
+            color: #229954;
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        #messageBox {
+            margin-top: 15px;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 20px;
+            color: #7f8c8d;
+        }
+
+        .spinner {
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #3498db;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 10px;
+        }
+
+        @keyframes spin {
+            0% {
+                transform: rotate(0deg);
+            }
+
+            100% {
+                transform: rotate(360deg);
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <h1>💰 Gestão de Empréstimos</h1>
+
+    <div id="messageBox" class="hidden"></div>
+
+    <!-- Seção de Lista de Contratos -->
+    <div id="contractsList" class="section">
+        <h2>Contratos</h2>
+        <div class="contracts-list" id="contractsContainer">
+            <p class="loading">Carregando contratos...</p>
+        </div>
+        <button class="btn-primary btn-full" onclick="showContractForm()">+ Novo Contrato</button>
+        <button class="btn-secondary btn-full" onclick="loadContracts()">Atualizar Lista</button>
+    </div>
+
+    <!-- Formulário de Novo Contrato -->
+    <div id="contractForm" class="section">
+        <h2>Novo Contrato de Empréstimo</h2>
+
+        <div class="form-group">
+            <label>Tipo de Contrato</label>
+            <select id="contractType">
+                <option value="CAPTADO">Captado (Empréstimo recebido)</option>
+                <option value="CEDIDO">Cedido (Empréstimo concedido)</option>
+            </select>
+        </div>
+
+        <div class="form-group">
+            <label>Contraparte *</label>
+            <input type="text" id="counterparty" placeholder="Ex: Banco XYZ" required>
+        </div>
+
+        <div class="row">
+            <div class="form-group">
+                <label>Moeda</label>
+                <select id="currency">
+                    <option value="BRL">BRL - Real</option>
+                    <option value="USD">USD - Dólar</option>
+                    <option value="EUR">EUR - Euro</option>
+                    <option value="GBP">GBP - Libra</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Principal *</label>
+                <input type="number" id="principal" placeholder="100000.00" step="0.01" required>
+            </div>
+        </div>
+
+        <div class="row">
+            <div class="form-group">
+                <label>Data Início *</label>
+                <input type="date" id="startDate" required>
+            </div>
+            <div class="form-group">
+                <label>Data Vencimento *</label>
+                <input type="date" id="maturityDate" required>
+            </div>
+        </div>
+
+        <div class="row">
+            <div class="form-group">
+                <label>Taxa de Juros (% a.a.) *</label>
+                <input type="number" id="interestRate" placeholder="12.5" step="0.01" required>
+            </div>
+            <div class="form-group">
+                <label>Sistema de Amortização</label>
+                <select id="paymentSystem">
+                    <option value="PRICE">PRICE (Parcela Fixa)</option>
+                    <option value="SAC">SAC (Amortização Constante)</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="row">
+            <div class="form-group">
+                <label>Periodicidade</label>
+                <select id="periodicity">
+                    <option value="MENSAL">Mensal</option>
+                    <option value="TRIMESTRAL">Trimestral</option>
+                    <option value="SEMESTRAL">Semestral</option>
+                    <option value="ANUAL">Anual</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Número de Parcelas *</label>
+                <input type="number" id="installments" placeholder="12" min="1" required>
+            </div>
+        </div>
+
+        <div class="info-box">
+            Os contratos serão salvos na planilha "Contratos" e poderão ser consultados a qualquer momento.
+        </div>
+
+        <button class="btn-success btn-full" onclick="createContract()">✓ Criar Contrato</button>
+        <button class="btn-secondary btn-full" onclick="hideContractForm()">Cancelar</button>
+    </div>
+
+    <!-- Scripts -->
+    <script src="src/loan-calculator.js"></script>
+    <script src="src/loan-manager.js"></script>
+    <script src="taskpane.js"></script>
+</body>
+
+</html>

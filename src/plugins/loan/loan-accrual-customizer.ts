@@ -3,6 +3,7 @@ import type { PluginContext } from '@core/types';
 import {
   DEFAULT_ACCRUAL_VIEW,
   FX_VARIATION_FOCUS_VIEW,
+  IFRS_USD_BRL_ACCRUAL_VIEW,
   cloneAccrualViewConfig,
   type AccrualSheetViewConfig
 } from './loan-accrual-view';
@@ -247,6 +248,14 @@ export class LoanAccrualCustomizer {
         description: FX_VARIATION_FOCUS_VIEW.description,
         tags: ['fx', 'variação'],
         view: FX_VARIATION_FOCUS_VIEW
+      },
+      {
+        id: IFRS_USD_BRL_ACCRUAL_VIEW.id,
+        name: 'IFRS USD→BRL',
+        description: IFRS_USD_BRL_ACCRUAL_VIEW.description,
+        tags: ['ifrs', 'cpc02', 'usd', 'brl'],
+        category: 'IFRS',
+        view: IFRS_USD_BRL_ACCRUAL_VIEW
       }
     ];
 

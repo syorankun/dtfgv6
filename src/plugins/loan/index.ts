@@ -13,3 +13,13 @@ export { LoanFXIntegration } from './loan-fx-integration';
 export { LoanValidator } from './loan-validator';
 export { LoanPaymentManager, type LoanPayment } from './loan-payment-manager';
 export { LoanDashboard } from './loan-dashboard';
+export { 
+  LoanAccrualPaymentEnricher, 
+  type AccrualRowWithPayments 
+} from './loan-accrual-payment-view';
+export {
+  DEFAULT_ACCRUAL_VIEW,
+  FX_VARIATION_FOCUS_VIEW,
+  PAYMENT_ACCRUAL_VIEW,
+  type AccrualSheetViewConfig
+} from './loan-accrual-view';

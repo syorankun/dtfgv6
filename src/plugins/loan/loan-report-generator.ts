@@ -18,6 +18,8 @@ import { resolveAccrualValue } from './loan-accrual-view';
 import { REPORT_TEMPLATES } from './loan-report-templates';
 import { logger } from '@core/storage-utils-consolidated';
 import { LoanSheets } from './loan-sheets';
+import { LoanAccrualPaymentEnricher } from './loan-accrual-payment-view';
+import type { LoanPaymentManager } from './loan-payment-manager';
 
 export interface ReportGenerationRequest {
   templateId: string;
@@ -28,6 +30,7 @@ export interface ReportGenerationRequest {
   outputMode: 'sheet' | 'pivot' | 'both';
   includeCharts: boolean;
   groupBy?: 'none' | 'currency' | 'type' | 'counterparty';
+  includePayments?: boolean; // Nova opção para incluir dados de pagamentos
 }
 
 export interface GeneratedReport {
@@ -43,11 +46,13 @@ export class LoanReportGenerator {
   private context: PluginContext;
   private scheduler: LoanScheduler;
   private sheets: LoanSheets;
+  private paymentManager?: LoanPaymentManager;
 
-  constructor(context: PluginContext, scheduler: LoanScheduler, sheets: LoanSheets) {
+  constructor(context: PluginContext, scheduler: LoanScheduler, sheets: LoanSheets, paymentManager?: LoanPaymentManager) {
     this.context = context;
     this.scheduler = scheduler;
     this.sheets = sheets;
+    this.paymentManager = paymentManager;
   }
 
   /**
@@ -156,8 +161,38 @@ export class LoanReportGenerator {
           false // showVariation
         );
 
+        // Enriquece com pagamentos se for o template de pagamentos e houver paymentManager
+        let enrichedRows: AccrualRow[] = rows;
+        if (request.templateId === 'payment-accrual-view' && this.paymentManager) {
+          logger.info(`[LoanReportGenerator] Enriquecendo com pagamentos para contrato ${contract.id}`);
+          const ledgerEntries = this.paymentManager.getLedger(contract.id);
+          logger.info(`[LoanReportGenerator] Ledger entries encontrados: ${ledgerEntries.length}`);
+          
+          if (ledgerEntries.length > 0) {
+            const enrichedWithPayments = LoanAccrualPaymentEnricher.enrichWithPayments(
+              rows,
+              ledgerEntries,
+              contract.currency
+            );
+            
+            logger.info(`[LoanReportGenerator] Dados enriquecidos. Exemplo primeira linha:`, enrichedWithPayments[0]);
+            
+            // Converte AccrualRowWithPayments de volta para AccrualRow com campos extras
+            enrichedRows = enrichedWithPayments.map(row => ({
+              ...row,
+              // Campos extras são preservados no spread
+            })) as AccrualRow[];
+          } else {
+            logger.warn(`[LoanReportGenerator] Nenhum ledger entry encontrado para ${contract.id}`);
+          }
+        } else {
+          if (request.templateId === 'payment-accrual-view') {
+            logger.warn(`[LoanReportGenerator] PaymentManager não disponível para enriquecer dados`);
+          }
+        }
+
         // Adiciona metadados do contrato a cada linha
-        const enrichedRows = rows.map(row => ({
+        const rowsWithMetadata = enrichedRows.map(row => ({
           ...row,
           contractId: contract.id,
           contractCurrency: contract.currency,
@@ -165,7 +200,7 @@ export class LoanReportGenerator {
           counterparty: contract.counterparty
         }));
 
-        allAccrualRows.push(...enrichedRows);
+        allAccrualRows.push(...rowsWithMetadata);
 
         contractMetadata[contract.id] = {
           counterparty: contract.counterparty,
@@ -237,6 +272,60 @@ export class LoanReportGenerator {
       { label: 'Total Linhas', value: rows.length.toString() },
       { label: 'Gerado em', value: new Date().toLocaleString('pt-BR') }
     ];
+
+    // Enriquecimento de metadados para o template de pagamentos
+    if (request.templateId === 'payment-accrual-view') {
+      metadata.push({ label: 'Modo de Cálculo', value: 'Accrual Recalculado com Pagamentos' });
+      metadata.push({ label: 'FX BRL', value: 'PTAX (mark-to-market) nas datas dos pontos' });
+      metadata.push({ label: 'Alocação Pagamentos', value: 'Juros primeiro, depois principal' });
+
+      const hasPaymentData = rows.some(row => Object.prototype.hasOwnProperty.call(row, 'interestPaidBRL'));
+
+      if (hasPaymentData) {
+        const enrichedSummary = LoanAccrualPaymentEnricher.createPaymentSummary(rows as any);
+        const contractCurrency = (rows[0] as any)?.contractCurrency || 'Moeda';
+
+        const formatNumber = (value: number, digits: number): string => {
+          if (!Number.isFinite(value)) {
+            return (0).toLocaleString('pt-BR', {
+              minimumFractionDigits: digits,
+              maximumFractionDigits: digits
+            });
+          }
+          return value.toLocaleString('pt-BR', {
+            minimumFractionDigits: digits,
+            maximumFractionDigits: digits
+          });
+        };
+
+        const formatPercent = (value: number | null): string => {
+          if (value === null || !Number.isFinite(value)) {
+            return 'N/A';
+          }
+          const percent = value * 100;
+          return `${percent.toLocaleString('pt-BR', {
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2
+          })}%`;
+        };
+
+        metadata.push(
+          { label: 'Total Juros Pagos (BRL)', value: formatNumber(enrichedSummary.totalInterestPaidBRL, 2) },
+          { label: `Total Juros Pagos (${contractCurrency})`, value: formatNumber(enrichedSummary.totalInterestPaidOrigin, 4) },
+          { label: 'Total Principal Pago (BRL)', value: formatNumber(enrichedSummary.totalPrincipalPaidBRL, 2) },
+          { label: `Total Principal Pago (${contractCurrency})`, value: formatNumber(enrichedSummary.totalPrincipalPaidOrigin, 4) },
+          { label: 'Juros Descobertos (BRL)', value: formatNumber(enrichedSummary.totalInterestDeltaBRL, 2) },
+          { label: `Juros Descobertos (${contractCurrency})`, value: formatNumber(enrichedSummary.totalInterestDeltaOrigin, 4) },
+          { label: 'Cobertura Média Juros', value: `${formatPercent(enrichedSummary.avgInterestCoverage)} · Cob/Parc/SemPag/SemJuros: ${enrichedSummary.coverageStatus.covered}/${enrichedSummary.coverageStatus.partial}/${enrichedSummary.coverageStatus.missing}/${enrichedSummary.coverageStatus.noInterest}` },
+          { label: 'Caixa x Accrual (BRL)', value: formatNumber(enrichedSummary.cashVsAccrualBRL, 2) },
+          { label: `Caixa x Accrual (${contractCurrency})`, value: formatNumber(enrichedSummary.cashVsAccrualOrigin, 4) },
+          { label: 'Saldo Final Recalculado (BRL)', value: formatNumber(enrichedSummary.finalBalanceBRL, 2) },
+          { label: `Saldo Final Recalculado (${contractCurrency})`, value: formatNumber(enrichedSummary.finalBalanceOrigin, 4) },
+          { label: 'Juros Pendentes (BRL)', value: formatNumber(enrichedSummary.finalInterestPendingBRL, 2) },
+          { label: `Juros Pendentes (${contractCurrency})`, value: formatNumber(enrichedSummary.finalInterestPendingOrigin, 4) }
+        );
+      }
+    }
 
     const options: AccrualSheetOptions = {
       view: template,

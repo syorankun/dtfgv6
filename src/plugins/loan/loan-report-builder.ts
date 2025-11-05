@@ -60,7 +60,9 @@ export const AVAILABLE_FIELDS: ColumnFieldOption[] = [
   { field: 'fxSourcePTAX', label: 'Fonte PTAX', category: 'BRL PTAX', type: 'string' },
 
   // Variação Cambial
-  { field: 'fxVariationBRL', label: 'Variação Cambial (BRL)', category: 'Variação FX', type: 'number', defaultDecimals: 2 },
+  { field: 'fxVariationOpeningBRL', label: 'Δ Principal (BRL)', category: 'Variação FX', type: 'number', defaultDecimals: 2 },
+  { field: 'fxVariationInterestBRL', label: 'Δ Juros (BRL)', category: 'Variação FX', type: 'number', defaultDecimals: 2 },
+  { field: 'fxVariationBRL', label: 'Δ Saldo (BRL)', category: 'Variação FX', type: 'number', defaultDecimals: 2 },
   { field: 'fxVariationPercent', label: 'Variação Cambial (%)', category: 'Variação FX', type: 'number', defaultDecimals: 4 },
 
   // Genéricos
@@ -76,9 +78,17 @@ export class LoanReportBuilder {
   private modalElement: HTMLElement | null = null;
   private currentTemplate: AccrualSheetViewConfig | null = null;
   private onSave: ((template: AccrualSheetViewConfig) => void) | null = null;
+  private customTemplatesMap: Map<string, any> = new Map();
 
   constructor(context: PluginContext) {
     this.context = context;
+  }
+
+  /**
+   * Define templates customizados disponíveis para edição
+   */
+  public setCustomTemplates(templates: Map<string, any>): void {
+    this.customTemplatesMap = templates;
   }
 
   /**
@@ -97,9 +107,19 @@ export class LoanReportBuilder {
   }
 
   /**
-   * Abre o builder para editar template existente
+   * Abre o builder para editar template existente (built-in ou customizado)
    */
   public edit(templateId: string, onSave: (template: AccrualSheetViewConfig) => void): void {
+    // Tenta buscar template customizado primeiro
+    const customTemplate = this.customTemplatesMap.get(templateId);
+    if (customTemplate && customTemplate.config) {
+      this.currentTemplate = cloneAccrualViewConfig(customTemplate.config);
+      this.onSave = onSave;
+      this.render();
+      return;
+    }
+
+    // Se não for customizado, busca nos built-in
     const template = REPORT_TEMPLATES[templateId as keyof typeof REPORT_TEMPLATES];
     if (!template) {
       this.context.ui.showToast('Template não encontrado', 'error');
@@ -416,6 +436,9 @@ export class LoanReportBuilder {
     // Save template
     document.getElementById('save-template-btn')?.addEventListener('click', () => this.saveTemplate());
 
+    // Preview button
+    document.getElementById('preview-btn')?.addEventListener('click', () => this.showPreview());
+
     // Add section
     document.getElementById('add-section-btn')?.addEventListener('click', () => this.addSection());
 
@@ -615,6 +638,169 @@ export class LoanReportBuilder {
     this.onSave(this.currentTemplate);
     this.context.ui.showToast(`Template "${this.currentTemplate.title}" salvo com sucesso!`, 'success');
     this.dispose();
+  }
+
+  /**
+   * Mostra preview do template
+   */
+  private showPreview(): void {
+    if (!this.currentTemplate) return;
+
+    // Validações básicas
+    if (this.currentTemplate.sections.length === 0) {
+      this.context.ui.showToast('Adicione pelo menos uma seção para visualizar o preview', 'warning');
+      return;
+    }
+
+    const hasColumns = this.currentTemplate.sections.some(s => s.columns.length > 0);
+    if (!hasColumns) {
+      this.context.ui.showToast('Adicione pelo menos uma coluna para visualizar o preview', 'warning');
+      return;
+    }
+
+    const previewHTML = this.generatePreviewHTML();
+
+    // Cria modal de preview
+    const previewModal = `
+      <div id="template-preview-modal" style="position: fixed; inset: 0; background: rgba(0,0,0,0.9); backdrop-filter: blur(20px); display: flex; align-items: center; justify-content: center; z-index: 10500;">
+        <div style="background: #ffffff; border-radius: 16px; width: 94%; max-width: 1400px; max-height: 90vh; display: flex; flex-direction: column; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.8); overflow: hidden;">
+
+          <!-- Header -->
+          <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 20px 28px; display: flex; justify-content: space-between; align-items: center; border-bottom: 3px solid rgba(255,255,255,0.2);">
+            <div>
+              <h3 style="margin: 0 0 4px 0; font-size: 22px; font-weight: 700;">👁️ Preview: ${this.currentTemplate.title}</h3>
+              <p style="margin: 0; opacity: 0.9; font-size: 13px;">${this.currentTemplate.description || 'Visualização da estrutura do template'}</p>
+            </div>
+            <button id="close-preview" style="background: rgba(255,255,255,0.2); border: none; color: white; padding: 8px; border-radius: 50%; cursor: pointer; font-size: 20px; width: 38px; height: 38px; display: flex; align-items: center; justify-content: center; transition: all 0.2s; font-weight: bold;"
+              onmouseover="this.style.background='rgba(255,255,255,0.3)'" onmouseout="this.style.background='rgba(255,255,255,0.2)'">×</button>
+          </div>
+
+          <!-- Preview Content -->
+          <div style="flex: 1; overflow: auto; padding: 28px; background: #f9fafb;">
+            ${previewHTML}
+          </div>
+
+          <!-- Footer -->
+          <div style="padding: 16px 28px; background: white; border-top: 2px solid #e5e7eb; display: flex; justify-content: space-between; align-items: center;">
+            <div style="font-size: 13px; color: #6b7280;">
+              💡 Esta é uma visualização da estrutura. Os dados reais aparecerão após gerar o relatório.
+            </div>
+            <button onclick="document.getElementById('template-preview-modal').remove()" style="padding: 10px 24px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: 600; font-size: 14px; box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3); transition: all 0.2s;"
+              onmouseover="this.style.transform='translateY(-1px)'; this.style.boxShadow='0 4px 12px rgba(102, 126, 234, 0.4)'" onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='0 2px 8px rgba(102, 126, 234, 0.3)'">
+              Fechar Preview
+            </button>
+          </div>
+
+        </div>
+      </div>
+    `;
+
+    document.body.insertAdjacentHTML('beforeend', previewModal);
+
+    // Attach close listener
+    document.getElementById('close-preview')?.addEventListener('click', () => {
+      document.getElementById('template-preview-modal')?.remove();
+    });
+  }
+
+  /**
+   * Gera HTML do preview
+   */
+  private generatePreviewHTML(): string {
+    if (!this.currentTemplate) return '';
+
+    let html = '<div style="background: white; border-radius: 12px; padding: 24px; box-shadow: 0 4px 12px rgba(0,0,0,0.1);">';
+
+    // Template header
+    html += `
+      <div style="margin-bottom: 28px; padding-bottom: 20px; border-bottom: 3px solid #f3f4f6;">
+        <h2 style="margin: 0 0 8px 0; font-size: 26px; font-weight: 700; color: #1f2937;">${this.currentTemplate.title}</h2>
+        ${this.currentTemplate.description ? `<p style="margin: 0; color: #6b7280; font-size: 15px;">${this.currentTemplate.description}</p>` : ''}
+        <div style="margin-top: 12px; display: flex; gap: 16px; font-size: 13px;">
+          <span style="background: #dbeafe; color: #1e40af; padding: 4px 12px; border-radius: 6px; font-weight: 600;">
+            ${this.currentTemplate.sections.length} seções
+          </span>
+          <span style="background: #d1fae5; color: #065f46; padding: 4px 12px; border-radius: 6px; font-weight: 600;">
+            ${this.currentTemplate.sections.reduce((sum, s) => sum + s.columns.length, 0)} colunas
+          </span>
+        </div>
+      </div>
+    `;
+
+    // Sections
+    this.currentTemplate.sections.forEach((section, sectionIndex) => {
+      html += `
+        <div style="margin-bottom: 32px;">
+          <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 12px 18px; border-radius: 8px 8px 0 0; display: flex; align-items: center; gap: 10px;">
+            <span style="font-size: 18px; font-weight: 700;">${sectionIndex + 1}</span>
+            <span style="font-size: 16px; font-weight: 700;">${section.title}</span>
+            <span style="background: rgba(255,255,255,0.2); padding: 2px 10px; border-radius: 12px; font-size: 12px; font-weight: 600; margin-left: auto;">
+              ${section.columns.length} colunas
+            </span>
+          </div>
+
+          <div style="background: white; border: 2px solid #e5e7eb; border-top: none; border-radius: 0 0 8px 8px; overflow: hidden;">
+            <table style="width: 100%; border-collapse: collapse;">
+              <thead>
+                <tr style="background: #f9fafb; border-bottom: 2px solid #e5e7eb;">
+                  ${section.columns.map(col => `
+                    <th style="padding: 14px 16px; text-align: ${col.format?.alignment || 'left'}; font-weight: 700; font-size: 13px; color: #374151; border-right: 1px solid #e5e7eb; white-space: nowrap;">
+                      ${col.label}
+                      ${col.summary ? '<span style="color: #667eea; font-size: 11px;"> ∑</span>' : ''}
+                    </th>
+                  `).join('')}
+                </tr>
+              </thead>
+              <tbody>
+                ${[1, 2, 3].map(_ => `
+                  <tr style="border-bottom: 1px solid #e5e7eb;">
+                    ${section.columns.map(col => `
+                      <td style="padding: 12px 16px; text-align: ${col.format?.alignment || 'left'}; font-size: 13px; color: #6b7280; border-right: 1px solid #f3f4f6; background: ${col.format?.bgColor || 'transparent'};">
+                        ${this.generateSampleValue(col)}
+                      </td>
+                    `).join('')}
+                  </tr>
+                `).join('')}
+                ${section.columns.some(c => c.summary) ? `
+                  <tr style="background: #f9fafb; border-top: 2px solid #667eea; font-weight: 600;">
+                    ${section.columns.map(col => `
+                      <td style="padding: 12px 16px; text-align: ${col.format?.alignment || 'left'}; font-size: 13px; color: #374151; border-right: 1px solid #e5e7eb; background: ${col.summaryFormat?.bgColor || '#f9fafb'};">
+                        ${col.summary ? `<strong>${this.currentTemplate?.summaryLabel || 'Total'}: ${this.generateSampleValue(col)}</strong>` : ''}
+                      </td>
+                    `).join('')}
+                  </tr>
+                ` : ''}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      `;
+    });
+
+    html += '</div>';
+    return html;
+  }
+
+  /**
+   * Gera valores de exemplo para preview
+   */
+  private generateSampleValue(column: AccrualSheetColumnDescriptor): string {
+    switch (column.type) {
+      case 'date':
+        return '31/12/2025';
+      case 'number':
+        const decimals = column.decimals ?? 2;
+        if (column.label.toLowerCase().includes('taxa') || column.label.toLowerCase().includes('rate')) {
+          return (Math.random() * 0.1).toFixed(decimals);
+        }
+        if (column.label.toLowerCase().includes('dias') || column.label.toLowerCase().includes('days')) {
+          return Math.floor(Math.random() * 30).toString();
+        }
+        return (Math.random() * 100000).toFixed(decimals);
+      case 'string':
+      default:
+        return 'Exemplo';
+    }
   }
 
   /**

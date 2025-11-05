@@ -11,6 +11,7 @@ import { LoanCalculator } from './loan-calculator';
 import { LoanFXIntegration } from './loan-fx-integration';
 import { LoanIndexerService } from './loan-indexer-service';
 import { LoanPaymentManager } from './loan-payment-manager';
+import { LoanAccrualPaymentRecalculator } from './loan-accrual-payment-recalculator';
 import { logger } from '@core/storage-utils-consolidated';
 
 /**
@@ -35,7 +36,10 @@ export interface AccrualRow {
   fxRatePTAX: number;
   fxSourcePTAX?: string;
   // Variação cambial (diferença entre PTAX e Contrato)
-  fxVariationBRL: number;              // Variação sobre saldo de abertura
+  fxVariationOpeningBRL: number;       // Variação sobre o principal na abertura
+  fxVariationInterestBRL: number;      // Variação sobre os juros do período
+  fxVariationBRL: number;              // Variação total (saldo final) entre PTAX e contrato
+  fxVariationClosingBRL: number;       // Alias semântico para variação total (compatibilidade futura)
   fxVariationPercent: number;          // Variação % (PTAX vs Contrato)
   // Juros acumulados (somatória acumulada de juros)
   accruedInterestOrigin: number;       // Juros acumulados na moeda de origem
@@ -94,9 +98,34 @@ export class LoanScheduler {
     startDate: string,
     endDate: string,
     frequency: 'Diário' | 'Mensal' | 'Anual' = 'Diário',
-    _showPTAXVariation: boolean = false
+    recalculateWithPayments: boolean = false
   ): Promise<AccrualRow[]> {
     logger.info(`[LoanScheduler] Gerando ACCRUAL para ${contract.id} de ${startDate} a ${endDate} (${frequency})`);
+
+    const pureAccrualRows = await this.generatePureAccrual(contract, startDate, endDate, frequency);
+
+    if (recalculateWithPayments) {
+      const payments = this.paymentManager.getPaymentsForContract(contract.id);
+      if (payments.length > 0) {
+        logger.info(`[LoanScheduler] Recalculando ACCRUAL com ${payments.length} pagamentos.`);
+        return LoanAccrualPaymentRecalculator.recalculate(
+          pureAccrualRows,
+          payments,
+          contract.interestConfig,
+          contract.principalOrigin
+        );
+      }
+    }
+
+    return pureAccrualRows;
+  }
+
+  private async generatePureAccrual(
+    contract: LoanContract,
+    startDate: string,
+    endDate: string,
+    frequency: 'Diário' | 'Mensal' | 'Anual'
+  ): Promise<AccrualRow[]> {
 
     const accrualRows: AccrualRow[] = [];
     const { interestConfig, currency } = contract;
@@ -162,8 +191,11 @@ export class LoanScheduler {
       let openingBalanceBRLPTAX: number;
       let interestBRLPTAX: number;
       let closingBalanceBRLPTAX: number;
-      let fxVariationBRL: number;
-      let fxVariationPercent: number;
+  let fxVariationOpeningBRL: number;
+  let fxVariationInterestBRL: number;
+  let fxVariationClosingBRL: number;
+  let fxVariationBRL: number;
+  let fxVariationPercent: number;
 
       if (currency === 'BRL') {
         // Se moeda é BRL, não há variação cambial
@@ -172,6 +204,9 @@ export class LoanScheduler {
         openingBalanceBRLPTAX = openingBalanceBRLContract;
         interestBRLPTAX = interestBRLContract;
         closingBalanceBRLPTAX = closingBalanceBRLContract;
+        fxVariationOpeningBRL = 0;
+        fxVariationInterestBRL = 0;
+        fxVariationClosingBRL = 0;
         fxVariationBRL = 0;
         fxVariationPercent = 0;
       } else {
@@ -198,10 +233,19 @@ export class LoanScheduler {
         closingBalanceBRLPTAX = LoanCalculator.round(closingBalanceOrigin * fxRatePTAX, 2);
 
         // Calcula variação cambial (diferença entre PTAX e Contrato)
-        fxVariationBRL = LoanCalculator.round(
+        fxVariationOpeningBRL = LoanCalculator.round(
           openingBalanceBRLPTAX - openingBalanceBRLContract,
           2
         );
+        fxVariationInterestBRL = LoanCalculator.round(
+          interestBRLPTAX - interestBRLContract,
+          2
+        );
+        fxVariationClosingBRL = LoanCalculator.round(
+          closingBalanceBRLPTAX - closingBalanceBRLContract,
+          2
+        );
+        fxVariationBRL = fxVariationClosingBRL;
         fxVariationPercent = fxRateContract > 0
           ? LoanCalculator.round(((fxRatePTAX - fxRateContract) / fxRateContract) * 100, 4)
           : 0;
@@ -233,7 +277,10 @@ export class LoanScheduler {
         fxRatePTAX,
         fxSourcePTAX,
         // Variação cambial
-        fxVariationBRL,
+  fxVariationOpeningBRL,
+  fxVariationInterestBRL,
+  fxVariationBRL,
+  fxVariationClosingBRL,
         fxVariationPercent,
         // Juros acumulados (somatória acumulada)
         accruedInterestOrigin: LoanCalculator.round(accruedInterestOrigin, 4),

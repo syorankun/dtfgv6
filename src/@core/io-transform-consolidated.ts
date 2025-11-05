@@ -168,11 +168,42 @@ export class FileWriter {
     return new Blob([csv], { type: "text/csv;charset=utf-8;" });
   }
 
+  // Excel limits sheet names to 31 chars and forbids : \ / ? * [ ]
+  private static sanitizeSheetName(raw: string, used: Set<string>): string {
+    const INVALID_RE = /[:\\\/\?\*\[\]]/g; // eslint-disable-line no-useless-escape
+    let name = (raw || "Sheet").replace(INVALID_RE, "_").trim();
+
+    // Remove surrounding quotes
+    if (name.startsWith("'") && name.endsWith("'")) {
+      name = name.slice(1, -1);
+    }
+
+    // Fallback if empty after cleanup
+    if (!name) name = "Sheet";
+
+    // Truncate to 31 chars
+    const MAX = 31;
+    name = name.slice(0, MAX);
+
+    // Ensure uniqueness by appending (n) within 31 chars
+    let base = name;
+    let counter = 1;
+    while (used.has(name)) {
+      const suffix = ` (${counter++})`;
+      const allowed = MAX - suffix.length;
+      name = base.slice(0, Math.max(1, allowed)) + suffix;
+    }
+
+    used.add(name);
+    return name;
+  }
+
   /**
    * Export sheet to XLSX
    */
   static exportXLSX(workbook: Workbook, options?: ExportOptions): Blob {
     const wb = XLSX.utils.book_new();
+    const usedNames = new Set<string>();
 
     workbook.sheets.forEach((sheet, _id) => {
       const data: any[][] = [];
@@ -200,7 +231,8 @@ export class FileWriter {
       }
 
       const ws = XLSX.utils.aoa_to_sheet(data);
-      XLSX.utils.book_append_sheet(wb, ws, sheet.name);
+      const safeName = FileWriter.sanitizeSheetName(sheet.name, usedNames);
+      XLSX.utils.book_append_sheet(wb, ws, safeName);
     });
 
     const wbout = XLSX.write(wb, { bookType: "xlsx", type: "array" });
@@ -241,6 +273,18 @@ export class FileWriter {
 
     const json = JSON.stringify(data, null, 2);
     return new Blob([json], { type: "application/json;charset=utf-8;" });
+  }
+
+  /**
+   * Sanitize file name for downloads (remove invalid chars and trim length)
+   */
+  static sanitizeFileName(name: string): string {
+    const INVALID_FILE_CHARS = /[\\/:*?"<>|]+/g; // eslint-disable-line no-useless-escape
+    let n = (name || "export").replace(INVALID_FILE_CHARS, "_").trim();
+    if (!n) n = "export";
+    const MAX_LEN = 120;
+    if (n.length > MAX_LEN) n = n.slice(0, MAX_LEN);
+    return n;
   }
 
   /**

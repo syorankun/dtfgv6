@@ -276,6 +276,9 @@ export class DJDataForgeKernel {
   tableManager: TableManager;
   dashboardManager: DashboardManager;
   
+  // Capabilities registry (for plugin inter-communication)
+  private capabilities: Map<string, any> = new Map();
+  
   // Auto-save
   private autoSaveTimer?: number;
   private grid?: any;
@@ -686,6 +689,68 @@ export class DJDataForgeKernel {
         logger.error("[Kernel] Beforeunload save failed", error);
       }
     });
+  }
+  
+  // --------------------------------------------------------------------------
+  // CAPABILITY SYSTEM (Plugin Inter-Communication)
+  // --------------------------------------------------------------------------
+  
+  /**
+   * Register a capability that other plugins can consume
+   * @param name Capability identifier (e.g., 'dj.fx.rates@3')
+   * @param api The API object to expose
+   */
+  registerCapability(name: string, api: any): void {
+    console.log(`🔌 [Kernel] Registering capability: ${name}`);
+    if (this.capabilities.has(name)) {
+      console.warn(`⚠️ [Kernel] Capability ${name} already registered, overwriting`);
+      logger.warn(`[Kernel] Capability ${name} already registered, overwriting`);
+    }
+    this.capabilities.set(name, api);
+    console.log(`✅ [Kernel] Capability registered: ${name}`);
+    logger.info(`[Kernel] Capability registered: ${name}`);
+    this.eventBus.emit('kernel:capability-registered', { name });
+  }
+  
+  /**
+   * Get a registered capability
+   * @param name Capability identifier
+   * @returns The capability API or undefined if not found
+   */
+  getCapability(name: string): any | undefined {
+    console.log(`🔍 [Kernel] Looking for capability: ${name}`);
+    const capability = this.capabilities.get(name);
+    console.log(`   → Found: ${!!capability}`);
+    if (!capability) {
+      logger.warn(`[Kernel] Capability not found: ${name}`);
+    }
+    return capability;
+  }
+  
+  /**
+   * Check if a capability is registered
+   * @param name Capability identifier
+   */
+  hasCapability(name: string): boolean {
+    return this.capabilities.has(name);
+  }
+  
+  /**
+   * List all registered capabilities
+   */
+  listCapabilities(): string[] {
+    return Array.from(this.capabilities.keys());
+  }
+  
+  /**
+   * Unregister a capability
+   * @param name Capability identifier
+   */
+  unregisterCapability(name: string): void {
+    if (this.capabilities.delete(name)) {
+      logger.info(`[Kernel] Capability unregistered: ${name}`);
+      this.eventBus.emit('kernel:capability-unregistered', { name });
+    }
   }
   
   // --------------------------------------------------------------------------

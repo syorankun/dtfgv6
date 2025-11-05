@@ -3,7 +3,9 @@
     "allow": [
       "SlashCommand(/init)",
       "Bash(tree:*)",
-      "Bash(npm run type-check:*)"
+      "Bash(npm run type-check:*)",
+      "Bash(find:*)",
+      "Bash(npm run build:*)"
     ],
     "deny": [],
     "ask": []

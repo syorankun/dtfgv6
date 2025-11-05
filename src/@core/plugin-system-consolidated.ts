@@ -440,7 +440,7 @@ import type {
       return {
         pluginId: manifest.id,
         manifest,
-        kernel: this.kernel.getContext(),
+        kernel: this.kernel,
         storage,
         ui,
         events,

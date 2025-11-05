@@ -1755,6 +1755,67 @@ a:focus-visible {
   max-width: 50px;
 }
 
+/* Ribbon SVG Icons */
+.ribbon-icon-svg {
+  width: 20px;
+  height: 20px;
+  margin-bottom: 2px;
+  display: block;
+  color: var(--theme-text-secondary);
+  transition: all var(--transition-base);
+}
+
+.ribbon-btn:hover .ribbon-icon-svg {
+  color: var(--theme-color-primary);
+  transform: scale(1.1);
+}
+
+.ribbon-btn-primary .ribbon-icon-svg {
+  color: white;
+}
+
+.ribbon-btn-primary:hover .ribbon-icon-svg {
+  color: white;
+  transform: scale(1.05);
+}
+
+.ribbon-btn-success {
+  background: var(--theme-color-success);
+  color: white;
+  border-color: var(--theme-color-success);
+  font-weight: 600;
+}
+
+.ribbon-btn-success:hover {
+  background: #059669;
+  border-color: #059669;
+  box-shadow: var(--shadow-md);
+}
+
+.ribbon-btn-success .ribbon-icon-svg {
+  color: white;
+}
+
+.ribbon-btn-success .ribbon-label {
+  color: white;
+}
+
+.ribbon-btn-success:hover .ribbon-icon-svg {
+  transform: scale(1.05);
+}
+
+/* Plugin Group Styling */
+.ribbon-group[data-plugin="true"] {
+  border-left: 2px solid var(--theme-color-primary);
+  padding-left: var(--spacing-sm);
+}
+
+.ribbon-group-title {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
 /* ============================================================================
      RESPONSIVE
      ============================================================================ */

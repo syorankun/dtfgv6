@@ -90,6 +90,7 @@ export class UIManager {
             <button class="ribbon-tab" data-tab="insert">Inserir</button>
             <button class="ribbon-tab" data-tab="formulas">Fórmulas</button>
             <button class="ribbon-tab" data-tab="data">Dados</button>
+            <button class="ribbon-tab" data-tab="plugins">🧩 Plugins</button>
             <button class="ribbon-tab" data-tab="view">Exibir</button>
           </div>
 
@@ -99,15 +100,15 @@ export class UIManager {
               <div class="ribbon-group-title">Arquivo</div>
               <div class="ribbon-buttons">
                 <button id="btn-new-workbook" class="ribbon-btn">
-                  <span class="ribbon-icon">📄</span>
+                  <svg class="ribbon-icon-svg" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
                   <span class="ribbon-label">Novo</span>
                 </button>
                 <button id="btn-import" class="ribbon-btn">
-                  <span class="ribbon-icon">📥</span>
+                  <svg class="ribbon-icon-svg" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
                   <span class="ribbon-label">Importar</span>
                 </button>
                 <button id="btn-export" class="ribbon-btn">
-                  <span class="ribbon-icon">📤</span>
+                  <svg class="ribbon-icon-svg" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
                   <span class="ribbon-label">Exportar</span>
                 </button>
               </div>
@@ -117,15 +118,15 @@ export class UIManager {
               <div class="ribbon-group-title">Formatação</div>
               <div class="ribbon-buttons">
                 <button id="btn-bold" class="ribbon-btn">
-                  <span class="ribbon-icon"><b>N</b></span>
+                  <svg class="ribbon-icon-svg" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 4h8a4 4 0 0 1 4 4 4 4 0 0 1-4 4H6z"/><path d="M6 12h9a4 4 0 0 1 4 4 4 4 0 0 1-4 4H6z"/></svg>
                   <span class="ribbon-label">Negrito</span>
                 </button>
                 <button id="btn-italic" class="ribbon-btn">
-                  <span class="ribbon-icon"><i>I</i></span>
+                  <svg class="ribbon-icon-svg" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="4" x2="10" y2="4"/><line x1="14" y1="20" x2="5" y2="20"/><line x1="15" y1="4" x2="9" y2="20"/></svg>
                   <span class="ribbon-label">Itálico</span>
                 </button>
                 <button id="btn-color" class="ribbon-btn">
-                  <span class="ribbon-icon">🎨</span>
+                  <svg class="ribbon-icon-svg" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z"/></svg>
                   <span class="ribbon-label">Cor</span>
                 </button>
               </div>
@@ -135,15 +136,15 @@ export class UIManager {
               <div class="ribbon-group-title">Alinhamento</div>
               <div class="ribbon-buttons">
                 <button id="btn-align-left" class="ribbon-btn">
-                  <span class="ribbon-icon">⬅️</span>
+                  <svg class="ribbon-icon-svg" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="17" y1="10" x2="3" y2="10"/><line x1="21" y1="6" x2="3" y2="6"/><line x1="21" y1="14" x2="3" y2="14"/><line x1="17" y1="18" x2="3" y2="18"/></svg>
                   <span class="ribbon-label">Esquerda</span>
                 </button>
                 <button id="btn-align-center" class="ribbon-btn">
-                  <span class="ribbon-icon">↔️</span>
+                  <svg class="ribbon-icon-svg" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="10" x2="6" y2="10"/><line x1="21" y1="6" x2="3" y2="6"/><line x1="21" y1="14" x2="3" y2="14"/><line x1="18" y1="18" x2="6" y2="18"/></svg>
                   <span class="ribbon-label">Centro</span>
                 </button>
                 <button id="btn-align-right" class="ribbon-btn">
-                  <span class="ribbon-icon">➡️</span>
+                  <svg class="ribbon-icon-svg" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="21" y1="10" x2="7" y2="10"/><line x1="21" y1="6" x2="3" y2="6"/><line x1="21" y1="14" x2="3" y2="14"/><line x1="21" y1="18" x2="7" y2="18"/></svg>
                   <span class="ribbon-label">Direita</span>
                 </button>
               </div>
@@ -154,8 +155,19 @@ export class UIManager {
           <div class="ribbon-content hidden" data-content="insert">
             <div class="ribbon-group">
               <div class="ribbon-group-title">Ilustrações</div>
-              <div class="ribbon-buttons" id="plugin-toolbar">
-                <!-- Plugin buttons will be added here dynamically -->
+              <div class="ribbon-buttons">
+                <button id="btn-insert-image" class="ribbon-btn">
+                  <svg class="ribbon-icon-svg" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+                  <span class="ribbon-label">Imagem</span>
+                </button>
+                <button id="btn-insert-shape" class="ribbon-btn">
+                  <svg class="ribbon-icon-svg" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/></svg>
+                  <span class="ribbon-label">Forma</span>
+                </button>
+                <button id="btn-insert-table" class="ribbon-btn">
+                  <svg class="ribbon-icon-svg" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 3H5a2 2 0 0 0-2 2v4m6-6h10a2 2 0 0 1 2 2v4M9 3v18m0 0h10a2 2 0 0 0 2-2V9M9 21H5a2 2 0 0 1-2-2V9m0 0h18"/></svg>
+                  <span class="ribbon-label">Tabela</span>
+                </button>
               </div>
             </div>
           </div>
@@ -166,11 +178,11 @@ export class UIManager {
               <div class="ribbon-group-title">Funções Rápidas</div>
               <div class="ribbon-buttons">
                 <button id="btn-autosum" class="ribbon-btn">
-                  <span class="ribbon-icon">Σ</span>
+                  <svg class="ribbon-icon-svg" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 4v6M6 18v2M18 4v14M6 10h12"/></svg>
                   <span class="ribbon-label">AutoSoma</span>
                 </button>
                 <button id="btn-all-functions" class="ribbon-btn ribbon-btn-primary">
-                  <span class="ribbon-icon">🧮</span>
+                  <svg class="ribbon-icon-svg" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
                   <span class="ribbon-label">Todas</span>
                 </button>
               </div>
@@ -180,32 +192,25 @@ export class UIManager {
               <div class="ribbon-group-title">Biblioteca de Funções</div>
               <div class="ribbon-buttons">
                 <button id="btn-math-functions" class="ribbon-btn">
-                  <span class="ribbon-icon">📐</span>
+                  <svg class="ribbon-icon-svg" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
                   <span class="ribbon-label">Matemática</span>
                 </button>
                 <button id="btn-stats-functions" class="ribbon-btn">
-                  <span class="ribbon-icon">📊</span>
+                  <svg class="ribbon-icon-svg" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="20" x2="12" y2="10"/><line x1="18" y1="20" x2="18" y2="4"/><line x1="6" y1="20" x2="6" y2="16"/></svg>
                   <span class="ribbon-label">Estatística</span>
                 </button>
                 <button id="btn-text-functions" class="ribbon-btn">
-                  <span class="ribbon-icon">📝</span>
+                  <svg class="ribbon-icon-svg" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7V4h16v3M9 20h6M12 4v16"/></svg>
                   <span class="ribbon-label">Texto</span>
                 </button>
                 <button id="btn-logic-functions" class="ribbon-btn">
-                  <span class="ribbon-icon">🔀</span>
+                  <svg class="ribbon-icon-svg" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
                   <span class="ribbon-label">Lógica</span>
                 </button>
                 <button id="btn-lookup-functions" class="ribbon-btn">
-                  <span class="ribbon-icon">🔍</span>
+                  <svg class="ribbon-icon-svg" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
                   <span class="ribbon-label">Pesquisa</span>
                 </button>
-              </div>
-            </div>
-
-            <div class="ribbon-group">
-              <div class="ribbon-group-title">Plugins</div>
-              <div class="ribbon-buttons" id="plugin-menu-items">
-                <!-- Plugin menu items will be added here dynamically -->
               </div>
             </div>
           </div>
@@ -216,19 +221,116 @@ export class UIManager {
               <div class="ribbon-group-title">Ferramentas de Dados</div>
               <div class="ribbon-buttons">
                 <button id="btn-filter-data" class="ribbon-btn">
-                  <span class="ribbon-icon">🔍</span>
+                  <svg class="ribbon-icon-svg" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>
                   <span class="ribbon-label">Filtrar</span>
                 </button>
                 <button id="btn-sort-data" class="ribbon-btn">
-                  <span class="ribbon-icon">↕️</span>
+                  <svg class="ribbon-icon-svg" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><polyline points="19 12 12 19 5 12"/></svg>
                   <span class="ribbon-label">Ordenar</span>
                 </button>
                 <button id="btn-data-validation" class="ribbon-btn">
-                  <span class="ribbon-icon">🔗</span>
+                  <svg class="ribbon-icon-svg" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
                   <span class="ribbon-label">Validação</span>
                 </button>
               </div>
             </div>
+          </div>
+
+          <!-- Plugins Tab Content -->
+          <div class="ribbon-content hidden" data-content="plugins">
+            <!-- FX & Finance Plugin -->
+            <div class="ribbon-group">
+              <div class="ribbon-group-title">💱 FX & Finance</div>
+              <div class="ribbon-buttons">
+                <button id="btn-fx-sync-ptax" class="ribbon-btn ribbon-btn-primary">
+                  <svg class="ribbon-icon-svg" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v4m0 12v4M4.93 4.93l2.83 2.83m8.48 8.48l2.83 2.83M2 12h4m12 0h4M4.93 19.07l2.83-2.83m8.48-8.48l2.83-2.83"/></svg>
+                  <span class="ribbon-label">Sincronizar PTAX</span>
+                </button>
+                <button id="btn-fx-add-manual" class="ribbon-btn">
+                  <svg class="ribbon-icon-svg" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
+                  <span class="ribbon-label">Taxa Manual</span>
+                </button>
+                <button id="btn-fx-dashboard-static" class="ribbon-btn">
+                  <svg class="ribbon-icon-svg" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+                  <span class="ribbon-label">Dashboard Câmbio</span>
+                </button>
+              </div>
+            </div>
+
+            <!-- Charts Professional Plugin -->
+            <div class="ribbon-group">
+              <div class="ribbon-group-title">📊 Charts Professional</div>
+              <div class="ribbon-buttons">
+                <button id="btn-create-chart" class="ribbon-btn ribbon-btn-success">
+                  <svg class="ribbon-icon-svg" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+                  <span class="ribbon-label">Criar Gráfico</span>
+                </button>
+              </div>
+            </div>
+
+            <!-- Loan Management Plugin -->
+            <div class="ribbon-group">
+              <div class="ribbon-group-title">💰 Gestão de Empréstimos</div>
+              <div class="ribbon-buttons">
+                <button id="btn-loan-dashboard" class="ribbon-btn">
+                  <svg class="ribbon-icon-svg" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="14" rx="2" ry="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg>
+                  <span class="ribbon-label">Dashboard</span>
+                </button>
+                <button id="btn-loan-new-contract" class="ribbon-btn ribbon-btn-primary">
+                  <svg class="ribbon-icon-svg" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/></svg>
+                  <span class="ribbon-label">Novo Contrato</span>
+                </button>
+                <button id="btn-loan-register-payment" class="ribbon-btn">
+                  <svg class="ribbon-icon-svg" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>
+                  <span class="ribbon-label">Registrar Pagamento</span>
+                </button>
+                <button id="btn-loan-generate-accrual" class="ribbon-btn">
+                  <svg class="ribbon-icon-svg" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                  <span class="ribbon-label">Gerar ACCRUAL</span>
+                </button>
+                <button id="btn-loan-sync-ptax" class="ribbon-btn">
+                  <svg class="ribbon-icon-svg" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v4m0 12v4M4.93 4.93l2.83 2.83m8.48 8.48l2.83 2.83M2 12h4m12 0h4M4.93 19.07l2.83-2.83m8.48-8.48l2.83-2.83"/></svg>
+                  <span class="ribbon-label">Sincronizar PTAX</span>
+                </button>
+              </div>
+            </div>
+
+            <!-- ProLease IFRS 16 Plugin -->
+            <div class="ribbon-group">
+              <div class="ribbon-group-title">🏢 ProLease IFRS 16</div>
+              <div class="ribbon-buttons">
+                <button id="btn-prolease-dashboard" class="ribbon-btn">
+                  <svg class="ribbon-icon-svg" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                  <span class="ribbon-label">Dashboard Leasing</span>
+                </button>
+              </div>
+            </div>
+
+            <!-- Plugin Management -->
+            <div class="ribbon-group">
+              <div class="ribbon-group-title">⚙️ Gerenciamento</div>
+              <div class="ribbon-buttons">
+                <button id="btn-plugin-manager" class="ribbon-btn">
+                  <svg class="ribbon-icon-svg" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 1v6m0 6v6M5.64 5.64l4.24 4.24m4.24 4.24l4.24 4.24M1 12h6m6 0h6M5.64 18.36l4.24-4.24m4.24-4.24l4.24-4.24"/></svg>
+                  <span class="ribbon-label">Gerenciar Plugins</span>
+                </button>
+                <button id="btn-plugin-settings" class="ribbon-btn">
+                  <svg class="ribbon-icon-svg" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>
+                  <span class="ribbon-label">Configurações</span>
+                </button>
+              </div>
+            </div>
+
+            <!-- Dynamic Plugin Buttons Container -->
+            <div class="ribbon-group" id="dynamic-plugin-group" style="display: none;">
+              <div class="ribbon-group-title">🧩 Plugins Adicionais</div>
+              <div class="ribbon-buttons" id="plugin-toolbar-dynamic">
+                <!-- Dynamic plugin buttons will be added here -->
+              </div>
+            </div>
+
+            <!-- Hidden container for plugin menu items (for compatibility) -->
+            <div id="plugin-menu-items" style="display: none;"></div>
           </div>
 
           <!-- View Tab Content -->
@@ -237,19 +339,19 @@ export class UIManager {
               <div class="ribbon-group-title">Mostrar/Ocultar</div>
               <div class="ribbon-buttons">
                 <button id="btn-toggle-sidebar" class="ribbon-btn">
-                  <span class="ribbon-icon">📂</span>
+                  <svg class="ribbon-icon-svg" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="18"/><rect x="14" y="3" width="7" height="18"/></svg>
                   <span class="ribbon-label">Barra Lateral</span>
                 </button>
                 <button id="btn-toggle-right-panel" class="ribbon-btn">
-                  <span class="ribbon-icon">📊</span>
+                  <svg class="ribbon-icon-svg" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18"/><line x1="15" y1="3" x2="15" y2="21"/></svg>
                   <span class="ribbon-label">Painéis Direita</span>
                 </button>
                 <button id="btn-toggle-formula-bar" class="ribbon-btn">
-                  <span class="ribbon-icon">ƒx</span>
+                  <svg class="ribbon-icon-svg" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
                   <span class="ribbon-label">Barra Fórmulas</span>
                 </button>
                 <button id="btn-toggle-gridlines" class="ribbon-btn">
-                  <span class="ribbon-icon">🔲</span>
+                  <svg class="ribbon-icon-svg" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="15"/><line x1="9" y1="3" x2="9" y2="21"/><line x1="15" y1="3" x2="15" y2="21"/></svg>
                   <span class="ribbon-label">Linhas Grade</span>
                 </button>
               </div>
@@ -259,11 +361,11 @@ export class UIManager {
               <div class="ribbon-group-title">Painéis Individuais</div>
               <div class="ribbon-buttons">
                 <button id="btn-toggle-console-panel" class="ribbon-btn">
-                  <span class="ribbon-icon">📝</span>
+                  <svg class="ribbon-icon-svg" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>
                   <span class="ribbon-label">Console</span>
                 </button>
                 <button id="btn-toggle-info-panel" class="ribbon-btn">
-                  <span class="ribbon-icon">ℹ️</span>
+                  <svg class="ribbon-icon-svg" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
                   <span class="ribbon-label">Info Célula</span>
                 </button>
               </div>
@@ -273,15 +375,15 @@ export class UIManager {
               <div class="ribbon-group-title">Zoom</div>
               <div class="ribbon-buttons">
                 <button id="btn-zoom-in" class="ribbon-btn">
-                  <span class="ribbon-icon">🔍+</span>
+                  <svg class="ribbon-icon-svg" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/></svg>
                   <span class="ribbon-label">Ampliar</span>
                 </button>
                 <button id="btn-zoom-out" class="ribbon-btn">
-                  <span class="ribbon-icon">🔍−</span>
+                  <svg class="ribbon-icon-svg" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="8" y1="11" x2="14" y2="11"/></svg>
                   <span class="ribbon-label">Reduzir</span>
                 </button>
                 <button id="btn-zoom-reset" class="ribbon-btn">
-                  <span class="ribbon-icon">100%</span>
+                  <svg class="ribbon-icon-svg" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
                   <span class="ribbon-label">Redefinir</span>
                 </button>
               </div>
@@ -491,13 +593,20 @@ export class UIManager {
   }
 
   public addToolbarButton(config: any) {
-    const toolbar = document.getElementById('plugin-toolbar');
-    if (toolbar) {
+    // Add to dynamic plugin group in Plugins tab
+    const toolbar = document.getElementById('plugin-toolbar-dynamic');
+    const dynamicGroup = document.getElementById('dynamic-plugin-group');
+
+    if (toolbar && dynamicGroup) {
       // Prevent duplication
       if (document.getElementById(`plugin-btn-${config.id}`)) {
         logger.warn('[UIManager] Toolbar button already exists', { id: config.id });
         return;
       }
+
+      // Show the dynamic plugin group
+      dynamicGroup.style.display = '';
+
       const btn = document.createElement('button');
       btn.id = `plugin-btn-${config.id}`;
       btn.className = 'ribbon-btn';
@@ -515,9 +624,9 @@ export class UIManager {
       });
 
       toolbar.appendChild(btn);
-      logger.info('[UIManager] Toolbar button added', { id: config.id, label: config.label });
+      logger.info('[UIManager] Toolbar button added to Plugins tab', { id: config.id, label: config.label });
     } else {
-      logger.error('[UIManager] Plugin toolbar not found');
+      logger.error('[UIManager] Plugin toolbar-dynamic not found');
     }
   }
 
@@ -1141,6 +1250,121 @@ export class UIManager {
         return;
         }
         this.showAddItemUI('dashboard', 'add-sheet-container');
+    });
+
+    // ============================================================================
+    // PLUGIN TAB EVENT LISTENERS
+    // ============================================================================
+
+    // FX & Finance Plugin Buttons
+    document.getElementById('btn-fx-sync-ptax')?.addEventListener('click', () => {
+      const menuItem = document.getElementById('plugin-menu-item-fx-sync-ptax');
+      if (menuItem) {
+        menuItem.click();
+      } else {
+        console.warn('[UIManager] FX plugin menu item not found: fx-sync-ptax');
+      }
+    });
+
+    document.getElementById('btn-fx-add-manual')?.addEventListener('click', () => {
+      const menuItem = document.getElementById('plugin-menu-item-fx-add-manual');
+      if (menuItem) {
+        menuItem.click();
+      } else {
+        console.warn('[UIManager] FX plugin menu item not found: fx-add-manual');
+      }
+    });
+
+    document.getElementById('btn-fx-dashboard-static')?.addEventListener('click', () => {
+      const menuItem = document.getElementById('plugin-menu-item-fx-dashboard-static');
+      if (menuItem) {
+        menuItem.click();
+      } else {
+        console.warn('[UIManager] FX plugin menu item not found: fx-dashboard-static');
+      }
+    });
+
+    // Charts Professional Plugin Button
+    document.getElementById('btn-create-chart')?.addEventListener('click', () => {
+      const toolbarBtn = document.getElementById('plugin-btn-create-chart');
+      if (toolbarBtn) {
+        toolbarBtn.click();
+      } else {
+        console.warn('[UIManager] Charts plugin toolbar button not found: create-chart');
+      }
+    });
+
+    // Loan Plugin Buttons
+    document.getElementById('btn-loan-dashboard')?.addEventListener('click', () => {
+      const menuItem = document.getElementById('plugin-menu-item-loan-dashboard');
+      if (menuItem) {
+        menuItem.click();
+      } else {
+        console.warn('[UIManager] Loan plugin menu item not found: loan-dashboard');
+      }
+    });
+
+    document.getElementById('btn-loan-new-contract')?.addEventListener('click', () => {
+      const menuItem = document.getElementById('plugin-menu-item-loan-new-contract');
+      if (menuItem) {
+        menuItem.click();
+      } else {
+        console.warn('[UIManager] Loan plugin menu item not found: loan-new-contract');
+      }
+    });
+
+    document.getElementById('btn-loan-register-payment')?.addEventListener('click', () => {
+      const menuItem = document.getElementById('plugin-menu-item-loan-register-payment');
+      if (menuItem) {
+        menuItem.click();
+      } else {
+        console.warn('[UIManager] Loan plugin menu item not found: loan-register-payment');
+      }
+    });
+
+    document.getElementById('btn-loan-generate-accrual')?.addEventListener('click', () => {
+      const menuItem = document.getElementById('plugin-menu-item-loan-generate-accrual');
+      if (menuItem) {
+        menuItem.click();
+      } else {
+        console.warn('[UIManager] Loan plugin menu item not found: loan-generate-accrual');
+      }
+    });
+
+    document.getElementById('btn-loan-sync-ptax')?.addEventListener('click', () => {
+      const menuItem = document.getElementById('plugin-menu-item-loan-sync-ptax');
+      if (menuItem) {
+        menuItem.click();
+      } else {
+        console.warn('[UIManager] Loan plugin menu item not found: loan-sync-ptax');
+      }
+    });
+
+    // ProLease Plugin Button
+    document.getElementById('btn-prolease-dashboard')?.addEventListener('click', () => {
+      const toolbarBtn = document.getElementById('plugin-btn-prolease-new-contract');
+      if (toolbarBtn) {
+        toolbarBtn.click();
+      } else {
+        console.warn('[UIManager] ProLease plugin toolbar button not found: prolease-new-contract');
+      }
+    });
+
+    // Plugin Management Buttons
+    document.getElementById('btn-plugin-manager')?.addEventListener('click', () => {
+      this.showSettingsModal();
+      // Switch to plugins tab
+      setTimeout(() => {
+        document.querySelector('[data-tab="plugins"]')?.dispatchEvent(new Event('click'));
+      }, 100);
+    });
+
+    document.getElementById('btn-plugin-settings')?.addEventListener('click', () => {
+      this.showSettingsModal();
+      // Switch to plugins tab
+      setTimeout(() => {
+        document.querySelector('[data-tab="plugins"]')?.dispatchEvent(new Event('click'));
+      }, 100);
     });
 
     // Setup context menu listeners

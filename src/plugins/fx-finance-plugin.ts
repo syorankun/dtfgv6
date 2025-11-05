@@ -1107,12 +1107,19 @@ export class FXFinancePlugin implements Plugin {
   // ============================================================================
 
   private registerCapability(): void {
-    const api: FXRatesAPI = {
+    console.log(`📡 [FXFinancePlugin] Registrando capability 'dj.fx.rates@3'...`);
+    
+    const api: FXRatesAPI & { syncPTAX?: (startDate: string, endDate: string, currencies: CurrencyCode[]) => Promise<void> } = {
       getRate: async (date: string, currency: CurrencyCode, source?: RateSource) => {
-        return this.getRateFromCache(date, currency, source || 'AUTO', true);
+        console.log(`📞 [FXFinancePlugin API] getRate chamado: date=${date}, currency=${currency}, source=${source}`);
+        console.log(`   → Cache size: ${this.ratesCache.size}`);
+        const result = this.getRateFromCache(date, currency, source || 'AUTO', true);
+        console.log(`   → Resultado: ${result}`);
+        return result;
       },
 
       convert: async (value: number, fromCurrency: CurrencyCode, toCurrency: CurrencyCode, date?: string) => {
+        console.log(`📞 [FXFinancePlugin API] convert chamado: ${value} ${fromCurrency} → ${toCurrency}`);
         const conversionDate = date || new Date().toISOString().split('T')[0];
 
         if (fromCurrency === 'BRL' && toCurrency === 'BRL') {
@@ -1143,14 +1150,28 @@ export class FXFinancePlugin implements Plugin {
       },
 
       getAvailableCurrencies: () => {
+        console.log(`📞 [FXFinancePlugin API] getAvailableCurrencies chamado`);
         return this.getLoadedCurrencies();
+      },
+
+      // Exposto para integrações automáticas (ex.: Loan Plugin)
+      syncPTAX: async (startDate: string, endDate: string, currencies: CurrencyCode[]) => {
+        console.log(`📞 [FXFinancePlugin API] syncPTAX chamado: ${startDate} a ${endDate}, moedas: ${currencies.join(', ')}`);
+        await this.syncPTAX(startDate, endDate, currencies);
       }
     };
 
     // Register capability (assuming kernel has a capability system)
     // This would need to be implemented in the kernel
-    if (this.context.kernel && typeof (this.context.kernel as any).registerCapability === 'function') {
-      (this.context.kernel as any).registerCapability('dj.fx.rates@3', api);
+    if (this.context.kernel && typeof this.context.kernel.registerCapability === 'function') {
+      console.log(`✅ [FXFinancePlugin] registerCapability existe no kernel, registrando...`);
+      this.context.kernel.registerCapability('dj.fx.rates@3', api);
+      console.log(`✅ [FXFinancePlugin] Capability 'dj.fx.rates@3' registrada com sucesso`);
+      console.log(`   → API exportada com métodos:`, Object.keys(api));
+    } else {
+      console.error(`❌ [FXFinancePlugin] registerCapability NÃO existe no kernel!`);
+      console.log(`   → Kernel:`, !!this.context.kernel);
+      console.log(`   → Tipo de registerCapability:`, typeof this.context.kernel.registerCapability);
     }
   }
 

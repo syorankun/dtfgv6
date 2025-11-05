@@ -10,28 +10,56 @@
 import type { PluginContext } from '@core/types';
 import type { LoanContract } from './loan-types';
 
+export type LoanDashboardHandlers = {
+  showReportsMenu: (contracts: LoanContract[]) => void;
+  registerPayment: (contractId?: string) => void;
+  quickReport: (type: 'interest' | 'principal' | 'consolidated', contracts: LoanContract[]) => void | Promise<void>;
+  createTemplate: () => void | Promise<void>;
+  openContract: (contractId: string) => void | Promise<void>;
+};
+
 export class LoanDashboard {
   private context: PluginContext;
   private modalElement: HTMLElement | null = null;
+  private contractsSnapshot: Map<string, LoanContract> = new Map();
+  private handlers: LoanDashboardHandlers;
 
   constructor(context: PluginContext) {
     this.context = context;
+    this.handlers = {
+      showReportsMenu: (contracts) => {
+        this.context.events.emit('loan:show-reports-menu', { contracts });
+      },
+      registerPayment: () => {
+        this.context.events.emit('loan:dashboard:register-payment', {});
+      },
+      quickReport: (type, contracts) => {
+        this.context.events.emit('loan:quick-report', { type, contracts });
+      },
+      createTemplate: () => {
+        this.context.events.emit('loan:create-template', {});
+      },
+      openContract: (contractId) => {
+        this.context.ui.showToast(`Detalhes do contrato ${contractId} indisponíveis no momento.`, 'info');
+      }
+    };
   }
 
   /**
    * Abre a dashboard de gestão de contratos.
    */
   public open(contracts: Map<string, LoanContract>): void {
-    this.render(contracts);
+    this.contractsSnapshot = new Map(contracts);
+    this.render();
   }
 
   /**
    * Renderiza a dashboard.
    */
-  private render(contracts: Map<string, LoanContract>): void {
+  private render(): void {
     this.dispose();
 
-    const contractsArray = Array.from(contracts.values());
+    const contractsArray = Array.from(this.contractsSnapshot.values());
     const activeContracts = contractsArray.filter(c => c.status === 'ATIVO');
     const totalCaptado = contractsArray
       .filter(c => c.contractType === 'CAPTADO')
@@ -51,6 +79,113 @@ export class LoanDashboard {
               <p style="margin: 6px 0 0; opacity: 0.95;">${contractsArray.length} contratos cadastrados · ${activeContracts.length} ativos</p>
             </div>
             <button id="dashboard-close" style="background: rgba(255,255,255,0.2); border: none; color: white; padding: 8px 12px; border-radius: 6px; cursor: pointer; font-size: 1.2rem; font-weight: 700;">×</button>
+          </div>
+
+          <!-- Action Buttons -->
+          <div style="padding: 20px 24px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-bottom: 3px solid rgba(255,255,255,0.2); display: flex; gap: 12px; flex-wrap: wrap;">
+            <button id="btn-reports-menu" style="
+              background: white;
+              color: #667eea;
+              border: none;
+              padding: 12px 20px;
+              border-radius: 8px;
+              cursor: pointer;
+              font-weight: 700;
+              font-size: 14px;
+              display: flex;
+              align-items: center;
+              gap: 8px;
+              box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+              transition: all 0.2s;
+            "
+            onmouseover="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 6px 16px rgba(0,0,0,0.2)'"
+            onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='0 4px 12px rgba(0,0,0,0.15)'">
+              📊 Relatórios Avançados
+            </button>
+
+            <button id="btn-register-payment" style="
+              background: #10b981;
+              color: white;
+              border: none;
+              padding: 12px 20px;
+              border-radius: 8px;
+              cursor: pointer;
+              font-weight: 700;
+              font-size: 14px;
+              display: flex;
+              align-items: center;
+              gap: 8px;
+              box-shadow: 0 4px 12px rgba(16,185,129,0.25);
+              transition: all 0.2s;
+            "
+            onmouseover="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 6px 16px rgba(16,185,129,0.35)'"
+            onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='0 4px 12px rgba(16,185,129,0.25)'">
+              💸 Registrar Pagamento
+            </button>
+
+            <button id="btn-quick-interest" style="
+              background: rgba(255,255,255,0.2);
+              color: white;
+              border: 2px solid rgba(255,255,255,0.3);
+              padding: 10px 16px;
+              border-radius: 8px;
+              cursor: pointer;
+              font-weight: 600;
+              font-size: 13px;
+              transition: all 0.2s;
+            "
+            onmouseover="this.style.background='rgba(255,255,255,0.3)'"
+            onmouseout="this.style.background='rgba(255,255,255,0.2)'">
+              💰 Análise de Juros
+            </button>
+
+            <button id="btn-quick-principal" style="
+              background: rgba(255,255,255,0.2);
+              color: white;
+              border: 2px solid rgba(255,255,255,0.3);
+              padding: 10px 16px;
+              border-radius: 8px;
+              cursor: pointer;
+              font-weight: 600;
+              font-size: 13px;
+              transition: all 0.2s;
+            "
+            onmouseover="this.style.background='rgba(255,255,255,0.3)'"
+            onmouseout="this.style.background='rgba(255,255,255,0.2)'">
+              📊 Análise de Principal
+            </button>
+
+            <button id="btn-quick-consolidated" style="
+              background: rgba(255,255,255,0.2);
+              color: white;
+              border: 2px solid rgba(255,255,255,0.3);
+              padding: 10px 16px;
+              border-radius: 8px;
+              cursor: pointer;
+              font-weight: 600;
+              font-size: 13px;
+              transition: all 0.2s;
+            "
+            onmouseover="this.style.background='rgba(255,255,255,0.3)'"
+            onmouseout="this.style.background='rgba(255,255,255,0.2)'">
+              📋 Visão Consolidada
+            </button>
+
+            <button id="btn-custom-template" style="
+              background: rgba(255,255,255,0.2);
+              color: white;
+              border: 2px solid rgba(255,255,255,0.3);
+              padding: 10px 16px;
+              border-radius: 8px;
+              cursor: pointer;
+              font-weight: 600;
+              font-size: 13px;
+              transition: all 0.2s;
+            "
+            onmouseover="this.style.background='rgba(255,255,255,0.3)'"
+            onmouseout="this.style.background='rgba(255,255,255,0.2)'">
+              🎨 Template Personalizado
+            </button>
           </div>
 
           <!-- KPIs -->
@@ -132,7 +267,14 @@ export class LoanDashboard {
     document.body.insertAdjacentHTML('beforeend', modalHTML);
     this.modalElement = document.getElementById('loan-dashboard-modal');
 
-    this.attachEventListeners(contracts);
+    this.attachEventListeners();
+  }
+
+  public registerHandlers(handlers: Partial<LoanDashboardHandlers>): void {
+    this.handlers = {
+      ...this.handlers,
+      ...handlers
+    };
   }
 
   private renderContractRows(contracts: LoanContract[]): string {
@@ -176,8 +318,51 @@ export class LoanDashboard {
     }).join('');
   }
 
-  private attachEventListeners(contracts: Map<string, LoanContract>): void {
+  private attachEventListeners(): void {
     document.getElementById('dashboard-close')?.addEventListener('click', () => this.dispose());
+
+    // Report buttons
+    document.getElementById('btn-reports-menu')?.addEventListener('click', () => {
+      const contractsArray = Array.from(this.contractsSnapshot.values());
+      this.dispose();
+      this.handlers.showReportsMenu(contractsArray);
+    });
+
+    document.getElementById('btn-register-payment')?.addEventListener('click', () => {
+      this.dispose();
+      this.handlers.registerPayment();
+    });
+
+    document.getElementById('btn-quick-interest')?.addEventListener('click', () => {
+      const contractsArray = Array.from(this.contractsSnapshot.values());
+      this.dispose();
+      Promise.resolve(this.handlers.quickReport('interest', contractsArray)).catch(error => {
+        console.error('[LoanDashboard] quickReport(interest) failed', error);
+      });
+    });
+
+    document.getElementById('btn-quick-principal')?.addEventListener('click', () => {
+      const contractsArray = Array.from(this.contractsSnapshot.values());
+      this.dispose();
+      Promise.resolve(this.handlers.quickReport('principal', contractsArray)).catch(error => {
+        console.error('[LoanDashboard] quickReport(principal) failed', error);
+      });
+    });
+
+    document.getElementById('btn-quick-consolidated')?.addEventListener('click', () => {
+      const contractsArray = Array.from(this.contractsSnapshot.values());
+      this.dispose();
+      Promise.resolve(this.handlers.quickReport('consolidated', contractsArray)).catch(error => {
+        console.error('[LoanDashboard] quickReport(consolidated) failed', error);
+      });
+    });
+
+    document.getElementById('btn-custom-template')?.addEventListener('click', () => {
+      this.dispose();
+      Promise.resolve(this.handlers.createTemplate()).catch(error => {
+        console.error('[LoanDashboard] createTemplate failed', error);
+      });
+    });
 
     // Search and filters
     const searchInput = document.getElementById('dashboard-search') as HTMLInputElement;
@@ -189,7 +374,7 @@ export class LoanDashboard {
       const statusValue = statusFilter?.value || '';
       const typeValue = typeFilter?.value || '';
 
-      const filtered = Array.from(contracts.values()).filter(contract => {
+      const filtered = Array.from(this.contractsSnapshot.values()).filter(contract => {
         const matchesSearch = !searchTerm || 
           contract.id.toLowerCase().includes(searchTerm) || 
           contract.counterparty.toLowerCase().includes(searchTerm);
@@ -225,25 +410,15 @@ export class LoanDashboard {
   }
 
   private showContractDetails(contractId: string): void {
-    // Fechar dashboard
+    if (!this.contractsSnapshot.has(contractId)) {
+      this.context.ui.showToast(`Contrato ${contractId} não encontrado`, 'warning');
+      return;
+    }
+
     this.dispose();
-    
-    // Notificar que deve abrir detalhes (será implementado no futuro)
-    this.context.ui.showToast(`📊 Abrindo detalhes do contrato ${contractId}...`, 'info');
-    
-    // TODO: Implementar modal de detalhes completo do contrato
-    // Por enquanto, apenas mostra uma mensagem
-    setTimeout(() => {
-      alert(
-        `Detalhes do Contrato: ${contractId}\n\n` +
-        `Esta funcionalidade será expandida em breve com:\n` +
-        `• Histórico completo de pagamentos\n` +
-        `• Gráfico de amortização\n` +
-        `• Cronograma detalhado\n` +
-        `• Simulações de pagamento antecipado\n` +
-        `• Exportação de relatórios`
-      );
-    }, 500);
+    Promise.resolve(this.handlers.openContract(contractId)).catch(error => {
+      console.error('[LoanDashboard] openContract failed', error);
+    });
   }
 
   private formatNumber(value: number): string {

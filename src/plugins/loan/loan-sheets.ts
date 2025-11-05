@@ -1,12 +1,51 @@
 
 // Arquivo: src/plugins/loan/loan-sheets.ts
 
-import type { PluginContext } from '@core/types';
+import type { CellFormat, PluginContext } from '@core/types';
 import type { Workbook, Sheet } from '@core/workbook-consolidated';
 import { LoanCalculator } from './loan-calculator';
 import type { LoanContract } from './loan-types';
 import type { LoanLedgerEntry } from './loan-payment-manager';
 import type { AccrualRow, ScheduleRow } from './loan-scheduler';
+import {
+  DEFAULT_ACCRUAL_VIEW,
+  type AccrualSheetOptions,
+  type AccrualSheetColumnDescriptor,
+  resolveAccrualValue
+} from './loan-accrual-view';
+
+const SECTION_HEADER_FORMAT: CellFormat = {
+  bold: true,
+  bgColor: '#0F172A',
+  textColor: '#F8FAFC',
+  alignment: 'center'
+};
+
+const COLUMN_HEADER_FORMAT: CellFormat = {
+  bold: true,
+  bgColor: '#1E293B',
+  textColor: '#F8FAFC',
+  alignment: 'center'
+};
+
+const METADATA_FORMAT: CellFormat = {
+  bgColor: '#E2E8F0',
+  textColor: '#0F172A',
+  alignment: 'left'
+};
+
+const SUMMARY_LABEL_FORMAT: CellFormat = {
+  bold: true,
+  bgColor: '#E2E8F0',
+  textColor: '#0F172A',
+  alignment: 'left'
+};
+
+const SUMMARY_VALUE_BASE_FORMAT: CellFormat = {
+  bold: true,
+  bgColor: '#F1F5F9',
+  textColor: '#0F172A'
+};
 
 /**
  * Gerencia a criação e atualização das planilhas utilizadas pelo Loan Plugin.
@@ -112,7 +151,12 @@ export class LoanSheets {
   /**
    * Cria uma planilha dedicada para um cronograma de ACCRUAL.
    */
-  public createAccrualSheet(contractId: string, period: string, rows: AccrualRow[]): void {
+  public createAccrualSheet(
+    contractId: string,
+    period: string,
+    rows: AccrualRow[],
+    options?: AccrualSheetOptions
+  ): void {
     if (!this.context?.kernel?.workbookManager) return;
 
     const workbook = this.ensureWorkbook();
@@ -122,65 +166,192 @@ export class LoanSheets {
 
     this.clearSheet(sheet);
 
-    const headers = [
-      'Data',
-      'Dias',
-      'Taxa Efetiva',
-      // Moeda Origem
-      'Saldo Inicial Origem',
-      'Juros Origem',
-      'Saldo Final Origem',
-      // BRL usando Taxa do CONTRATO (fixada)
-      'Saldo Inicial BRL (Contrato)',
-      'Juros BRL (Contrato)',
-      'Saldo Final BRL (Contrato)',
-      'Taxa FX Contrato',
-      // BRL usando Taxa PTAX BCB (mark-to-market)
-      'Saldo Inicial BRL (PTAX)',
-      'Juros BRL (PTAX)',
-      'Saldo Final BRL (PTAX)',
-      'Taxa FX PTAX',
-      'Fonte PTAX',
-      // Variação Cambial
-      'Variação Cambial (BRL)',
-      'Variação Cambial (%)'
-    ];
+    const view = options?.view ?? DEFAULT_ACCRUAL_VIEW;
+    const includeSummary = options?.includeSummary ?? true;
 
-    headers.forEach((header, col) => {
-      sheet.setCell(0, col, header, { type: 'string', format: { bold: true } });
+    const metadataMap = new Map<string, string>();
+    metadataMap.set('Contrato', contractId);
+    metadataMap.set('Período', period.replace('_', ' → '));
+    (options?.metadata || []).forEach(entry => {
+      if (entry.value) {
+        metadataMap.set(entry.label, entry.value);
+      }
     });
 
-    rows.forEach((row, index) => {
-      const targetRow = index + 1;
-      let col = 0;
-      
-      // Data, Dias, Taxa Efetiva
-      sheet.setCell(targetRow, col++, row.date, { type: 'date' });
-      sheet.setCell(targetRow, col++, row.days, { type: 'number' });
-      sheet.setCell(targetRow, col++, LoanCalculator.round(row.effRate, 8), { type: 'number' });
-      
-      // Valores em Moeda Origem
-      sheet.setCell(targetRow, col++, LoanCalculator.round(row.openingBalanceOrigin, 4), { type: 'number' });
-      sheet.setCell(targetRow, col++, LoanCalculator.round(row.interestOrigin, 4), { type: 'number' });
-      sheet.setCell(targetRow, col++, LoanCalculator.round(row.closingBalanceOrigin, 4), { type: 'number' });
-      
-      // Valores em BRL usando Taxa do CONTRATO (fixada)
-      sheet.setCell(targetRow, col++, LoanCalculator.round(row.openingBalanceBRLContract, 2), { type: 'number' });
-      sheet.setCell(targetRow, col++, LoanCalculator.round(row.interestBRLContract, 2), { type: 'number' });
-      sheet.setCell(targetRow, col++, LoanCalculator.round(row.closingBalanceBRLContract, 2), { type: 'number' });
-      sheet.setCell(targetRow, col++, LoanCalculator.round(row.fxRateContract, 6), { type: 'number' });
-      
-      // Valores em BRL usando Taxa PTAX do BCB (mark-to-market)
-      sheet.setCell(targetRow, col++, LoanCalculator.round(row.openingBalanceBRLPTAX, 2), { type: 'number' });
-      sheet.setCell(targetRow, col++, LoanCalculator.round(row.interestBRLPTAX, 2), { type: 'number' });
-      sheet.setCell(targetRow, col++, LoanCalculator.round(row.closingBalanceBRLPTAX, 2), { type: 'number' });
-      sheet.setCell(targetRow, col++, LoanCalculator.round(row.fxRatePTAX, 6), { type: 'number' });
-      sheet.setCell(targetRow, col++, row.fxSourcePTAX || '', { type: 'string' });
-      
-      // Variação Cambial
-      sheet.setCell(targetRow, col++, LoanCalculator.round(row.fxVariationBRL, 2), { type: 'number' });
-      sheet.setCell(targetRow, col++, LoanCalculator.round(row.fxVariationPercent, 4), { type: 'number' });
+    const columns = view.sections.flatMap(section =>
+      section.columns.map((descriptor, index) => ({
+        sectionTitle: section.title,
+        descriptor,
+        sectionColumnIndex: index
+      }))
+    );
+
+    const getDefaultAlignment = (descriptor: AccrualSheetColumnDescriptor): CellFormat['alignment'] => {
+      if (descriptor.format?.alignment) {
+        return descriptor.format.alignment;
+      }
+      switch (descriptor.type) {
+        case 'number':
+          return 'right';
+        case 'date':
+          return 'center';
+        default:
+          return 'left';
+      }
+    };
+
+    const buildDataFormat = (descriptor: AccrualSheetColumnDescriptor): CellFormat => ({
+      alignment: getDefaultAlignment(descriptor),
+      ...(descriptor.format || {})
     });
+
+    const buildSummaryFormat = (descriptor: AccrualSheetColumnDescriptor): CellFormat => ({
+      alignment: descriptor.summaryFormat?.alignment || getDefaultAlignment(descriptor),
+      ...(descriptor.summaryFormat || descriptor.format || {})
+    });
+
+    const formatCellValue = (
+      rawValue: any,
+      descriptor: AccrualSheetColumnDescriptor
+    ): { value: any; type: 'number' | 'string' | 'date' } => {
+      if (descriptor.type === 'number') {
+        if (typeof rawValue === 'number' && Number.isFinite(rawValue)) {
+          const decimals = descriptor.decimals ?? 2;
+          return {
+            value: LoanCalculator.round(rawValue, decimals),
+            type: 'number'
+          };
+        }
+        return { value: '', type: 'number' };
+      }
+
+      if (descriptor.type === 'date') {
+        if (typeof rawValue === 'string') {
+          return { value: rawValue, type: 'date' };
+        }
+        if (rawValue instanceof Date) {
+          return { value: rawValue.toISOString().split('T')[0], type: 'date' };
+        }
+        return { value: '', type: 'date' };
+      }
+
+      return { value: rawValue ?? '', type: 'string' };
+    };
+
+    let rowIndex = 0;
+
+    const title = view.title || 'Accrual';
+    sheet.setCell(rowIndex, 0, title, { type: 'string', format: { bold: true } });
+    rowIndex += 1;
+
+    const metadataEntries = Array.from(metadataMap.entries());
+    if (metadataEntries.length) {
+      metadataEntries.forEach(([label, value], colIndex) => {
+        sheet.setCell(rowIndex, colIndex, `${label}: ${value}`, {
+          type: 'string',
+          format: METADATA_FORMAT
+        });
+      });
+      rowIndex += 1;
+    }
+
+    const sectionRow = rowIndex;
+    const headerRow = sectionRow + 1;
+    const dataStartRow = sectionRow + 2;
+
+    columns.forEach(({ sectionTitle, descriptor, sectionColumnIndex }, colIndex) => {
+      const sectionLabel = sectionColumnIndex === 0 ? sectionTitle : '';
+      sheet.setCell(sectionRow, colIndex, sectionLabel, {
+        type: 'string',
+        format: SECTION_HEADER_FORMAT
+      });
+
+      sheet.setCell(headerRow, colIndex, descriptor.label, {
+        type: 'string',
+        format: COLUMN_HEADER_FORMAT
+      });
+
+      if (descriptor.width) {
+        const column = sheet.getColumn(colIndex);
+        if (column) {
+          column.width = descriptor.width;
+        }
+      }
+    });
+
+    rows.forEach((row, rowOffset) => {
+      const targetRow = dataStartRow + rowOffset;
+      columns.forEach(({ descriptor }, colIndex) => {
+        const rawValue = resolveAccrualValue(row, descriptor);
+        const { value, type } = formatCellValue(rawValue, descriptor);
+        sheet.setCell(targetRow, colIndex, value, {
+          type,
+          format: buildDataFormat(descriptor)
+        });
+      });
+    });
+
+    if (includeSummary && rows.length) {
+      const summaryRowIndex = dataStartRow + rows.length;
+
+      columns.forEach(({ descriptor }, colIndex) => {
+        if (colIndex === 0) {
+          sheet.setCell(summaryRowIndex, colIndex, view.summaryLabel || 'Totais', {
+            type: 'string',
+            format: SUMMARY_LABEL_FORMAT
+          });
+          return;
+        }
+
+        let summaryRaw: number | string | null | undefined;
+
+        switch (descriptor.summary) {
+          case 'sum': {
+            let sum = 0;
+            let count = 0;
+            rows.forEach(row => {
+              const raw = resolveAccrualValue(row, descriptor);
+              if (typeof raw === 'number' && Number.isFinite(raw)) {
+                sum += raw;
+                count += 1;
+              }
+            });
+            summaryRaw = count > 0 ? sum : undefined;
+            break;
+          }
+          case 'avg': {
+            const values: number[] = [];
+            rows.forEach(row => {
+              const raw = resolveAccrualValue(row, descriptor);
+              if (typeof raw === 'number' && Number.isFinite(raw)) {
+                values.push(raw);
+              }
+            });
+            if (values.length) {
+              summaryRaw = values.reduce((acc, value) => acc + value, 0) / values.length;
+            }
+            break;
+          }
+          case 'last': {
+            summaryRaw = resolveAccrualValue(rows[rows.length - 1], descriptor);
+            break;
+          }
+          default:
+            summaryRaw = undefined;
+        }
+
+        const { value, type } = formatCellValue(summaryRaw, descriptor);
+        const summaryFormat = {
+          ...SUMMARY_VALUE_BASE_FORMAT,
+          ...buildSummaryFormat(descriptor)
+        };
+
+        sheet.setCell(summaryRowIndex, colIndex, value, {
+          type,
+          format: summaryFormat
+        });
+      });
+    }
   }
 
   /**

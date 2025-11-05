@@ -18,14 +18,27 @@ import type { LoanContract, LoanContractInput } from './loan-types';
 import { INTEREST_TEMPLATES } from './loan-templates';
 import { LoanFXIntegration } from './loan-fx-integration';
 import { LoanScheduler } from './loan-scheduler';
+import type { AccrualRow } from './loan-scheduler';
 import { LoanCalculator } from './loan-calculator';
 import { LoanValidator } from './loan-validator';
 import { LoanPaymentManager, type LoanPayment, type LoanLedgerEntry } from './loan-payment-manager';
 import { LoanSheets } from './loan-sheets';
 import { LoanWizard } from './loan-wizard';
 import { LoanDashboard } from './loan-dashboard';
+import { LoanContractInspector } from './loan-contract-inspector';
 import { LoanIndexerService } from './loan-indexer-service';
 import { LoanAccrualHistory } from './loan-accrual-history';
+import {
+  resolveAccrualValue,
+  type AccrualSheetOptions,
+  type AccrualSheetViewConfig,
+  type AccrualSheetMetadataEntry
+} from './loan-accrual-view';
+import {
+  LoanAccrualCustomizer,
+  type AccrualViewProfile
+} from './loan-accrual-customizer';
+import { LoanReportManager } from './loan-report-manager';
 
 /**
  * Plugin principal para Gestão de Empréstimos.
@@ -58,7 +71,10 @@ export class LoanPlugin implements Plugin {
   private accrualHistory!: LoanAccrualHistory;
   private sheets!: LoanSheets;
   private dashboard?: LoanDashboard;
+  private contractInspector?: LoanContractInspector;
   private activeWizard?: LoanWizard;
+  private accrualCustomizer!: LoanAccrualCustomizer;
+  private reportManager!: LoanReportManager;
   private autosaveHandler = async (): Promise<void> => {
     await this.saveContracts();
     await this.savePayments();
@@ -83,6 +99,37 @@ export class LoanPlugin implements Plugin {
       this.scheduler = new LoanScheduler(this.fxIntegration, this.indexerService, this.paymentManager);
       this.sheets = new LoanSheets(context);
       this.dashboard = new LoanDashboard(context);
+      this.contractInspector = new LoanContractInspector(
+        context,
+        (id) => this.contracts.get(id),
+        this.paymentManager,
+        this.accrualHistory,
+        {
+          openPayment: (contractId) => this.showPaymentModal(contractId),
+          generateAccrual: async (contractId) => this.generateAccrualFromDashboard(contractId),
+          generateSchedule: async (contractId) => this.generateScheduleFromDashboard(contractId),
+          openReports: (contractId) => this.openReportsForContract(contractId)
+        }
+      );
+      this.accrualCustomizer = new LoanAccrualCustomizer(context);
+      await this.accrualCustomizer.init();
+
+      // Inicializa sistema de relatórios
+      this.reportManager = new LoanReportManager(context, this.scheduler, this.sheets);
+      await this.reportManager.init();
+      this.dashboard?.registerHandlers({
+        showReportsMenu: (contracts) => this.reportManager.showReportSelector(contracts),
+        registerPayment: (contractId) => this.showPaymentModal(contractId),
+        quickReport: async (type, contracts) => {
+          await this.reportManager.quickReport(type, contracts);
+        },
+        createTemplate: () => {
+          this.reportManager.createNewTemplate();
+        },
+        openContract: (contractId) => {
+          this.contractInspector?.open(contractId);
+        }
+      });
 
       logger.info(`[LoanPlugin] ${Object.keys(INTEREST_TEMPLATES).length} templates carregados`);
 
@@ -305,6 +352,40 @@ export class LoanPlugin implements Plugin {
       }
     );
 
+    // LOAN.ACCRUAL.VIEW(viewId, [contractId])
+    registry.register(
+      'LOAN.ACCRUAL.VIEW',
+      async (viewId: string, contractId?: string) => {
+        const normalizedView = (viewId || '').toString().trim();
+        const normalizedContract = contractId ? contractId.toString().trim() : undefined;
+
+        if (!normalizedView) {
+          return '#N/A';
+        }
+
+        const success = await this.accrualCustomizer.setActiveView(normalizedView, normalizedContract);
+        return success ? normalizedView : '#N/A';
+      },
+      {
+        argCount: -1,
+        description: 'Define o layout do ACCRUAL (global ou por contrato)',
+        async: true
+      }
+    );
+
+    // LOAN.ACCRUAL.VIEWS()
+    registry.register(
+      'LOAN.ACCRUAL.VIEWS',
+      () => {
+        const profiles = this.accrualCustomizer.listProfiles();
+        return profiles.map(profile => [profile.id, profile.name, profile.description || '']);
+      },
+      {
+        argCount: 0,
+        description: 'Lista layouts de ACCRUAL disponíveis'
+      }
+    );
+
     // LOAN.SCHEDULE(contractId)
     registry.register(
       'LOAN.SCHEDULE',
@@ -399,6 +480,46 @@ export class LoanPlugin implements Plugin {
       onClick: () => this.showAccrualWizard()
     });
 
+    // Submenu: Relatórios Avançados (NOVO)
+    this.context.ui.addMenuItem({
+      id: 'loan-reports',
+      label: '📊 Relatórios Avançados',
+      parent: 'loan-menu',
+      onClick: () => this.showReportsMenu()
+    });
+
+    // Submenu: Relatório Rápido - Juros
+    this.context.ui.addMenuItem({
+      id: 'loan-quick-interest',
+      label: '💰 Análise de Juros',
+      parent: 'loan-reports',
+      onClick: () => this.quickReport('interest')
+    });
+
+    // Submenu: Relatório Rápido - Principal
+    this.context.ui.addMenuItem({
+      id: 'loan-quick-principal',
+      label: '📊 Análise de Principal',
+      parent: 'loan-reports',
+      onClick: () => this.quickReport('principal')
+    });
+
+    // Submenu: Relatório Rápido - Consolidado
+    this.context.ui.addMenuItem({
+      id: 'loan-quick-consolidated',
+      label: '📋 Visão Consolidada',
+      parent: 'loan-reports',
+      onClick: () => this.quickReport('consolidated')
+    });
+
+    // Submenu: Criar Relatório Personalizado
+    this.context.ui.addMenuItem({
+      id: 'loan-custom-report',
+      label: '🎨 Criar Relatório Personalizado',
+      parent: 'loan-reports',
+      onClick: () => this.reportManager.createNewTemplate()
+    });
+
     // Submenu: Sincronizar PTAX
     this.context.ui.addMenuItem({
       id: 'loan-sync-ptax',
@@ -434,6 +555,54 @@ export class LoanPlugin implements Plugin {
    */
   private setupEventListeners(): void {
     this.context.events.on('kernel:autosave-done', this.autosaveHandler);
+
+    // Eventos do sistema de relatórios
+    this.context.events.on('loan:show-reports-menu', (data: any) => {
+      if (data?.contracts) {
+        this.reportManager.showReportSelector(data.contracts);
+      }
+    });
+
+    this.context.events.on('loan:quick-report', async (data: any) => {
+      if (data?.type && data?.contracts) {
+        await this.reportManager.quickReport(data.type, data.contracts);
+      }
+    });
+
+    this.context.events.on('loan:create-template', () => {
+      this.reportManager.createNewTemplate();
+    });
+
+    this.context.events.on('loan:dashboard:open-contract', (data: any) => {
+      if (data?.contractId) {
+        this.contractInspector?.open(data.contractId);
+      }
+    });
+
+    this.context.events.on('loan:dashboard:register-payment', (data: any) => {
+      const contractId = typeof data?.contractId === 'string' ? data.contractId : undefined;
+      this.showPaymentModal(contractId);
+    });
+
+    this.context.events.on('loan:dashboard:generate-accrual', async (data: any) => {
+      const contractId = data?.contractId;
+      if (typeof contractId === 'string') {
+        await this.generateAccrualFromDashboard(contractId);
+      }
+    });
+
+    this.context.events.on('loan:dashboard:generate-schedule', async (data: any) => {
+      const contractId = data?.contractId;
+      if (typeof contractId === 'string') {
+        await this.generateScheduleFromDashboard(contractId);
+      }
+    });
+
+    this.context.events.on('loan:dashboard:open-reports', (data: any) => {
+      if (typeof data?.contractId === 'string') {
+        this.openReportsForContract(data.contractId);
+      }
+    });
   }
 
   /**
@@ -820,18 +989,33 @@ export class LoanPlugin implements Plugin {
   /**
    * Modal: Registrar Pagamento.
    */
-  private showPaymentModal(): void {
-    const activeContracts = Array.from(this.contracts.values()).filter(c => c.status === 'ATIVO');
-    if (activeContracts.length === 0) {
-      this.context.ui.showToast('Nenhum contrato ativo encontrado.', 'warning');
+  private showPaymentModal(presetContractId?: string): void {
+    const selectable = new Map<string, LoanContract>();
+    this.contracts.forEach(contract => {
+      if (contract.status === 'ATIVO') {
+        selectable.set(contract.id, contract);
+      }
+    });
+
+    if (presetContractId) {
+      const preset = this.contracts.get(presetContractId);
+      if (preset) {
+        selectable.set(preset.id, preset);
+      }
+    }
+
+    if (selectable.size === 0) {
+      this.context.ui.showToast('Nenhum contrato disponível para pagamento.', 'warning');
       return;
     }
 
     const modalId = 'loan-payment-modal';
     document.getElementById(modalId)?.remove();
 
+    const sortedContracts = Array.from(selectable.values()).sort((a, b) => a.id.localeCompare(b.id));
     const defaultDate = new Date().toISOString().split('T')[0];
-    const optionsHTML = activeContracts.map(contract => `
+    const optionsHTML = sortedContracts
+      .map(contract => `
       <option value="${contract.id}">
         ${contract.id} · ${contract.counterparty} (${contract.currency})
       </option>
@@ -939,12 +1123,17 @@ export class LoanPlugin implements Plugin {
     const closeModal = () => document.getElementById(modalId)?.remove();
     document.getElementById('loan-payment-cancel')?.addEventListener('click', () => closeModal());
 
-    // Se houver apenas um contrato ativo, selecionar e mostrar saldo automaticamente
-    if (activeContracts.length === 1) {
-      const contractSelect = document.getElementById('loan-payment-contract') as HTMLSelectElement;
-      if (contractSelect) {
-        contractSelect.value = activeContracts[0].id;
-        this.updatePaymentModalBalance(activeContracts[0].id);
+    const contractSelect = document.getElementById('loan-payment-contract') as HTMLSelectElement | null;
+    if (contractSelect) {
+      if (presetContractId && selectable.has(presetContractId)) {
+        contractSelect.value = presetContractId;
+        this.updatePaymentModalBalance(presetContractId);
+        this.updatePaymentSimulation();
+      } else if (sortedContracts.length === 1) {
+        const onlyContractId = sortedContracts[0].id;
+        contractSelect.value = onlyContractId;
+        this.updatePaymentModalBalance(onlyContractId);
+        this.updatePaymentSimulation();
       }
     }
 
@@ -952,6 +1141,7 @@ export class LoanPlugin implements Plugin {
     document.getElementById('loan-payment-contract')?.addEventListener('change', (e) => {
       const contractId = (e.target as HTMLSelectElement).value;
       this.updatePaymentModalBalance(contractId);
+      this.updatePaymentSimulation();
     });
 
     // Event listeners para atualização da simulação
@@ -1214,10 +1404,39 @@ export class LoanPlugin implements Plugin {
     this.activeWizard = undefined;
     this.dashboard?.dispose();
     this.dashboard = undefined;
+  this.contractInspector?.dispose();
+  this.contractInspector = undefined;
+    this.reportManager?.dispose();
 
     await this.saveContracts();
     await this.savePayments();
     logger.info('[LoanPlugin] Desativado');
+  }
+
+  /**
+   * Mostra menu de relatórios
+   */
+  private showReportsMenu(): void {
+    if (this.contracts.size === 0) {
+      this.context.ui.showToast('Nenhum contrato cadastrado.', 'warning');
+      return;
+    }
+
+    const contracts = Array.from(this.contracts.values());
+    this.reportManager.showReportSelector(contracts);
+  }
+
+  /**
+   * Gera relatório rápido
+   */
+  private async quickReport(type: 'interest' | 'principal' | 'consolidated'): Promise<void> {
+    if (this.contracts.size === 0) {
+      this.context.ui.showToast('Nenhum contrato cadastrado.', 'warning');
+      return;
+    }
+
+    const contracts = Array.from(this.contracts.values());
+    await this.reportManager.quickReport(type, contracts);
   }
 
   /**
@@ -1229,6 +1448,67 @@ export class LoanPlugin implements Plugin {
     } else {
       this.context.ui.showToast('Dashboard não disponível', 'warning');
     }
+  }
+
+  private async generateAccrualFromDashboard(contractId: string): Promise<void> {
+    const contract = this.contracts.get(contractId);
+    if (!contract) {
+      this.context.ui.showToast(`Contrato ${contractId} não encontrado.`, 'error');
+      return;
+    }
+
+    try {
+      const end = new Date();
+      const start = new Date(end.getTime() - 30 * 24 * 60 * 60 * 1000);
+      const format = (date: Date) => date.toISOString().split('T')[0];
+
+      const rows = await this.generateAccrualSheet(contractId, format(start), format(end), 'Mensal', false);
+      await this.saveAccrualHistory();
+      this.context.ui.showToast(`✅ ACCRUAL (${rows} linhas) gerado para ${contractId}`, 'success');
+    } catch (error) {
+      logger.error('[LoanPlugin] Erro ao gerar ACCRUAL via dashboard:', error);
+      this.context.ui.showToast('❌ Erro ao gerar ACCRUAL. Verifique o console.', 'error');
+    }
+  }
+
+  private async generateScheduleFromDashboard(contractId: string): Promise<void> {
+    const contract = this.contracts.get(contractId);
+    if (!contract) {
+      this.context.ui.showToast(`Contrato ${contractId} não encontrado.`, 'error');
+      return;
+    }
+
+    if (contract.paymentFlow.type !== 'SCHEDULED' || !contract.paymentFlow.scheduled) {
+      this.context.ui.showToast('Contrato não possui cronograma automático.', 'warning');
+      return;
+    }
+
+    try {
+      const rows = await this.generateScheduleSheet(contractId);
+      if (rows === 0) {
+        this.context.ui.showToast('Cronograma não gerou novas linhas.', 'warning');
+      } else {
+        this.context.ui.showToast(`✅ Cronograma atualizado com ${rows} parcelas`, 'success');
+      }
+    } catch (error) {
+      logger.error('[LoanPlugin] Erro ao gerar cronograma via dashboard:', error);
+      this.context.ui.showToast('❌ Erro ao gerar cronograma. Verifique o console.', 'error');
+    }
+  }
+
+  private openReportsForContract(contractId: string): void {
+    const contract = this.contracts.get(contractId);
+    if (!contract) {
+      this.context.ui.showToast(`Contrato ${contractId} não encontrado.`, 'error');
+      return;
+    }
+
+    if (!this.reportManager) {
+      this.context.ui.showToast('Gerenciador de relatórios não inicializado.', 'error');
+      return;
+    }
+
+    this.reportManager.showReportSelector([contract]);
   }
 
   private async populateNextPaymentSnapshot(contract: LoanContract): Promise<void> {
@@ -1323,7 +1603,10 @@ export class LoanPlugin implements Plugin {
     }
 
     const period = `${startDate}_${endDate}`;
-    this.sheets.createAccrualSheet(contractId, period, accrualRows);
+    const { options: sheetOptions, profile, view } = this.getAccrualSheetContext(contract, startDate, endDate);
+    this.sheets.createAccrualSheet(contractId, period, accrualRows, sheetOptions);
+
+    this.publishAccrualPivotDataset(contract, startDate, endDate, accrualRows, view, profile);
     return accrualRows.length;
   }
 
@@ -1525,5 +1808,110 @@ export class LoanPlugin implements Plugin {
       newBalanceOrigin,
       ptaxInfo
     };
+  }
+
+  private getAccrualSheetContext(
+    contract: LoanContract,
+    startDate: string,
+    endDate: string
+  ): {
+    options: AccrualSheetOptions;
+    profile: AccrualViewProfile;
+    view: AccrualSheetViewConfig;
+  } {
+    const { profile, view } = this.accrualCustomizer.resolveView(contract.id);
+
+    const metadata: AccrualSheetMetadataEntry[] = [];
+    metadata.push({ label: 'Moeda', value: contract.currency });
+
+    if (contract.contractFXRate) {
+      metadata.push({ label: 'FX Contrato', value: contract.contractFXRate.toFixed(6) });
+    }
+
+    metadata.push({ label: 'Status', value: contract.status });
+    metadata.push({ label: 'Apuração', value: `${startDate} → ${endDate}` });
+    metadata.push({ label: 'Layout', value: `${profile.name} (${profile.id})` });
+
+    return {
+      options: {
+        view,
+        includeSummary: true,
+        metadata
+      },
+      profile,
+      view
+    };
+  }
+
+  private publishAccrualPivotDataset(
+    contract: LoanContract,
+    startDate: string,
+    endDate: string,
+    rows: AccrualRow[],
+    view: AccrualSheetViewConfig,
+    profile: AccrualViewProfile
+  ): void {
+    const events = this.context?.events;
+    if (!events || typeof events.emit !== 'function' || rows.length === 0) {
+      return;
+    }
+
+    try {
+      const columnDescriptors = view.sections.flatMap(section => section.columns);
+
+      type PivotColumn = { id: string; label: string; type: 'string' | 'number' | 'date' };
+
+      const pivotColumns: PivotColumn[] = [
+        { id: 'contractId', label: 'Contrato', type: 'string' },
+        { id: 'contractCurrency', label: 'Moeda Contrato', type: 'string' },
+        { id: 'periodStart', label: 'Início Período', type: 'date' },
+        { id: 'periodEnd', label: 'Fim Período', type: 'date' },
+        { id: 'accrualDate', label: 'Data ACCRUAL', type: 'date' }
+      ];
+
+      columnDescriptors.forEach((descriptor, index) => {
+        const columnId = descriptor.pivotKey || descriptor.id || descriptor.field || `col_${index}`;
+        pivotColumns.push({
+          id: columnId,
+          label: descriptor.label,
+          type: descriptor.type
+        });
+      });
+
+      const datasetRows = rows.map(row => {
+        const record: Record<string, any> = {
+          contractId: contract.id,
+          contractCurrency: contract.currency,
+          periodStart: startDate,
+          periodEnd: endDate,
+          accrualDate: row.date
+        };
+
+        columnDescriptors.forEach((descriptor, index) => {
+          const columnId = descriptor.pivotKey || descriptor.id || descriptor.field || `col_${index}`;
+          record[columnId] = resolveAccrualValue(row, descriptor);
+        });
+
+        return record;
+      });
+
+      events.emit('pivot:registerSource', {
+        sourceId: `loan-accrual:${contract.id}:${startDate}:${endDate}`,
+        plugin: this.manifest.id,
+        columns: pivotColumns,
+        rows: datasetRows,
+        metadata: {
+          contractId: contract.id,
+          currency: contract.currency,
+          startDate,
+          endDate,
+          viewId: view.id,
+          viewName: profile.name,
+          title: view.title ?? profile.name ?? 'Accrual'
+        }
+      });
+    } catch (error) {
+      logger.warn('[LoanPlugin] Falha ao registrar dataset de ACCRUAL para Pivot', error);
+    }
   }
 }

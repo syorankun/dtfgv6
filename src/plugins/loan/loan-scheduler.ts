@@ -123,6 +123,8 @@ export class LoanScheduler {
     }
 
     // Variáveis para acumular juros ao longo do período
+    // Mantém o total acumulado de juros através de todos os períodos
+    // para rastreamento de juros acumulados (accumulated interest tracking)
     let accruedInterestOrigin = 0;
     let accruedInterestBRLContract = 0;
     let accruedInterestBRLPTAX = 0;
@@ -205,7 +207,9 @@ export class LoanScheduler {
           : 0;
       }
 
-      // Acumula juros
+      // Acumula juros progressivamente antes de criar a linha
+      // Cada linha conterá o total acumulado incluindo os juros do período atual
+      // Isso garante que o usuário veja a evolução cumulativa dos juros ao longo do tempo
       accruedInterestOrigin += interestOrigin;
       accruedInterestBRLContract += interestBRLContract;
       accruedInterestBRLPTAX += interestBRLPTAX;

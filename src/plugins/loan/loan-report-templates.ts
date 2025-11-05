@@ -425,6 +425,18 @@ export const CONSOLIDATED_TEMPLATE: AccrualSheetViewConfig = {
           summaryFormat: { bold: true, bgColor: '#D1FAE5' }
         },
         {
+          id: 'accrued_brl',
+          pivotKey: 'accruedBRL',
+          field: 'accruedInterestBRLPTAX',
+          label: 'Juros Acumulados (BRL)',
+          type: 'number',
+          decimals: 2,
+          width: 160,
+          summary: 'last',
+          format: { alignment: 'right', textColor: '#059669' },
+          summaryFormat: { bold: true, bgColor: '#D1FAE5' }
+        },
+        {
           id: 'eff_rate',
           pivotKey: 'effectiveRate',
           field: 'effRate',
@@ -617,6 +629,18 @@ export const EXECUTIVE_SUMMARY_TEMPLATE: AccrualSheetViewConfig = {
           decimals: 2,
           width: 130,
           summary: 'sum',
+          format: { alignment: 'right', textColor: '#059669' },
+          summaryFormat: { bold: true, bgColor: '#D1FAE5' }
+        },
+        {
+          id: 'accrued',
+          pivotKey: 'accrued',
+          field: 'accruedInterestBRLPTAX',
+          label: 'Juros Acum. (BRL)',
+          type: 'number',
+          decimals: 2,
+          width: 150,
+          summary: 'last',
           format: { alignment: 'right', textColor: '#059669' },
           summaryFormat: { bold: true, bgColor: '#D1FAE5' }
         },

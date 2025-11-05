@@ -65,6 +65,18 @@ export const INTEREST_ANALYSIS_TEMPLATE: AccrualSheetViewConfig = {
           summaryFormat: { bold: true, bgColor: '#D1FAE5' }
         },
         {
+          id: 'accrued_origin',
+          pivotKey: 'accruedOrigin',
+          field: 'accruedInterestOrigin',
+          label: 'Juros Acumulados',
+          type: 'number',
+          decimals: 4,
+          width: 160,
+          summary: 'last',
+          format: { alignment: 'right', textColor: '#059669' },
+          summaryFormat: { bold: true, bgColor: '#D1FAE5' }
+        },
+        {
           id: 'eff_rate',
           pivotKey: 'effectiveRate',
           field: 'effRate',
@@ -94,6 +106,18 @@ export const INTEREST_ANALYSIS_TEMPLATE: AccrualSheetViewConfig = {
           summaryFormat: { bold: true, bgColor: '#D1FAE5' }
         },
         {
+          id: 'accrued_contract',
+          pivotKey: 'accruedContractBRL',
+          field: 'accruedInterestBRLContract',
+          label: 'Juros Acum. (Contrato)',
+          type: 'number',
+          decimals: 2,
+          width: 180,
+          summary: 'last',
+          format: { alignment: 'right', textColor: '#059669' },
+          summaryFormat: { bold: true, bgColor: '#D1FAE5' }
+        },
+        {
           id: 'interest_ptax',
           pivotKey: 'interestPTAXBRL',
           field: 'interestBRLPTAX',
@@ -102,6 +126,18 @@ export const INTEREST_ANALYSIS_TEMPLATE: AccrualSheetViewConfig = {
           decimals: 2,
           width: 160,
           summary: 'sum',
+          format: { alignment: 'right', textColor: '#059669' },
+          summaryFormat: { bold: true, bgColor: '#D1FAE5' }
+        },
+        {
+          id: 'accrued_ptax',
+          pivotKey: 'accruedPTAXBRL',
+          field: 'accruedInterestBRLPTAX',
+          label: 'Juros Acum. (PTAX)',
+          type: 'number',
+          decimals: 2,
+          width: 180,
+          summary: 'last',
           format: { alignment: 'right', textColor: '#059669' },
           summaryFormat: { bold: true, bgColor: '#D1FAE5' }
         },

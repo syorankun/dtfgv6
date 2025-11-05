@@ -37,6 +37,10 @@ export interface AccrualRow {
   // Variação cambial (diferença entre PTAX e Contrato)
   fxVariationBRL: number;              // Variação sobre saldo de abertura
   fxVariationPercent: number;          // Variação % (PTAX vs Contrato)
+  // Juros acumulados (somatória acumulada de juros)
+  accruedInterestOrigin: number;       // Juros acumulados na moeda de origem
+  accruedInterestBRLContract: number;  // Juros acumulados em BRL (taxa contrato)
+  accruedInterestBRLPTAX: number;      // Juros acumulados em BRL (PTAX)
   
   // DEPRECATED (mantidos por compatibilidade)
   openingBalanceBRL: number;
@@ -118,6 +122,11 @@ export class LoanScheduler {
       logger.warn(`[LoanScheduler] Usando saldo atual como fallback para ${startDate}`);
     }
 
+    // Variáveis para acumular juros ao longo do período
+    let accruedInterestOrigin = 0;
+    let accruedInterestBRLContract = 0;
+    let accruedInterestBRLPTAX = 0;
+
     while (currentDate <= finalDate) {
       const dateStr = currentDate.toISOString().split('T')[0];
 
@@ -196,6 +205,11 @@ export class LoanScheduler {
           : 0;
       }
 
+      // Acumula juros
+      accruedInterestOrigin += interestOrigin;
+      accruedInterestBRLContract += interestBRLContract;
+      accruedInterestBRLPTAX += interestBRLPTAX;
+
       const newRow: AccrualRow = {
         date: nextDateStr,
         days,
@@ -217,6 +231,10 @@ export class LoanScheduler {
         // Variação cambial
         fxVariationBRL,
         fxVariationPercent,
+        // Juros acumulados (somatória acumulada)
+        accruedInterestOrigin: LoanCalculator.round(accruedInterestOrigin, 4),
+        accruedInterestBRLContract: LoanCalculator.round(accruedInterestBRLContract, 2),
+        accruedInterestBRLPTAX: LoanCalculator.round(accruedInterestBRLPTAX, 2),
         // Compatibilidade (usa valores PTAX como padrão)
         openingBalanceBRL: openingBalanceBRLPTAX,
         interestBRL: interestBRLPTAX,

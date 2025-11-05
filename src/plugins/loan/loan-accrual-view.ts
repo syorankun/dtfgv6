@@ -114,6 +114,17 @@ export const DEFAULT_ACCRUAL_VIEW: AccrualSheetViewConfig = {
           format: { alignment: 'right' }
         },
         {
+          id: 'origin_accrued',
+          pivotKey: 'originAccrued',
+          field: 'accruedInterestOrigin',
+          label: 'Juros Acumulados',
+          type: 'number',
+          decimals: 4,
+          summary: 'last',
+          width: 150,
+          format: { alignment: 'right' }
+        },
+        {
           id: 'origin_closing',
           pivotKey: 'originClosing',
           field: 'closingBalanceOrigin',
@@ -150,6 +161,17 @@ export const DEFAULT_ACCRUAL_VIEW: AccrualSheetViewConfig = {
           decimals: 2,
           summary: 'sum',
           width: 120,
+          format: { alignment: 'right' }
+        },
+        {
+          id: 'contract_accrued',
+          pivotKey: 'contractAccruedBRL',
+          field: 'accruedInterestBRLContract',
+          label: 'Juros Acumulados',
+          type: 'number',
+          decimals: 2,
+          summary: 'last',
+          width: 150,
           format: { alignment: 'right' }
         },
         {
@@ -200,6 +222,17 @@ export const DEFAULT_ACCRUAL_VIEW: AccrualSheetViewConfig = {
           decimals: 2,
           summary: 'sum',
           width: 120,
+          format: { alignment: 'right' }
+        },
+        {
+          id: 'ptax_accrued',
+          pivotKey: 'ptaxAccruedBRL',
+          field: 'accruedInterestBRLPTAX',
+          label: 'Juros Acumulados',
+          type: 'number',
+          decimals: 2,
+          summary: 'last',
+          width: 150,
           format: { alignment: 'right' }
         },
         {
@@ -341,6 +374,17 @@ export const FX_VARIATION_FOCUS_VIEW: AccrualSheetViewConfig = {
           format: { alignment: 'right' }
         },
         {
+          id: 'fxv_accrued_contract',
+          field: 'accruedInterestBRLContract',
+          pivotKey: 'accruedContractBRL',
+          label: 'Juros Acum. (Contrato)',
+          type: 'number',
+          decimals: 2,
+          summary: 'last',
+          width: 170,
+          format: { alignment: 'right' }
+        },
+        {
           id: 'fxv_interest_ptax',
           field: 'interestBRLPTAX',
           pivotKey: 'interestPTAXBRL',
@@ -349,6 +393,17 @@ export const FX_VARIATION_FOCUS_VIEW: AccrualSheetViewConfig = {
           decimals: 2,
           summary: 'sum',
           width: 150,
+          format: { alignment: 'right' }
+        },
+        {
+          id: 'fxv_accrued_ptax',
+          field: 'accruedInterestBRLPTAX',
+          pivotKey: 'accruedPTAXBRL',
+          label: 'Juros Acum. (PTAX)',
+          type: 'number',
+          decimals: 2,
+          summary: 'last',
+          width: 170,
           format: { alignment: 'right' }
         },
         {

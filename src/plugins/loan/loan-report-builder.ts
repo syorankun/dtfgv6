@@ -41,17 +41,20 @@ export const AVAILABLE_FIELDS: ColumnFieldOption[] = [
   // Origem
   { field: 'openingBalanceOrigin', label: 'Saldo Inicial (Origem)', category: 'Moeda Origem', type: 'number', defaultDecimals: 4 },
   { field: 'interestOrigin', label: 'Juros (Origem)', category: 'Moeda Origem', type: 'number', defaultDecimals: 4 },
+  { field: 'accruedInterestOrigin', label: 'Juros Acumulados (Origem)', category: 'Moeda Origem', type: 'number', defaultDecimals: 4 },
   { field: 'closingBalanceOrigin', label: 'Saldo Final (Origem)', category: 'Moeda Origem', type: 'number', defaultDecimals: 4 },
 
   // BRL Contrato
   { field: 'openingBalanceBRLContract', label: 'Saldo Inicial BRL (Contrato)', category: 'BRL Contrato', type: 'number', defaultDecimals: 2 },
   { field: 'interestBRLContract', label: 'Juros BRL (Contrato)', category: 'BRL Contrato', type: 'number', defaultDecimals: 2 },
+  { field: 'accruedInterestBRLContract', label: 'Juros Acumulados BRL (Contrato)', category: 'BRL Contrato', type: 'number', defaultDecimals: 2 },
   { field: 'closingBalanceBRLContract', label: 'Saldo Final BRL (Contrato)', category: 'BRL Contrato', type: 'number', defaultDecimals: 2 },
   { field: 'fxRateContract', label: 'FX Contrato', category: 'BRL Contrato', type: 'number', defaultDecimals: 6 },
 
   // BRL PTAX
   { field: 'openingBalanceBRLPTAX', label: 'Saldo Inicial BRL (PTAX)', category: 'BRL PTAX', type: 'number', defaultDecimals: 2 },
   { field: 'interestBRLPTAX', label: 'Juros BRL (PTAX)', category: 'BRL PTAX', type: 'number', defaultDecimals: 2 },
+  { field: 'accruedInterestBRLPTAX', label: 'Juros Acumulados BRL (PTAX)', category: 'BRL PTAX', type: 'number', defaultDecimals: 2 },
   { field: 'closingBalanceBRLPTAX', label: 'Saldo Final BRL (PTAX)', category: 'BRL PTAX', type: 'number', defaultDecimals: 2 },
   { field: 'fxRatePTAX', label: 'FX PTAX', category: 'BRL PTAX', type: 'number', defaultDecimals: 6 },
   { field: 'fxSourcePTAX', label: 'Fonte PTAX', category: 'BRL PTAX', type: 'string' },

@@ -852,15 +852,15 @@ export class UIManager {
         switch (format.toLowerCase()) {
           case 'csv':
             blob = FileWriter.exportCSV(sheet);
-            fileName = `${wb.name}_${sheet.name}.csv`;
+            fileName = FileWriter.sanitizeFileName(`${wb.name}_${sheet.name}`) + '.csv';
             break;
           case 'xlsx':
             blob = FileWriter.exportXLSX(wb);
-            fileName = `${wb.name}.xlsx`;
+            fileName = FileWriter.sanitizeFileName(`${wb.name}`) + '.xlsx';
             break;
           case 'json':
             blob = FileWriter.exportJSON(sheet);
-            fileName = `${wb.name}_${sheet.name}.json`;
+            fileName = FileWriter.sanitizeFileName(`${wb.name}_${sheet.name}`) + '.json';
             break;
           default:
             return;

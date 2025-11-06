@@ -238,6 +238,10 @@ export class LoanPaymentManager {
     return this.payments.get(contractId) || [];
   }
 
+  public getPaymentsForContract(contractId: string): LoanPayment[] {
+    return this.payments.get(contractId) || [];
+  }
+
   /**
    * Calcula total de pagamentos realizados em um contrato.
    */

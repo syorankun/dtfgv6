@@ -872,11 +872,11 @@ export class LoanWizard {
                 } as InterestLeg;
               });
             } else {
-              // Template CUSTOM
+              // Template CUSTOM - usa FIXED como padrão
+              // FIXED não usa baseRateAnnual, a taxa é o spreadAnnual
               this.formData.interestConfig.legs = [{
                 indexer: 'FIXED',
                 indexerPercent: 100,
-                baseRateAnnual: undefined,
                 spreadAnnual: 8.5,
                 role: 'RATE'
               }];

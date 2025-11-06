@@ -1,0 +1,104 @@
+<!-- ============================================================================
+  CustomUI XML - Ribbon Customizada para Loan Manager
+  ============================================================================
+
+  INSTRUÇÕES PARA ADICIONAR AO .XLAM:
+
+  1. Salve seu arquivo como .xlam
+  2. Feche o Excel
+  3. Renomeie .xlam para .zip
+  4. Extraia o conteúdo
+  5. Crie a pasta: customUI (na raiz)
+  6. Salve este arquivo como: customUI/customUI14.xml
+  7. Edite o arquivo [Content_Types].xml e adicione:
+     <Default Extension="xml" ContentType="application/xml"/>
+  8. Edite o arquivo _rels/.rels e adicione:
+     <Relationship Id="customUIRelID" Type="http://schemas.microsoft.com/office/2006/relationships/ui/extensibility" Target="customUI/customUI14.xml"/>
+  9. Recompacte tudo em .zip
+  10. Renomeie .zip para .xlam
+
+  ALTERNATIVA MAIS SIMPLES:
+  Use a ferramenta "Custom UI Editor" (download gratuito):
+  https://github.com/fernandreu/office-custom-ui-editor/releases
+
+  Com a ferramenta:
+  1. Abra seu .xlam
+  2. Insert → Office 2010+ Custom UI Part
+  3. Cole este código XML
+  4. Salve
+
+  ============================================================================ -->
+
+<customUI xmlns="http://schemas.microsoft.com/office/2009/07/customui" onLoad="RibbonCallbacks.OnRibbonLoad">
+  <ribbon>
+    <tabs>
+      <!-- Nova aba "Empréstimos" -->
+      <tab id="tabLoanManager" label="Empréstimos">
+
+        <!-- Grupo: Contratos -->
+        <group id="grpContratos" label="Contratos">
+          <button id="btnNovoContrato"
+                  label="Novo Contrato"
+                  size="large"
+                  imageMso="CreateClassModule"
+                  onAction="RibbonCallbacks.OnNovoContratoClick" />
+
+          <button id="btnDashboard"
+                  label="Dashboard"
+                  size="large"
+                  imageMso="MacroPlay"
+                  onAction="RibbonCallbacks.OnDashboardClick" />
+        </group>
+
+        <!-- Grupo: Cronogramas -->
+        <group id="grpCronogramas" label="Cronogramas">
+          <button id="btnGerarCronograma"
+                  label="Gerar Cronograma"
+                  size="large"
+                  imageMso="TableStyleMedium9"
+                  onAction="RibbonCallbacks.OnGerarCronogramaClick" />
+        </group>
+
+        <!-- Grupo: Pagamentos -->
+        <group id="grpPagamentos" label="Pagamentos">
+          <button id="btnRegistrarPagamento"
+                  label="Registrar Pagamento"
+                  size="large"
+                  imageMso="CreatePaymentReceipt"
+                  onAction="RibbonCallbacks.OnRegistrarPagamentoClick" />
+        </group>
+
+        <!-- Grupo: Ferramentas -->
+        <group id="grpFerramentas" label="Ferramentas">
+          <button id="btnAbrirContratos"
+                  label="Abrir Contratos"
+                  size="normal"
+                  imageMso="FileOpen"
+                  onAction="RibbonCallbacks.OnAbrirContratosClick" />
+
+          <button id="btnAtualizar"
+                  label="Atualizar"
+                  size="normal"
+                  imageMso="Refresh"
+                  onAction="RibbonCallbacks.OnAtualizarClick" />
+        </group>
+
+        <!-- Grupo: Ajuda -->
+        <group id="grpAjuda" label="Ajuda">
+          <button id="btnSobre"
+                  label="Sobre"
+                  size="normal"
+                  imageMso="Info"
+                  onAction="RibbonCallbacks.OnSobreClick" />
+
+          <button id="btnAjuda"
+                  label="Ajuda"
+                  size="normal"
+                  imageMso="Help"
+                  onAction="RibbonCallbacks.OnAjudaClick" />
+        </group>
+
+      </tab>
+    </tabs>
+  </ribbon>
+</customUI>

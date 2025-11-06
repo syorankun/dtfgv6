@@ -5,7 +5,10 @@
       "Bash(tree:*)",
       "Bash(npm run type-check:*)",
       "Bash(find:*)",
-      "Bash(npm run build:*)"
+      "Bash(npm run build:*)",
+      "Bash(chmod:*)",
+      "Bash(./check-reports-system.sh:*)",
+      "Bash(mkdir:*)"
     ],
     "deny": [],
     "ask": []

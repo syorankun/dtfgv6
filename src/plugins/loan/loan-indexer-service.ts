@@ -33,9 +33,22 @@ export class LoanIndexerService {
     try {
       if (leg.indexer === 'PTAX') {
         indexerEffective = await this.computePTAXVariation(contract, leg, startDate, endDate);
-      } else {
-        const baseAnnual = leg.baseRateAnnual ?? (leg.indexer === 'MANUAL' ? leg.spreadAnnual : 0);
+      } else if (leg.indexer === 'FIXED') {
+        // Para taxa FIXED, o spreadAnnual É a taxa fixa total
+        // O indexerEffective fica 0 e o spread será calculado separadamente
+        indexerEffective = 0;
+      } else if (leg.indexer === 'MANUAL') {
+        // Para MANUAL, usa baseRateAnnual se fornecido, senão usa spreadAnnual
+        const baseAnnual = leg.baseRateAnnual ?? leg.spreadAnnual;
         if (baseAnnual > 0) {
+          indexerEffective = LoanCalculator.calculatePeriodicRate(baseAnnual, compounding, dayCount, days);
+        }
+      } else {
+        // Para CDI e outros indexadores, EXIGE baseRateAnnual
+        const baseAnnual = leg.baseRateAnnual;
+        if (baseAnnual == null || baseAnnual === 0) {
+          logger.warn(`[LoanIndexerService] baseRateAnnual não fornecido para indexador ${leg.indexer}. Taxa será 0.`, { leg });
+        } else {
           indexerEffective = LoanCalculator.calculatePeriodicRate(baseAnnual, compounding, dayCount, days);
         }
       }

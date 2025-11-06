@@ -117,6 +117,16 @@ export class LoanValidator {
       errors.push(`${prefix}Taxa base anual do indexador não pode ser negativa`);
     }
 
+    // VALIDAÇÃO CRÍTICA: CDI requer baseRateAnnual
+    if (leg.indexer === 'CDI' && (leg.baseRateAnnual == null || leg.baseRateAnnual === 0)) {
+      errors.push(`${prefix}Indexador CDI requer baseRateAnnual (taxa CDI anual, ex: 13.65)`);
+    }
+
+    // FIXED deve usar apenas spreadAnnual
+    if (leg.indexer === 'FIXED' && leg.spreadAnnual === 0) {
+      errors.push(`${prefix}Taxa FIXED requer spreadAnnual maior que zero`);
+    }
+
     if (!['30/360', 'ACT/365', 'ACT/360', 'BUS/252'].includes(leg.dayCountBasis || '30/360')) {
       errors.push(`${prefix}Convenção de contagem de dias inválida`);
     }

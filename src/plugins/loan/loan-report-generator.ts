@@ -158,36 +158,28 @@ export class LoanReportGenerator {
           request.startDate,
           request.endDate,
           request.frequency,
-          false // showVariation
+          { recalculateWithPayments: request.templateId === 'payment-accrual-view' }
         );
 
-        // Enriquece com pagamentos se for o template de pagamentos e houver paymentManager
         let enrichedRows: AccrualRow[] = rows;
+
         if (request.templateId === 'payment-accrual-view' && this.paymentManager) {
-          logger.info(`[LoanReportGenerator] Enriquecendo com pagamentos para contrato ${contract.id}`);
-          const ledgerEntries = this.paymentManager.getLedger(contract.id);
-          logger.info(`[LoanReportGenerator] Ledger entries encontrados: ${ledgerEntries.length}`);
-          
-          if (ledgerEntries.length > 0) {
-            const enrichedWithPayments = LoanAccrualPaymentEnricher.enrichWithPayments(
-              rows,
-              ledgerEntries,
-              contract.currency
-            );
-            
-            logger.info(`[LoanReportGenerator] Dados enriquecidos. Exemplo primeira linha:`, enrichedWithPayments[0]);
-            
-            // Converte AccrualRowWithPayments de volta para AccrualRow com campos extras
-            enrichedRows = enrichedWithPayments.map(row => ({
-              ...row,
-              // Campos extras são preservados no spread
-            })) as AccrualRow[];
-          } else {
-            logger.warn(`[LoanReportGenerator] Nenhum ledger entry encontrado para ${contract.id}`);
-          }
-        } else {
-          if (request.templateId === 'payment-accrual-view') {
-            logger.warn(`[LoanReportGenerator] PaymentManager não disponível para enriquecer dados`);
+          const firstRow: any = rows[0];
+          const hasPaymentMarkers = firstRow && 'interestPaidBRL' in firstRow;
+
+          if (!hasPaymentMarkers) {
+            const ledgerEntries = this.paymentManager.getLedger(contract.id);
+            if (ledgerEntries.length > 0) {
+              logger.info(`[LoanReportGenerator] Aplicando fallback de enriquecimento por ledger para ${contract.id}`);
+              const enrichedWithPayments = LoanAccrualPaymentEnricher.enrichWithPayments(
+                rows,
+                ledgerEntries,
+                contract.currency
+              );
+              enrichedRows = enrichedWithPayments.map(row => ({
+                ...row
+              })) as AccrualRow[];
+            }
           }
         }
 

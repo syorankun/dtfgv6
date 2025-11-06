@@ -1564,19 +1564,22 @@ export class LoanPlugin implements Plugin {
     startDate: string,
     endDate: string,
     frequency: 'Diário' | 'Mensal' | 'Anual',
-    showVariation: boolean
+    _showVariation: boolean
   ): Promise<number> {
     const contract = this.contracts.get(contractId);
     if (!contract) {
       throw new Error(`Contrato ${contractId} não encontrado`);
     }
 
+    const activeViewId = this.accrualCustomizer.getActiveViewId(contract.id);
+    const includePayments = activeViewId === 'payment-accrual-view';
+
     const accrualRows = await this.scheduler.buildAccrualRows(
       contract,
       startDate,
       endDate,
       frequency,
-      showVariation
+      { recalculateWithPayments: includePayments }
     );
 
     // Record each accrual period in history
@@ -1808,26 +1811,6 @@ export class LoanPlugin implements Plugin {
       newBalanceOrigin,
       ptaxInfo
     };
-  }
-
-  private async renderAccrualSheet(
-    contract: LoanContract,
-    startDate: string,
-    endDate: string,
-    frequency: 'Diário' | 'Mensal' | 'Anual'
-  ): Promise<string> {
-    const rows = await this.scheduler.buildAccrualRows(
-      contract,
-      startDate,
-      endDate,
-      frequency,
-      this.accrualCustomizer.getActiveViewId(contract.id) === 'payment-accrual-view'
-    );
-
-    const { options, profile, view } = this.getAccrualSheetContext(contract, startDate, endDate);
-    const sheet = this.sheetRenderer.render(rows, options);
-    this.publishAccrualPivotDataset(contract, startDate, endDate, rows, view, profile);
-    return sheet;
   }
 
   private getAccrualSheetContext(

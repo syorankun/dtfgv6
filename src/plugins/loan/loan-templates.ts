@@ -11,12 +11,13 @@ export const INTEREST_TEMPLATES: Record<string, InterestTemplate> = {
   /**
    * Template para taxas pós-fixadas baseadas no CDI mais um spread.
    * Exemplo: 110% do CDI + 2.5% ao ano.
+   * IMPORTANTE: baseRateAnnual deve ser fornecida pelo usuário (taxa CDI atual)
    */
   CDI_PLUS: {
     name: 'CDI + Spread',
     description: 'Taxa do CDI + spread fixo (ex: 110% CDI + 2.5% a.a.)',
     legs: [
-      { indexer: 'CDI', indexerPercent: 100, spreadAnnual: 2.5, role: 'RATE' }
+      { indexer: 'CDI', indexerPercent: 100, spreadAnnual: 2.5, baseRateAnnual: 13.65, role: 'RATE' }
     ]
   },
 
@@ -54,7 +55,7 @@ export const INTEREST_TEMPLATES: Record<string, InterestTemplate> = {
     name: 'CDI + PTAX (Duas Pernas)',
     description: 'Composto: CDI + Variação PTAX + spreads',
     legs: [
-      { indexer: 'CDI', indexerPercent: 100, spreadAnnual: 1.5, role: 'RATE' },
+      { indexer: 'CDI', indexerPercent: 100, spreadAnnual: 1.5, baseRateAnnual: 13.65, role: 'RATE' },
       { indexer: 'PTAX', indexerPercent: 100, spreadAnnual: 1.0, ptaxCurrency: 'USD', role: 'ADJUSTMENT' }
     ]
   },

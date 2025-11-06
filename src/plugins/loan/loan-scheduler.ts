@@ -90,16 +90,20 @@ export class LoanScheduler {
    * @param startDate Data de início do período.
    * @param endDate Data de fim do período.
    * @param frequency Frequência de atualização ('Diário', 'Mensal', 'Anual').
-   * @param showPTAXVariation Se true, calcula variação PTAX (Contrato - BCB).
-   * @returns Uma matriz de linhas de ACCRUAL.
+  * @param options Booleano rápido ou objeto de opções. Quando `recalculateWithPayments`
+  *        for verdadeiro, refaz o accrual considerando pagamentos registrados.
+  * @returns Uma matriz de linhas de ACCRUAL.
    */
   public async buildAccrualRows(
     contract: LoanContract,
     startDate: string,
     endDate: string,
     frequency: 'Diário' | 'Mensal' | 'Anual' = 'Diário',
-    recalculateWithPayments: boolean = false
+    options: boolean | { recalculateWithPayments?: boolean } = false
   ): Promise<AccrualRow[]> {
+    const recalculateWithPayments = typeof options === 'boolean'
+      ? options
+      : options?.recalculateWithPayments ?? false;
     logger.info(`[LoanScheduler] Gerando ACCRUAL para ${contract.id} de ${startDate} a ${endDate} (${frequency})`);
 
     const pureAccrualRows = await this.generatePureAccrual(contract, startDate, endDate, frequency);
